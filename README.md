@@ -1,8 +1,8 @@
 # VerifyIQ
 
-VerifyIQ is a Swedish B2B KYC / AML / company verification platform starter monorepo. This repository is being assembled in chunks. This root package contains the shared workspace setup, development orchestration, environment template, and root-level linting / formatting configuration.
+VerifyIQ is a Swedish B2B KYC / AML / company verification platform starter monorepo.
 
-The finished monorepo is designed to include:
+The monorepo includes:
 - a NestJS backend for KYC, AML, company verification, monitoring, documents, reports, and webhooks
 - a Next.js frontend dashboard for compliance operations
 - PostgreSQL for persistence
@@ -10,9 +10,64 @@ The finished monorepo is designed to include:
 - MinIO for local S3-compatible file storage
 - Docker Compose for local development
 
-## Repository Structure
+## Quick start (step by step)
 
-This chunk provides the root files listed below. The backend and frontend package contents are delivered in later chunks.
+> **Windows users:** run the commands below in PowerShell or Git Bash from the root of the repository.
+
+### Option A – Docker Compose (recommended, runs everything automatically)
+
+```bash
+# 1. Copy the environment template
+cp .env.example .env        # PowerShell: Copy-Item .env.example .env
+
+# 2. Edit .env – fill in real secrets (JWT_SECRET, JWT_REFRESH_SECRET, BV_CLIENT_ID, BV_CLIENT_SECRET)
+#    The rest of the defaults work for a local Docker stack.
+
+# 3. Build and start all services (postgres, redis, minio, backend, frontend)
+docker compose up --build
+
+# 4. Run the database migration (once, in a separate terminal)
+docker compose exec backend node -e "const {AppDataSource} = require('./dist/data-source'); AppDataSource.initialize().then(() => AppDataSource.runMigrations()).then(() => process.exit(0));"
+```
+
+Services will be available at:
+- Frontend: <http://localhost:3000>
+- Backend API: <http://localhost:4000/api/v1>
+- MinIO console: <http://localhost:9001> (user: `minioadmin`, password: `minioadmin`)
+
+---
+
+### Option B – Local development (backend + frontend without Docker)
+
+Prerequisites: Node.js ≥ 20, a running PostgreSQL 16 instance, and a running Redis 7 instance.
+
+```bash
+# 1. Copy and edit the environment file
+cp .env.example .env        # PowerShell: Copy-Item .env.example .env
+# Edit .env: set PG_HOST, PG_USER, PG_PASSWORD, PG_DBNAME, REDIS_HOST,
+#            JWT_SECRET, JWT_REFRESH_SECRET, and other required values.
+
+# 2. Install backend dependencies
+cd backend
+npm install
+
+# 3. Build the backend (compiles TypeScript to dist/)
+npm run build
+
+# 4. Start the backend in watch mode
+npm run start:dev
+
+# 5. In a second terminal – install and start the frontend
+cd ../frontend
+npm install
+npm run dev
+```
+
+The backend reads environment variables from the `.env` file you created in the repository root (or from the current shell environment). Make sure the file is present before running `npm run start:dev`.
+
+---
+
+## Repository Structure
 
 ```text
 verifyiq-app/
@@ -20,14 +75,15 @@ verifyiq-app/
 ├── .gitignore
 ├── README.md
 ├── docker-compose.yml
-├── package.json
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json
 ├── eslint.config.js
 ├── prettier.config.js
-├── backend/                  # delivered in later chunks
+├── backend/
 │   ├── Dockerfile
+│   ├── .dockerignore
 │   ├── package.json
+│   ├── package-lock.json
 │   ├── tsconfig.json
 │   ├── tsconfig.build.json
 │   ├── nest-cli.json
@@ -54,11 +110,13 @@ verifyiq-app/
 │       ├── reports/
 │       ├── documents/
 │       └── monitoring/
-└── frontend/                 # delivered in later chunks
+└── frontend/
     ├── Dockerfile
+    ├── .dockerignore
     ├── package.json
+    ├── package-lock.json
     ├── tsconfig.json
-    ├── next.config.ts
+    ├── next.config.js
     ├── postcss.config.js
     ├── tailwind.config.ts
     ├── components.json
@@ -71,77 +129,31 @@ verifyiq-app/
         └── types/
 ```
 
-## What this chunk includes
+## Environment variables
 
-- workspace root package configuration
-- shared TypeScript base config
-- shared linting and formatting config
-- local Docker Compose stack definition
-- environment template aligned to backend and frontend env names
-
-## Environment
-
-Copy `.env.example` to `.env` and adjust values before running the full stack:
+Copy `.env.example` to `.env` and fill in the values before starting anything:
 
 ```bash
-cp .env.example .env
+cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 ```
 
-Required environment variables are standardized across the repository:
-- `NODE_ENV`
-- `PORT`
-- `PG_HOST`
-- `PG_PORT`
-- `PG_DBNAME`
-- `PG_USER`
-- `PG_PASSWORD`
-- `DATABASE_URL`
-- `REDIS_HOST`
-- `REDIS_PORT`
-- `REDIS_PASSWORD`
-- `JWT_SECRET`
-- `JWT_REFRESH_SECRET`
-- `MINIO_ENDPOINT`
-- `MINIO_PORT`
-- `MINIO_USE_SSL`
-- `MINIO_ROOT_USER`
-- `MINIO_ROOT_PASSWORD`
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `S3_BUCKET`
-- `BV_CLIENT_ID`
-- `BV_CLIENT_SECRET`
-- `API_BASE_URL`
-- `NEXT_PUBLIC_API_BASE_URL`
+| Variable | Required | Notes |
+|---|---|---|
+| `PORT` | yes | Backend HTTP port (default `4000`) |
+| `PG_HOST` / `PG_PORT` / `PG_DBNAME` / `PG_USER` / `PG_PASSWORD` | yes | PostgreSQL connection |
+| `REDIS_HOST` / `REDIS_PORT` | yes | Redis connection |
+| `JWT_SECRET` | yes | Min 16 chars – change from the default! |
+| `JWT_REFRESH_SECRET` | yes | Min 16 chars – change from the default! |
+| `MINIO_ENDPOINT` / `MINIO_PORT` / `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | yes | MinIO / S3 storage |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | yes | Same as MinIO credentials for local dev |
+| `BV_CLIENT_ID` / `BV_CLIENT_SECRET` | yes | Bolagsverket API credentials |
+| `NEXT_PUBLIC_API_BASE_URL` | yes | Frontend → backend URL |
 
-## Local infrastructure
+## Local URLs
 
-The root `docker-compose.yml` defines these services:
-- `postgres`
-- `redis`
-- `minio`
-- `backend`
-- `frontend`
-
-The backend and frontend services are defined now so the root orchestration remains stable, but those service images become runnable only after the later backend and frontend chunks are added.
-
-## Intended local URLs after all chunks are present
-
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:4000/api/v1`
-- MinIO API: `http://localhost:9000`
-- MinIO Console: `http://localhost:9001`
-
-## Expected next steps after all chunks are assembled
-
-1. Copy `.env.example` to `.env`
-2. Fill secrets and credentials
-3. Start infrastructure with Docker Compose
-4. Install backend and frontend dependencies
-5. Run database migration
-6. Seed demo data
-7. Start backend and frontend
-
-## Notes
-
-This README is intentionally limited to the files already included in this chunk plus the known repository structure that later chunks are expected to populate. Startup commands that depend on backend and frontend package files are intentionally not claimed as runnable until those chunks exist.
+| Service | URL |
+|---|---|
+| Frontend | <http://localhost:3000> |
+| Backend API | <http://localhost:4000/api/v1> |
+| MinIO API | <http://localhost:9000> |
+| MinIO Console | <http://localhost:9001> |
