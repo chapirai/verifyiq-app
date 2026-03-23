@@ -58,8 +58,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     container_name: verifyiq-backend
     restart: unless-stopped
     env_file:
@@ -87,8 +87,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./frontend/Dockerfile
     container_name: verifyiq-frontend
     restart: unless-stopped
     env_file:
