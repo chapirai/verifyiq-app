@@ -7,8 +7,14 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
+  const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+  const allowedOrigins = new Set([frontendUrl, 'http://localhost:3000']);
+
   const app = await NestFactory.create(AppModule, {
-    cors: true,
+    cors: {
+      origin: [...allowedOrigins],
+      credentials: true,
+    },
   });
 
   app.setGlobalPrefix('api/v1');
