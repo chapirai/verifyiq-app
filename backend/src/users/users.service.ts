@@ -1,54 +1,33 @@
 import { Injectable } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service';
+import { User } from './user.entity';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class UsersService {
-  private readonly users = new Map<string, any>();
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
 
-  constructor(private readonly auditService: AuditService) {}
-
-  async create(dto: any) {
-    const user = {
-      id: dto?.id ?? `user_${Date.now()}`,
-      tenantId: dto?.tenantId ?? 'demo-tenant',
-      email: dto?.email ?? 'unknown@example.com',
-      role: dto?.role ?? 'user',
-      ...dto,
-    };
-
-    this.users.set(user.id, user);
-
-    await this.auditService.log({
-      tenantId: user.tenantId,
-      actorId: dto?.actorId ?? null,
-      action: 'user.create',
-      resourceType: 'user',
-      resourceId: user.id,
-      metadata: { email: user.email, role: user.role },
-    });
-
-    return user;
+  async findById(id: number): Promise<User> {
+    return await this.userRepository.findOneOrFail(id);
   }
 
-  async update(id: string, dto: any) {
-    const existing = this.users.get(id) ?? { id, tenantId: dto?.tenantId ?? 'demo-tenant' };
-    const user = {
-      ...existing,
-      ...dto,
-      id,
-    };
+  async findByEmail(email: string): Promise<User | undefined> {
+    return await this.userRepository.findOne({ where: { email } });
+  }
 
-    this.users.set(id, user);
+  async findAllByTenant(tenantId: number): Promise<User[]> {
+    return await this.userRepository.find({ where: { tenantId } });
+  }
 
-    await this.auditService.log({
-      tenantId: user.tenantId,
-      actorId: dto?.actorId ?? null,
-      action: 'user.update',
-      resourceType: 'user',
-      resourceId: user.id,
-      metadata: { updatedFields: Object.keys(dto ?? {}) },
-    });
+  async create(user: User): Promise<User> {
+    return await this.userRepository.save(user);
+  }
 
-    return user;
+  async update(id: number, user: Partial<User>): Promise<User> {
+    await this.userRepository.update(id, user);
+    return this.findById(id);
   }
 }
