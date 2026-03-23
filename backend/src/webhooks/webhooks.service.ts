@@ -29,7 +29,14 @@ export class WebhooksService {
       isActive: dto.isActive ?? true,
     });
     const saved = await this.endpointsRepo.save(endpoint);
-    await this.auditService.log({ action: 'webhook.endpoint.created', actorUserId, entityType: 'webhook_endpoint', entityId: saved.id, payload: { ...dto, secret: '[redacted]' } });
+    await this.auditService.log({
+      tenantId: '00000000-0000-0000-0000-000000000001',
+      actorId: actorUserId ?? null,
+      action: 'webhook.endpoint.created',
+      resourceType: 'webhook_endpoint',
+      resourceId: saved.id,
+      metadata: { ...dto, secret: '[redacted]' },
+    });
     return saved;
   }
 
