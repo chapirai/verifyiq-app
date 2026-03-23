@@ -1,21 +1,23 @@
 import { Injectable } from '@nestjs/common';
 
 // Define the CreateAuditLogInput interface
-interface CreateAuditLogInput {
+export interface CreateAuditLogInput {
     tenantId: string;
-    actorId: string;
+    actorId: string | null;
     action: string;
     resourceType: string;
     resourceId: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, any> | null;
 }
 
 @Injectable()
 export class AuditService {
-    // Method to list audit logs for a tenant
-    async listForTenant(tenantId: string): Promise<any[]> {
+    async log(_input: CreateAuditLogInput): Promise<void> {
+        // Implementation to persist audit log entry
+    }
+
+    async listForTenant(_tenantId: string, _limit?: number): Promise<any[]> {
         // Implementation to retrieve audit logs based on tenantId
-        // This should query the database for audit logs associated with the tenant
-        return []; // Return the retrieved logs
+        return [];
     }
 }
