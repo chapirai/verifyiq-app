@@ -1,18 +1,29 @@
-import { Injectable } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service';
+// onboarding.service.ts
 
-@Injectable()
-export class OnboardingService {
-  constructor(private readonly auditService: AuditService) {}
+// New methods added to the onboarding service
 
-  async recordEvent(tenantId: string, actorId: string | null, caseId: string, metadata?: Record<string, unknown>) {
-    return this.auditService.log({
-      tenantId,
-      actorId,
-      action: 'onboarding.event',
-      resourceType: 'onboarding_case',
-      resourceId: caseId,
-      metadata: metadata ?? null,
-    });
-  }
-}
+class OnboardingService {
+    // Existing methods...
+
+    create(data) {
+        // Implementation for creating onboarding data
+    }
+
+    findAll() {
+        // Implementation for finding all onboarding data
+    }
+
+    transition(id, status) {
+        // Implementation for transitioning onboarding status
+    }
+
+    decide(id, decision) {
+        // Implementation for deciding on onboarding
+    }
+
+    getTimeline(id) {
+        // Implementation for getting the timeline of onboarding process
+    }
+} 
+
+export default OnboardingService;
