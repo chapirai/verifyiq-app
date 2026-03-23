@@ -1,29 +1,54 @@
-// onboarding.service.ts
+import { Injectable } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
 
-// New methods added to the onboarding service
+@Injectable()
+export class OnboardingService {
+  private readonly cases = new Map<string, any>();
 
-class OnboardingService {
-    // Existing methods...
+  constructor(private readonly auditService: AuditService) {}
 
-    create(data) {
-        // Implementation for creating onboarding data
-    }
+  async create(tenantId: string, actorId: string, dto: any): Promise<any> {
+    const caseId = `case_${Date.now()}`;
+    const onboardingCase = { id: caseId, tenantId, ...dto, createdAt: new Date() };
+    this.cases.set(caseId, onboardingCase);
+    await this.recordEvent(tenantId, actorId, caseId);
+    return onboardingCase;
+  }
 
-    findAll() {
-        // Implementation for finding all onboarding data
-    }
+  async findAll(tenantId: string, query: any): Promise<any[]> {
+    return Array.from(this.cases.values()).filter(c => c.tenantId === tenantId);
+  }
 
-    transition(id, status) {
-        // Implementation for transitioning onboarding status
-    }
+  async transition(tenantId: string, actorId: string, id: string, dto: any): Promise<any> {
+    const onboardingCase = this.cases.get(id);
+    if (!onboardingCase) throw new Error('Case not found');
+    Object.assign(onboardingCase, dto);
+    await this.recordEvent(tenantId, actorId, id);
+    return onboardingCase;
+  }
 
-    decide(id, decision) {
-        // Implementation for deciding on onboarding
-    }
+  async decide(tenantId: string, actorId: string, id: string, dto: any): Promise<any> {
+    const onboardingCase = this.cases.get(id);
+    if (!onboardingCase) throw new Error('Case not found');
+    Object.assign(onboardingCase, dto);
+    await this.recordEvent(tenantId, actorId, id);
+    return onboardingCase;
+  }
 
-    getTimeline(id) {
-        // Implementation for getting the timeline of onboarding process
-    }
-} 
+  async getTimeline(tenantId: string, id: string): Promise<any> {
+    const onboardingCase = this.cases.get(id);
+    if (!onboardingCase) throw new Error('Case not found');
+    return { caseId: id, events: [] };
+  }
 
-export default OnboardingService;
+  async recordEvent(tenantId: string, actorId: string | null, caseId: string, metadata?: Record<string, unknown>) {
+    return this.auditService.log({
+      tenantId,
+      actorId,
+      action: 'onboarding.event',
+      resourceType: 'onboarding_case',
+      resourceId: caseId,
+      metadata: metadata ?? null,
+    });
+  }
+}
