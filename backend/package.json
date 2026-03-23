@@ -5,6 +5,7 @@
   "scripts": {
     "build": "nest build",
     "start": "node dist/main",
+    "start:prod": "node dist/main",
     "start:dev": "nest start --watch",
     "seed": "ts-node -r tsconfig-paths/register src/seed.ts"
   },
