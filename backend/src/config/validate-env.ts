@@ -25,7 +25,7 @@ const envSchema = z.object({
   BV_CLIENT_ID: z.string().min(1),
   BV_CLIENT_SECRET: z.string().min(1),
   API_BASE_URL: z.string().url(),
-  NEXT_PUBLIC_API_BASE_URL: z.string().url(),
+  FRONTEND_URL: z.string().url().optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
