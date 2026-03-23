@@ -10,24 +10,26 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  async findById(id: number): Promise<User> {
-    return await this.userRepository.findOneOrFail(id);
+  async findById(id: string): Promise<User> {
+    return await this.userRepository.findOneOrFail({ where: { id } });
   }
 
   async findByEmail(email: string): Promise<User | undefined> {
-    return await this.userRepository.findOne({ where: { email } });
+    return await this.userRepository.findOne({ where: { email } }) ?? undefined;
   }
 
-  async findAllByTenant(tenantId: number): Promise<User[]> {
+  async findAllByTenant(tenantId: string): Promise<User[]> {
     return await this.userRepository.find({ where: { tenantId } });
   }
 
-  async create(user: User): Promise<User> {
-    return await this.userRepository.save(user);
+  async create(user: Partial<User>, _userId?: string): Promise<User> {
+    const entity = this.userRepository.create(user);
+    return await this.userRepository.save(entity);
   }
 
-  async update(id: number, user: Partial<User>): Promise<User> {
-    await this.userRepository.update(id, user);
+  async update(id: string, user: Partial<User>, _userId?: string): Promise<User> {
+    const { tenant: _tenant, refreshTokens: _refreshTokens, auditLogs: _auditLogs, ...safeFields } = user;
+    await this.userRepository.update(id, safeFields);
     return this.findById(id);
   }
 }

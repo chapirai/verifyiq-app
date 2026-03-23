@@ -15,7 +15,7 @@ export class OnboardingService {
     return onboardingCase;
   }
 
-  async findAll(tenantId: string, query: any): Promise<any[]> {
+  async findAll(tenantId: string, _query?: any): Promise<any[]> {
     return Array.from(this.cases.values()).filter(c => c.tenantId === tenantId);
   }
 
@@ -35,7 +35,7 @@ export class OnboardingService {
     return onboardingCase;
   }
 
-  async getTimeline(tenantId: string, id: string): Promise<any> {
+  async getTimeline(_tenantId: string, id: string): Promise<any> {
     const onboardingCase = this.cases.get(id);
     if (!onboardingCase) throw new Error('Case not found');
     return { caseId: id, events: [] };
