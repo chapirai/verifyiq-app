@@ -1,0 +1,70 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { AuditModule } from './audit/audit.module';
+import { AuthModule } from './auth/auth.module';
+import envConfig from './config/env';
+import { validateEnv } from './config/validate-env';
+import { CompaniesModule } from './companies/companies.module';
+import { DocumentsModule } from './documents/documents.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
+import { PartiesModule } from './parties/parties.module';
+import { ReportsModule } from './reports/reports.module';
+import { RiskModule } from './risk/risk.module';
+import { ScreeningModule } from './screening/screening.module';
+import { TenantsModule } from './tenants/tenants.module';
+import { UsersModule } from './users/users.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      load: [envConfig],
+      validate: validateEnv,
+    }),
+    ScheduleModule.forRoot(),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.getOrThrow<string>('PG_HOST'),
+        port: config.getOrThrow<number>('PG_PORT'),
+        username: config.getOrThrow<string>('PG_USER'),
+        password: config.getOrThrow<string>('PG_PASSWORD'),
+        database: config.getOrThrow<string>('PG_DBNAME'),
+        autoLoadEntities: true,
+        synchronize: false,
+      }),
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.getOrThrow<string>('REDIS_HOST'),
+          port: config.getOrThrow<number>('REDIS_PORT'),
+          password: config.get<string>('REDIS_PASSWORD') || undefined,
+        },
+      }),
+    }),
+    AuthModule,
+    AuditModule,
+    TenantsModule,
+    UsersModule,
+    PartiesModule,
+    CompaniesModule,
+    OnboardingModule,
+    ScreeningModule,
+    RiskModule,
+    MonitoringModule,
+    WebhooksModule,
+    DocumentsModule,
+    ReportsModule,
+  ],
+})
+export class AppModule {}

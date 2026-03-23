@@ -1,0 +1,53 @@
+verifyiq-app/
+├── .env.example
+├── .gitignore
+├── README.md
+├── docker-compose.yml
+├── package.json
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+├── eslint.config.js
+├── prettier.config.js
+├── backend/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── tsconfig.build.json
+│   ├── nest-cli.json
+│   ├── .eslintrc.js
+│   ├── migrations/001_initial_schema.sql
+│   └── src/
+│       ├── main.ts
+│       ├── app.module.ts
+│       ├── data-source.ts
+│       ├── seed.ts
+│       ├── config/
+│       ├── common/
+│       ├── auth/
+│       ├── audit/
+│       ├── tenants/
+│       ├── users/
+│       ├── parties/
+│       ├── companies/
+│       ├── onboarding/
+│       ├── screening/
+│       ├── risk/
+│       ├── monitoring/
+│       ├── webhooks/
+│       ├── documents/
+│       └── reports/
+└── frontend/
+    ├── Dockerfile
+    ├── package.json
+    ├── tsconfig.json
+    ├── next.config.ts
+    ├── postcss.config.js
+    ├── tailwind.config.ts
+    ├── components.json
+    ├── .eslintrc.js
+    └── src/
+        ├── app/
+        ├── components/
+        ├── hooks/
+        ├── lib/
+        └── types/
