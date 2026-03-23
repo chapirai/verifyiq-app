@@ -9,7 +9,7 @@ function readToken(key: string): string | null {
 
 export const httpClient: AxiosInstance = axios.create({
   baseURL,
-  withCredentials: false,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
