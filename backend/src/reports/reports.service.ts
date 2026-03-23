@@ -28,7 +28,14 @@ export class ReportsService {
     });
     const saved = await this.reportsRepo.save(report);
     await this.reportsQueue.add('generate-report', { reportId: saved.id });
-    await this.auditService.log({ action: 'report.queued', actorUserId, entityType: 'report', entityId: saved.id, payload: dto });
+    await this.auditService.log({
+      tenantId: '00000000-0000-0000-0000-000000000001',
+      actorId: actorUserId ?? null,
+      action: 'report.queued',
+      resourceType: 'report',
+      resourceId: saved.id,
+      metadata: dto,
+    });
     return saved;
   }
 
