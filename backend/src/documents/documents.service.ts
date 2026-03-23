@@ -30,7 +30,14 @@ export class DocumentsService {
       uploadedByUserId: actorUserId ?? null,
     });
     const saved = await this.documentsRepo.save(entity);
-    await this.auditService.log({ action: 'document.upload_intent.created', actorUserId, entityType: 'document', entityId: saved.id, payload: dto });
+    await this.auditService.log({
+      tenantId: '00000000-0000-0000-0000-000000000001',
+      actorId: actorUserId ?? null,
+      action: 'document.upload_intent.created',
+      resourceType: 'document',
+      resourceId: saved.id,
+      metadata: dto,
+    });
     return {
       document: saved,
       uploadUrl: `/api/v1/documents/${saved.id}/upload`,
