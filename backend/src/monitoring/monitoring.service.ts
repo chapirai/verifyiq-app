@@ -27,7 +27,14 @@ export class MonitoringService {
       createdByUserId: actorUserId ?? null,
     });
     const saved = await this.subscriptionsRepo.save(subscription);
-    await this.auditService.log({ action: 'monitoring.subscription.created', actorUserId, entityType: 'monitoring_subscription', entityId: saved.id, payload: dto });
+    await this.auditService.log({
+      tenantId,
+      actorId: actorUserId ?? null,
+      action: 'monitoring.subscription.created',
+      resourceType: 'monitoring_subscription',
+      resourceId: saved.id,
+      metadata: dto,
+    });
     return saved;
   }
 
@@ -48,7 +55,14 @@ export class MonitoringService {
       payload: dto.payload ?? {},
     });
     const saved = await this.alertsRepo.save(alert);
-    await this.auditService.log({ action: 'monitoring.alert.created', actorUserId, entityType: 'monitoring_alert', entityId: saved.id, payload: dto });
+    await this.auditService.log({
+      tenantId: subscription.tenantId,
+      actorId: actorUserId ?? null,
+      action: 'monitoring.alert.created',
+      resourceType: 'monitoring_alert',
+      resourceId: saved.id,
+      metadata: dto,
+    });
     return saved;
   }
 
