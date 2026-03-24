@@ -82,7 +82,7 @@ export class BolagsverketClient {
     payload?: unknown,
   ): Promise<{ responseData: T; requestId: string }> {
     let attempt = 0;
-    let delayMs: number = RETRY_CONFIG.initialDelayMs;
+    let retryDelayMs: number = RETRY_CONFIG.initialDelayMs;
 
     while (true) {
       const headers = this.buildHeaders();
@@ -102,10 +102,10 @@ export class BolagsverketClient {
         if (isRetryable && attempt < RETRY_CONFIG.maxRetries) {
           attempt++;
           this.logger.warn(
-            `Bolagsverket ${url} failed with ${status} – retry ${attempt}/${RETRY_CONFIG.maxRetries} in ${delayMs}ms`,
+            `Bolagsverket ${url} failed with ${status} – retry ${attempt}/${RETRY_CONFIG.maxRetries} in ${retryDelayMs}ms`,
           );
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-          delayMs = Math.min(delayMs * RETRY_CONFIG.backoffMultiplier, RETRY_CONFIG.maxDelayMs);
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+          retryDelayMs = Math.min(retryDelayMs * RETRY_CONFIG.backoffMultiplier, RETRY_CONFIG.maxDelayMs);
           continue;
         }
 
@@ -114,12 +114,17 @@ export class BolagsverketClient {
     }
   }
 
+  /** Wrap a value in an array if it is not already one. */
+  private ensureArray<T>(data: T | T[]): T[] {
+    return Array.isArray(data) ? data : [data];
+  }
+
   // ── Public API methods ────────────────────────────────────────────────────
 
   /** GET /isalive – verify API availability before making data requests. */
   async healthCheck(): Promise<{ status: string }> {
     const { responseData } = await this.requestWithRetry<string>('get', `${HVD_BASE_URL}/isalive`);
-    return { status: (responseData as any) === 'OK' || responseData ? 'OK' : 'UNKNOWN' };
+    return { status: responseData === 'OK' ? 'OK' : 'UNKNOWN' };
   }
 
   /** POST /vardefulla-datamangder/v1/organisationer – high-value dataset. */
@@ -178,7 +183,7 @@ export class BolagsverketClient {
       `${ORG_BASE_URL}/organisationsinformation`,
       payload,
     );
-    const responseArray = Array.isArray(responseData) ? responseData : [responseData];
+    const responseArray = this.ensureArray(responseData);
     return { requestPayload: payload, responsePayload: responseArray, requestId };
   }
 
@@ -207,7 +212,7 @@ export class BolagsverketClient {
       `${ORG_BASE_URL}/arenden`,
       payload,
     );
-    const responseArray = Array.isArray(responseData) ? responseData : [responseData];
+    const responseArray = this.ensureArray(responseData);
     return { requestPayload: payload, responsePayload: responseArray, requestId };
   }
 

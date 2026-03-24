@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BolagsverketClient } from '../integrations/bolagsverket.client';
-import { BolagsverketMapper, NormalisedCompany } from '../integrations/bolagsverket.mapper';
+import { BolagsverketMapper, DEFAULT_COMPANY_NAME, NormalisedCompany } from '../integrations/bolagsverket.mapper';
 import {
   AktiekapitalforandringResponse,
   ArendeResponse,
@@ -12,6 +12,9 @@ import {
   OrganisationInformationResponse,
   OrganisationsengagemangResponse,
 } from '../integrations/bolagsverket.types';
+
+/** Allowed tolerance when validating share-capital arithmetic (1 %). */
+const SHARE_CAPITAL_TOLERANCE = 0.01;
 
 export interface CompleteCompanyProfile {
   normalisedData: NormalisedCompany;
@@ -253,7 +256,7 @@ export class BolagsverketService {
     if (!company.organisationNumber) {
       errors.push('Missing organisationNumber');
     }
-    if (!company.legalName || company.legalName === 'Unknown company') {
+    if (!company.legalName || company.legalName === DEFAULT_COMPANY_NAME) {
       warnings.push('Legal name is missing or unknown');
     }
 
@@ -266,7 +269,7 @@ export class BolagsverketService {
     if (share?.antalAktier && share?.kvotvarde && share?.aktiekapital) {
       const computed = share.antalAktier * share.kvotvarde;
       const diff = Math.abs(computed - share.aktiekapital);
-      if (diff / share.aktiekapital > 0.01) {
+      if (diff / share.aktiekapital > SHARE_CAPITAL_TOLERANCE) {
         warnings.push(
           `Share capital mismatch: ${share.antalAktier} × ${share.kvotvarde} = ${computed}, but registered aktiekapital = ${share.aktiekapital}`,
         );

@@ -7,6 +7,9 @@ import {
   OrganisationInformationResponse,
 } from './bolagsverket.types';
 
+/** Fallback legal name when none is returned by the API. */
+export const DEFAULT_COMPANY_NAME = 'Unknown company';
+
 /** Normalised company record produced by the mapper (not a DB entity). */
 export interface NormalisedCompany {
   organisationNumber: string;
@@ -67,7 +70,7 @@ export class BolagsverketMapper {
       organisationNumber:
         hvOrg.identitetsbeteckning ?? richOrg.identitetsbeteckning ?? '',
       legalName:
-        hvOrg.namn ?? richOrg.namn ?? 'Unknown company',
+        hvOrg.namn ?? richOrg.namn ?? DEFAULT_COMPANY_NAME,
       companyForm:
         hvOrg.organisationsform ?? richOrg.organisationsform ?? null,
       status:
