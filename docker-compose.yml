@@ -73,6 +73,9 @@ services:
       REDIS_PORT: 6379
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       API_BASE_URL: http://localhost:${PORT:-4000}/api/v1
       FRONTEND_URL: http://localhost:3000
     depends_on:

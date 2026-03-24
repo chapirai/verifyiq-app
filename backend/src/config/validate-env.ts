@@ -16,7 +16,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16),
   MINIO_ENDPOINT: z.string().min(1),
   MINIO_PORT: z.coerce.number().int().positive(),
-  MINIO_USE_SSL: z.enum(['true', 'false']).or(z.boolean().transform(String)),
+  MINIO_USE_SSL: z.enum(['true', 'false']).or(z.boolean().transform(v => (v ? 'true' : 'false'))).default('false'),
   MINIO_ROOT_USER: z.string().min(1),
   MINIO_ROOT_PASSWORD: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.string().min(1),
