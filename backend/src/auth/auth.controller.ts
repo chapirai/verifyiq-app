@@ -1,4 +1,5 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
+import { TenantsService } from '../tenants/tenants.service';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -6,7 +7,19 @@ import { LogoutDto } from './dto/logout.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly tenantsService: TenantsService,
+  ) {}
+
+  @Get('tenant/:slug')
+  async getTenantBySlug(@Param('slug') slug: string) {
+    const tenant = await this.tenantsService.findBySlug(slug);
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with slug "${slug}" not found`);
+    }
+    return { id: tenant.id, name: tenant.name, slug: tenant.slug };
+  }
 
   @Post('login')
   async login(@Body() dto: LoginDto): Promise<any> {
