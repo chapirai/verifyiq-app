@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import type { Route } from 'next';
 
-const nav = [
+const nav: { href: Route; label: string }[] = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/companies', label: 'Companies' },
   { href: '/onboarding', label: 'Onboarding' },
