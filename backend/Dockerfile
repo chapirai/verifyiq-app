@@ -20,5 +20,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY backend/package.json ./package.json
 COPY backend/migrations ./migrations
+COPY backend/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 EXPOSE 4000
-CMD ["node", "dist/main.js"]
+CMD ["/app/docker-entrypoint.sh"]
