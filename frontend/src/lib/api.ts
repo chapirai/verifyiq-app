@@ -69,9 +69,20 @@ export interface CompanyLookupPayload {
   organisationInformationsmangd?: string[];
 }
 
+const defaultTenantSlug = process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG || 'demo-bank';
+
 export const api = {
-  async login(email: string, password: string): Promise<LoginResponse> {
-    const response = await httpClient.post<LoginResponse>('/auth/login', { email, password });
+  async login(email: string, password: string, tenantSlug = defaultTenantSlug): Promise<LoginResponse> {
+    let tenantId: string;
+    try {
+      const tenantResponse = await httpClient.get<{ id: string; name: string; slug: string }>(
+        `/auth/tenant/${tenantSlug}`,
+      );
+      tenantId = tenantResponse.data.id;
+    } catch {
+      throw new Error(`Could not find tenant "${tenantSlug}". Please check your configuration.`);
+    }
+    const response = await httpClient.post<LoginResponse>('/auth/login', { tenantId, email, password });
     if (typeof window !== 'undefined') {
       localStorage.setItem('verifyiq_access_token', response.data.accessToken || '');
       localStorage.setItem('verifyiq_refresh_token', response.data.refreshToken || '');
