@@ -78,6 +78,15 @@ services:
       MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-verifyiq-documents}
+      # Development-only defaults (from .env.example) – override in production via .env or environment variables
+      JWT_SECRET: ${JWT_SECRET:-WZ68qSjcW6YNHkHetT39/vBJFmKrzzr53iv+nFpxm5Y=}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-uppyoy6DH7cb/nO5wdEdELl8FgDlhF9qWxugzQmzta4=}
+      # Bolagsverket API credentials – set real values in .env before using company-lookup features
+      BV_CLIENT_ID: ${BV_CLIENT_ID:-placeholder-bv-client-id}
+      BV_CLIENT_SECRET: ${BV_CLIENT_SECRET:-placeholder-bv-client-secret}
       API_BASE_URL: http://localhost:${PORT:-4000}/api/v1
       FRONTEND_URL: http://localhost:3000
     depends_on:
