@@ -1,12 +1,10 @@
-version: '3.9'
-
 services:
   postgres:
     image: postgres:16-alpine
     container_name: verifyiq-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${PG_DBNAME:-company}
+      POSTGRES_DB: ${PG_DBNAME:-Company}
       POSTGRES_USER: ${PG_USER:-postgres}
       POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
     ports:
@@ -14,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${PG_USER:-postgres} -d ${PG_DBNAME:-company}']
+      test: ['CMD-SHELL', 'pg_isready -U ${PG_USER:-postgres} -d ${PG_DBNAME:-Company}']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -63,12 +61,16 @@ services:
     container_name: verifyiq-backend
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-4000}
       PG_HOST: postgres
       PG_PORT: 5432
+      PG_USER: ${PG_USER:-postgres}
+      PG_PASSWORD: ${PG_PASSWORD:-postgres}
+      PG_DBNAME: ${PG_DBNAME:-Company}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       MINIO_ENDPOINT: minio
@@ -95,7 +97,8 @@ services:
     container_name: verifyiq-frontend
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000/api/v1}

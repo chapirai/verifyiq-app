@@ -3,7 +3,7 @@ export default () => ({
   PORT: Number(process.env.PORT ?? 4000),
   PG_HOST: process.env.PG_HOST ?? 'localhost',
   PG_PORT: Number(process.env.PG_PORT ?? 5432),
-  PG_DBNAME: process.env.PG_DBNAME ?? 'company',
+  PG_DBNAME: process.env.PG_DBNAME ?? 'Company',
   PG_USER: process.env.PG_USER ?? 'postgres',
   PG_PASSWORD: process.env.PG_PASSWORD ?? 'postgres',
   DATABASE_URL: process.env.DATABASE_URL,
