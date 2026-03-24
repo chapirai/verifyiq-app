@@ -3,7 +3,7 @@ import 'reflect-metadata';
 
 import { DataSource } from 'typeorm';
 
-export default new DataSource({
+export const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.PG_HOST,
   port: Number(process.env.PG_PORT ?? 5432),
@@ -12,6 +12,6 @@ export default new DataSource({
   database: process.env.PG_DBNAME,
   synchronize: false,
   logging: false,
-  entities: ['src/**/*.entity.ts', 'dist/**/*.entity.js'],
-  migrations: ['migrations/*.sql'],
+  entities: ['dist/**/*.entity.js'],
+  migrations: ['dist/migrations/*.js'],
 });
