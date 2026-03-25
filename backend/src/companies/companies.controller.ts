@@ -4,6 +4,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { CompaniesService } from './companies.service';
+import { LookupCompanyDto } from './dto/lookup-company.dto';
 
 @Controller('companies')
 @UseGuards(JwtAuthGuard)
@@ -11,9 +12,9 @@ export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
   @Post('lookup')
-  lookup(@TenantId() tenantId: string, @CurrentUser('sub') actorId: string | undefined, @Body() dto: any) {
+  lookup(@TenantId() tenantId: string, @CurrentUser('sub') actorId: string | undefined, @Body() dto: LookupCompanyDto) {
     const ctx: TenantContext = { tenantId, actorId: actorId ?? null };
-    return this.companiesService.lookup(ctx, dto);
+    return this.companiesService.orchestrateLookup(ctx, dto);
   }
 
   @Get()
