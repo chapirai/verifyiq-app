@@ -10,11 +10,19 @@ import { AuthModule } from './auth/auth.module';
 import envConfig from './config/env';
 import { validateEnv } from './config/validate-env';
 import { CompaniesModule } from './companies/companies.module';
+import { CompanyCasesModule } from './company-cases/company-cases.module';
 import { DocumentsModule } from './documents/documents.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { PartiesModule } from './parties/parties.module';
+import { PersonEnrichmentModule } from './person-enrichment/person-enrichment.module';
+import { PropertyModule } from './property/property.module';
+import { CreditDecisioningModule } from './credit-decisioning/credit-decisioning.module';
+import { EntitlementsModule } from './entitlements/entitlements.module';
+import { FinancialModule } from './financial/financial.module';
+import { OwnershipModule } from './ownership/ownership.module';
 import { ReportsModule } from './reports/reports.module';
+import { RiskIndicatorsModule } from './risk-indicators/risk-indicators.module';
 import { RiskModule } from './risk/risk.module';
 import { ScreeningModule } from './screening/screening.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -66,6 +74,14 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     WebhooksModule,
     DocumentsModule,
     ReportsModule,
+    OwnershipModule,
+    EntitlementsModule,
+    FinancialModule,
+    CreditDecisioningModule,
+    CompanyCasesModule,
+    PersonEnrichmentModule,
+    PropertyModule,
+    RiskIndicatorsModule,
   ],
   controllers: [AppController],
 })

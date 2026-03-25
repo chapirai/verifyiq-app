@@ -20,6 +20,21 @@ export class MonitoringSubscriptionEntity {
   @Column({ type: 'jsonb', name: 'event_types', default: () => "'[]'::jsonb" })
   eventTypes!: string[];
 
+  @Column({ type: 'varchar', length: 64, name: 'subject_type', default: 'company' })
+  subjectType!: string; // 'company' | 'person' | 'ownership' | 'beneficial_owner'
+
+  @Column({ type: 'varchar', length: 64, name: 'organisation_number', nullable: true })
+  organisationNumber!: string | null;
+
+  @Column({ type: 'varchar', length: 32, name: 'personnummer', nullable: true })
+  personnummer!: string | null;
+
+  @Column({ type: 'jsonb', name: 'dataset_families', default: () => "'[]'::jsonb" })
+  datasetFamilies!: string[]; // which dataset families to monitor
+
+  @Column({ type: 'jsonb', name: 'alert_config', default: () => "'{}'::jsonb" })
+  alertConfig!: Record<string, unknown>; // thresholds, cooldown, channels
+
   @Column({ type: 'uuid', name: 'created_by_user_id', nullable: true })
   createdByUserId!: string | null;
 

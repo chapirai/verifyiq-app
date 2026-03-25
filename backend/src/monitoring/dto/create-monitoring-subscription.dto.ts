@@ -12,4 +12,23 @@ export class CreateMonitoringSubscriptionDto {
   @IsArray()
   @IsString({ each: true })
   eventTypes!: string[];
+
+  @IsOptional()
+  @IsString()
+  subjectType?: string;
+
+  @IsOptional()
+  @IsString()
+  organisationNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  personnummer?: string;
+
+  @IsOptional()
+  @IsArray()
+  datasetFamilies?: string[];
+
+  @IsOptional()
+  alertConfig?: Record<string, unknown>;
 }
