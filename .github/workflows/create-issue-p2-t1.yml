@@ -1,4 +1,4 @@
-name: "Create Issue: P2-T1 Snapshot Entity & Storage Model"
+name: "Create Issue: P2-T1 Risk Score Engine"
 
 on:
   workflow_dispatch:
@@ -8,92 +8,154 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+    env:
+      ISSUE_BODY: |
+        TICKET ID: P2-T1
+        PHASE: 2 — Risk, Documents, Ownership & Monitoring
+        TITLE: Build Risk Score Engine — Backend Service & Risk Tab on Company Profile
+        PURPOSE: Compute a structured risk score for any company based on its Bolagsverket data, expose it via a dedicated API endpoint, and activate the "Risk" tab on the company profile page so compliance analysts can see risk signals at a glance
+        USER: Compliance analyst / KYC officer
+        INPUT: Org number (from company profile page Risk tab)
+        OUTPUT: Risk score object { overallScore, riskLevel, signals[], computedAt, orgNumber }
+
+        DEPENDS ON: P1-T2 (lookup endpoint), P1-T3 (company profile page with tab navigation)
+
+        ---
+
+        BACKEND LAYER
+
+        Entity: CompanyRiskScoreEntity
+          File: backend/src/companies/entities/company-risk-score.entity.ts
+          Table: company_risk_scores
+          Fields:
+            - id: UUID (PK)
+            - orgNumber: string (indexed, NOT NULL)
+            - tenantId: UUID (indexed, NOT NULL)
+            - overallScore: integer 0-100 (NOT NULL) — weighted composite score
+            - riskLevel: enum ("LOW" | "MEDIUM" | "HIGH" | "CRITICAL")
+            - signals: jsonb (NOT NULL) — array of { code, label, severity, weight, value }
+            - computedAt: timestamptz (NOT NULL) — when score was last calculated
+            - snapshotRef: UUID (nullable) — reference to the company snapshot used
+            - createdAt / updatedAt: timestamptz (auto)
+          Indexes:
+            - (tenantId, orgNumber) UNIQUE — one active score per company per tenant
+            - (riskLevel) — for filtering by risk level
+            - (computedAt) — for staleness detection
+
+        Migration: 1000000000006-CompanyRiskScores.ts
+          - Creates company_risk_scores table with all indexes
+          - Down migration drops table cleanly
+
+        Risk Signals (initial set, computed from company data):
+          1. STATUS_INACTIVE   — company is not active             (severity: HIGH,     weight: 30)
+          2. COMPANY_AGE_YOUNG — registered < 6 months ago         (severity: MEDIUM,   weight: 15)
+          3. HIGH_RISK_FORM    — company form is Enskild firma      (severity: MEDIUM,   weight: 15)
+          4. FOREIGN_COUNTRY   — countryCode is not "SE"           (severity: HIGH,     weight: 20)
+          5. MISSING_DESC      — no businessDescription present    (severity: LOW,      weight:  5)
+          6. DATA_STALE        — last fetch was > 30 days ago       (severity: LOW,      weight: 10)
+          7. LIQUIDATION       — status contains "liquidation"     (severity: CRITICAL, weight: 40)
+
+        Score calculation:
+          overallScore = sum of weights of triggered signals (capped at 100)
+          riskLevel:  0-20 = LOW, 21-50 = MEDIUM, 51-80 = HIGH, 81-100 = CRITICAL
+
+        Service: RiskScoreService
+          File: backend/src/companies/services/risk-score.service.ts
+          Methods:
+            - computeAndSave(orgNumber, tenantId, companyData, metadata): Promise<CompanyRiskScoreEntity>
+                * Evaluates all signals against company data
+                * Calculates overallScore and riskLevel
+                * UPSERT into company_risk_scores (update if orgNumber+tenantId exists)
+                * Returns saved entity
+            - getLatest(orgNumber, tenantId): Promise<CompanyRiskScoreEntity | null>
+
+        Controller endpoints (add to CompaniesController):
+          GET  /api/v1/companies/:orgNumber/risk-score
+               Auth: JWT required — returns latest CompanyRiskScoreEntity or 404
+          POST /api/v1/companies/:orgNumber/risk-score/compute
+               Auth: JWT required — forces fresh computation, returns 201 with new entity
+
+        Module registration:
+          - Add CompanyRiskScoreEntity to CompaniesModule entities array
+          - Add RiskScoreService to CompaniesModule providers array
+
+        ---
+
+        FRONTEND LAYER
+
+        New hook: useRiskScore(orgNumber)
+          File: frontend/src/hooks/useRiskScore.ts
+          Returns { riskScore, loading, error, refetch }
+
+        New component: RiskScorePanel
+          File: frontend/src/components/company/RiskScorePanel.tsx
+          - Displays overall score (0-100) as a progress bar
+          - riskLevel badge: LOW=green, MEDIUM=yellow, HIGH=orange, CRITICAL=red
+          - Lists triggered signals: severity dot + label + severity badge
+          - "Computed: X minutes ago" relative timestamp
+          - "Recompute" button calls POST .../risk-score/compute
+          - Empty state: "No risk score yet. Click Compute to generate."
+          - Loading skeleton + error state with retry button
+
+        Update: TabNavigation component
+          File: frontend/src/components/company/TabNavigation.tsx
+          - Remove the "Soon" badge from the "Risk" tab only
+
+        Update: Company profile page
+          File: frontend/src/app/(dashboard)/companies/[orgNumber]/page.tsx
+          - Render <RiskScorePanel orgNumber={orgNumber} /> when Risk tab is active
+
+        ---
+
+        STYLING & UX
+        - Score bar: thin progress bar (slate-800 bg, colored fill per riskLevel)
+        - Badge colors: green-600 LOW, yellow-500 MEDIUM, orange-500 HIGH, red-600 CRITICAL
+        - Signal list: severity dot + label + badge per row
+        - Dark theme (existing slate palette), mobile responsive
+
+        ---
+
+        ACCEPTANCE CRITERIA
+        - GET /api/v1/companies/:orgNumber/risk-score returns overallScore, riskLevel, signals[]
+        - POST .../risk-score/compute triggers fresh computation and upsert
+        - All 7 signals evaluated correctly against company data
+        - Score capped at 100, riskLevel matches score range
+        - UPSERT is idempotent (orgNumber+tenantId updates row, not duplicates)
+        - Migration runs cleanly (up and down)
+        - Risk tab no longer shows "Soon" badge
+        - RiskScorePanel renders score, riskLevel, triggered signals
+        - Recompute button triggers fresh calculation
+        - Loading skeleton and error state work correctly
+        - Mobile responsive, no console errors
+        - Auth required (401 without valid JWT)
+
+        ---
+
+        ERROR HANDLING
+        - Company not in DB yet: 404 "Run a lookup first"
+        - No signals triggered: score=0, riskLevel="LOW", signals=[]
+        - Recompute fails: error toast "Could not recompute risk score. Try again."
+
+        ---
+
+        TESTING
+        - Unit: RiskScoreService signal evaluators with mock company data
+        - Unit: score calculation (weight sum, cap at 100, riskLevel mapping)
+        - Integration: GET endpoint returns score from DB
+        - Integration: POST compute upserts new score
+        - Frontend: RiskScorePanel renders all riskLevel variants
+        - Frontend: loading skeleton and error state render correctly
     steps:
       - name: Create GitHub Issue P2-T1
         uses: actions/github-script@v7
         with:
           script: |
-            await github.rest.issues.create({
+            const body = process.env.ISSUE_BODY;
+            const result = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: "P2-T1: Design Snapshot Entity & Storage Model for Immutable Company Data History",
-              labels: ["phase-2", "workstream-A", "backend", "database"],
-              body: `TICKET ID: P2-T1
-PHASE: 2 — Snapshots, Cache, Lineage & Data Storage
-WORKSTREAM: A — Snapshots
-TITLE: Design Snapshot Entity & Storage Model for Immutable Company Data History
-PURPOSE: Define the database schema and TypeORM entity for immutable, point-in-time snapshots of company data, so that every version of a company record is permanently preserved and auditable
-USER: System (triggered by every successful company lookup)
-INPUT: Enriched company data returned from Bolagsverket API or DB
-OUTPUT: A new snapshot row saved in the DB capturing the exact state of company data at a given point in time
-
-DEPENDENCIES: Phase 1 (P1-T2 lookup flow must exist)
-
-BACKEND LAYER:
-
-Entity: CompanySnapshotEntity
-  Table name: company_snapshots
-  Fields:
-    - id: UUID (PK, auto-generated)
-    - orgNumber: string (indexed, NOT NULL) — Swedish organisation number
-    - snapshotData: jsonb (NOT NULL) — full raw company payload at time of snapshot
-    - dataSource: enum ('DB_CACHE' | 'API') — where data originated
-    - fetchedAt: timestamptz (NOT NULL) — when data was originally fetched from source
-    - createdAt: timestamptz (auto, NOT NULL) — when snapshot row was written
-    - tenantId: UUID (indexed, NOT NULL) — tenant isolation
-    - correlationId: UUID (nullable) — links snapshot to originating lookup request
-    - schemaVersion: string (NOT NULL, default '1.0') — payload schema version for future migrations
-    - checksum: string (NOT NULL) — SHA-256 of snapshotData for integrity verification
-
-Indexes:
-    - (orgNumber, createdAt DESC) — for fetching snapshot history
-    - (tenantId, orgNumber) — for tenant-scoped queries
-    - (correlationId) — for linking snapshots to audit logs
-    - (checksum) — for deduplication checks
-
-Constraints:
-    - snapshotData must be valid JSON (DB-level CHECK constraint)
-    - fetchedAt must be <= createdAt
-    - tenantId + orgNumber + fetchedAt must be unique (no duplicate snapshots for same fetch)
-
-Migration: 1000000000004-CompanySnapshots.ts
-  - Creates company_snapshots table
-  - Adds all indexes listed above
-  - Adds check constraint on snapshotData
-  - Down migration: drops table cleanly
-
-TypeORM Module Registration:
-  - Register CompanySnapshotEntity in CompaniesModule (entities array)
-  - Ensure TypeORM can find the entity via glob or explicit import
-
-DATA DESIGN NOTES:
-  - Snapshots are IMMUTABLE — never updated after creation, only inserted
-  - snapshotData stores the full normalised company payload (same shape as CompanyData type)
-  - schemaVersion allows future payload migrations without losing old snapshots
-  - checksum enables change detection (P2-D1 will use this)
-  - tenantId enables full multi-tenant data isolation at DB level
-
-ACCEPTANCE CRITERIA:
-  □ CompanySnapshotEntity file created under backend/src/companies/entities/
-  □ All fields typed correctly (UUID, jsonb, enum, timestamptz)
-  □ Migration file created and runs cleanly (up + down)
-  □ All indexes created in migration
-  □ Entity registered in CompaniesModule
-  □ checksum field stores SHA-256 hex string of snapshotData JSON
-  □ schemaVersion defaults to '1.0'
-  □ Unique constraint on (tenantId, orgNumber, fetchedAt)
-  □ No TypeORM or migration errors in test DB
-  □ Entity matches CompanyData type shape for snapshotData
-
-TESTING:
-  - Unit test: entity can be instantiated and fields assigned
-  - Migration test: up migration creates table + indexes; down drops cleanly
-  - DB test: insert a snapshot row, read it back, verify all fields
-  - DB test: attempt duplicate (tenantId, orgNumber, fetchedAt) — must fail with unique violation
-
-ERROR HANDLING:
-  - Migration failure: down() must cleanly roll back table creation
-  - Duplicate insert: DB constraint violation — handled by Persistence Service (P2-T2)
-  - Invalid JSON in snapshotData: DB CHECK constraint rejects at write time`
+              title: "P2-T1: Build Risk Score Engine — Backend Service & Risk Tab on Company Profile",
+              assignees: ["chapirai"],
+              body: body,
             });
-            console.log('Issue P2-T1 created successfully');
+            console.log(`Issue created: ${result.data.html_url}`);
