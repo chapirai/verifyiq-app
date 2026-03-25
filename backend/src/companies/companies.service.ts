@@ -1,7 +1,10 @@
 import { GatewayTimeoutException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
+import { ListCompaniesDto } from './dto/list-companies.dto';
 import { CACHE_TTL_DAYS } from './services/bv-cache.service';
 import { BolagsverketService } from './services/bolagsverket.service';
 import {
@@ -10,6 +13,7 @@ import {
   LookupCompanyDto,
   LookupCompanyResponseDto,
 } from './dto/lookup-company.dto';
+import { CompanyEntity } from './entities/company.entity';
 
 /** Timeout for external Bolagsverket API calls (ms). */
 const API_TIMEOUT_MS = 10_000;
@@ -33,6 +37,8 @@ export class CompaniesService {
   constructor(
     private readonly auditService: AuditService,
     private readonly bolagsverketService: BolagsverketService,
+    @InjectRepository(CompanyEntity)
+    private readonly companyRepo: Repository<CompanyEntity>,
   ) {}
 
   /**
@@ -133,11 +139,47 @@ export class CompaniesService {
   }
 
   /**
-   * @todo Implement DB-backed company list query.
-   * Currently returns an empty array as this endpoint is not yet implemented.
+   * List companies for a tenant with optional fuzzy name search, exact org number
+   * lookup, status filtering, and pagination.
    */
-  async findAll(_ctx: TenantContext, _query: any) {
-    return [];
+  async findAll(ctx: TenantContext, query: ListCompaniesDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const offset = (page - 1) * limit;
+
+    const qb = this.companyRepo
+      .createQueryBuilder('c')
+      .select([
+        'c.id',
+        'c.organisationNumber',
+        'c.legalName',
+        'c.status',
+        'c.createdAt',
+        'c.updatedAt',
+      ])
+      .where('c.tenantId = :tenantId', { tenantId: ctx.tenantId });
+
+    if (query.q) {
+      qb.andWhere('c.legalName ILIKE :q', { q: `%${query.q}%` });
+    }
+
+    if (query.org_number) {
+      qb.andWhere('c.organisationNumber = :orgNumber', { orgNumber: query.org_number });
+    }
+
+    if (query.status) {
+      qb.andWhere('c.status = :status', { status: query.status });
+    }
+
+    const [data, total] = await qb.skip(offset).take(limit).getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      has_next: offset + data.length < total,
+    };
   }
 
   /**
