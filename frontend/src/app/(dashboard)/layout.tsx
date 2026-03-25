@@ -3,6 +3,7 @@ import type { Route } from 'next';
 
 const nav: { href: Route; label: string }[] = [
   { href: '/dashboard', label: 'Overview' },
+  { href: '/search', label: 'Company Search' },
   { href: '/companies', label: 'Companies' },
   { href: '/companies/bolagsverket', label: 'Bolagsverket' },
   { href: '/onboarding', label: 'Onboarding' },
