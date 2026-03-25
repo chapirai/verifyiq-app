@@ -29,6 +29,24 @@ export class MonitoringAlertEntity {
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
   payload!: Record<string, unknown>;
 
+  @Column({ type: 'varchar', length: 64, name: 'dataset_family', nullable: true })
+  datasetFamily!: string | null;
+
+  @Column({ type: 'varchar', length: 32, name: 'organisation_number', nullable: true })
+  organisationNumber!: string | null;
+
+  @Column({ type: 'varchar', length: 32, name: 'personnummer', nullable: true })
+  personnummer!: string | null;
+
+  @Column({ type: 'boolean', name: 'is_acknowledged', default: false })
+  isAcknowledged!: boolean;
+
+  @Column({ type: 'timestamptz', name: 'acknowledged_at', nullable: true })
+  acknowledgedAt!: Date | null;
+
+  @Column({ type: 'uuid', name: 'acknowledged_by_user_id', nullable: true })
+  acknowledgedByUserId!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 

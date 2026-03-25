@@ -69,4 +69,36 @@ export class MonitoringService {
   listAlerts() {
     return this.alertsRepo.find({ order: { createdAt: 'DESC' } });
   }
+
+  async acknowledgeAlert(alertId: string, actorUserId: string) {
+    const alert = await this.alertsRepo.findOne({ where: { id: alertId } });
+    if (!alert) throw new NotFoundException('Alert not found');
+    alert.isAcknowledged = true;
+    alert.acknowledgedAt = new Date();
+    alert.acknowledgedByUserId = actorUserId;
+    const saved = await this.alertsRepo.save(alert);
+    await this.auditService.log({
+      tenantId: alert.tenantId,
+      actorId: actorUserId,
+      action: 'monitoring.alert.acknowledged',
+      resourceType: 'monitoring_alert',
+      resourceId: alertId,
+      metadata: null,
+    });
+    return saved;
+  }
+
+  async listAlertsByDatasetFamily(tenantId: string, datasetFamily: string) {
+    return this.alertsRepo.find({
+      where: { tenantId, datasetFamily } as any,
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async listSubscriptionsByOrg(tenantId: string, organisationNumber: string) {
+    return this.subscriptionsRepo.find({
+      where: { tenantId, organisationNumber } as any,
+      order: { createdAt: 'DESC' },
+    });
+  }
 }
