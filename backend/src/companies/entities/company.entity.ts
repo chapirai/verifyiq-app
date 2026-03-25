@@ -9,6 +9,8 @@ import {
 
 @Entity({ name: 'companies' })
 @Index(['tenantId', 'organisationNumber'], { unique: true })
+@Index(['tenantId', 'status'])
+@Index(['tenantId', 'legalName'])
 export class CompanyEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

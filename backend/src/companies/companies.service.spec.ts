@@ -1,10 +1,13 @@
 import { GatewayTimeoutException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditService } from '../../audit/audit.service';
 import { TenantContext } from '../../common/interfaces/tenant-context.interface';
 import { CompaniesService } from '../companies.service';
+import { ListCompaniesDto } from '../dto/list-companies.dto';
 import { LookupCompanyDto } from '../dto/lookup-company.dto';
 import { BvFetchSnapshotEntity } from '../entities/bv-fetch-snapshot.entity';
+import { CompanyEntity } from '../entities/company.entity';
 import { BolagsverketService } from '../services/bolagsverket.service';
 import { CACHE_TTL_DAYS } from '../services/bv-cache.service';
 
@@ -58,6 +61,10 @@ describe('CompaniesService – orchestrateLookup', () => {
         {
           provide: AuditService,
           useValue: { log: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: getRepositoryToken(CompanyEntity),
+          useValue: { createQueryBuilder: jest.fn() },
         },
       ],
     }).compile();
@@ -198,5 +205,180 @@ describe('CompaniesService – orchestrateLookup', () => {
         service.orchestrateLookup(ctx, { orgNumber: ORG_NR }),
       ).rejects.toThrow('API failure');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helper: build a chainable QueryBuilder mock
+// ---------------------------------------------------------------------------
+function makeQbMock(data: Partial<CompanyEntity>[], total: number) {
+  const qb: Record<string, jest.Mock> = {};
+  const chain = () => qb;
+  qb.select = jest.fn(chain);
+  qb.where = jest.fn(chain);
+  qb.andWhere = jest.fn(chain);
+  qb.skip = jest.fn(chain);
+  qb.take = jest.fn(chain);
+  qb.getManyAndCount = jest.fn().mockResolvedValue([data, total]);
+  return qb;
+}
+
+describe('CompaniesService – findAll', () => {
+  let service: CompaniesService;
+  let companyRepo: { createQueryBuilder: jest.Mock };
+
+  beforeEach(async () => {
+    companyRepo = { createQueryBuilder: jest.fn() };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        CompaniesService,
+        {
+          provide: BolagsverketService,
+          useValue: { enrichAndSave: jest.fn() },
+        },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: getRepositoryToken(CompanyEntity),
+          useValue: companyRepo,
+        },
+      ],
+    }).compile();
+
+    service = module.get<CompaniesService>(CompaniesService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns empty data array with has_next=false when no results', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    const result = await service.findAll(ctx, {});
+    expect(result).toEqual({ data: [], total: 0, page: 1, limit: 10, has_next: false });
+  });
+
+  it('applies tenant isolation via WHERE tenantId = :tenantId', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findAll(ctx, {});
+
+    expect(qb.where).toHaveBeenCalledWith('c.tenantId = :tenantId', { tenantId: TENANT_ID });
+  });
+
+  it('applies q filter as ILIKE when q is provided', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findAll(ctx, { q: 'nordic' } as ListCompaniesDto);
+
+    expect(qb.andWhere).toHaveBeenCalledWith('c.legalName ILIKE :q', { q: '%nordic%' });
+  });
+
+  it('does NOT apply q filter when q is absent', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findAll(ctx, {});
+
+    const calls: string[] = qb.andWhere.mock.calls.map((c: unknown[]) => c[0]);
+    expect(calls.some((c) => c.includes('legalName'))).toBe(false);
+  });
+
+  it('applies org_number exact filter when org_number is provided', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findAll(ctx, { org_number: ORG_NR } as ListCompaniesDto);
+
+    expect(qb.andWhere).toHaveBeenCalledWith('c.organisationNumber = :orgNumber', { orgNumber: ORG_NR });
+  });
+
+  it('applies status filter when status is provided', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findAll(ctx, { status: 'ACTIVE' } as ListCompaniesDto);
+
+    expect(qb.andWhere).toHaveBeenCalledWith('c.status = :status', { status: 'ACTIVE' });
+  });
+
+  it('uses default page=1 and limit=10 when not provided', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findAll(ctx, {});
+
+    expect(qb.skip).toHaveBeenCalledWith(0); // offset = (1-1)*10 = 0
+    expect(qb.take).toHaveBeenCalledWith(10);
+  });
+
+  it('calculates correct offset for page 2 with limit 10', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findAll(ctx, { page: 2, limit: 10 } as ListCompaniesDto);
+
+    expect(qb.skip).toHaveBeenCalledWith(10);
+    expect(qb.take).toHaveBeenCalledWith(10);
+  });
+
+  it('sets has_next=true when more results exist beyond current page', async () => {
+    const items = [{ id: '1' }, { id: '2' }] as CompanyEntity[];
+    const qb = makeQbMock(items, 25);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    const result = await service.findAll(ctx, { page: 1, limit: 10 } as ListCompaniesDto);
+
+    expect(result.has_next).toBe(true);
+    expect(result.total).toBe(25);
+  });
+
+  it('sets has_next=false on the last page', async () => {
+    const items = [{ id: '1' }, { id: '2' }] as CompanyEntity[];
+    const qb = makeQbMock(items, 12);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    const result = await service.findAll(ctx, { page: 2, limit: 10 } as ListCompaniesDto);
+
+    // page 2: offset=10, data.length=2, total=12 → 10+2=12 === 12 → no next
+    expect(result.has_next).toBe(false);
+  });
+
+  it('returns empty data and has_next=false for an out-of-range page', async () => {
+    const qb = makeQbMock([], 5);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    const result = await service.findAll(ctx, { page: 999, limit: 10 } as ListCompaniesDto);
+
+    expect(result.data).toEqual([]);
+    expect(result.has_next).toBe(false);
+    expect(result.total).toBe(5);
+  });
+
+  it('combines multiple filters in a single query', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findAll(ctx, { q: 'nordic', status: 'ACTIVE' } as ListCompaniesDto);
+
+    expect(qb.andWhere).toHaveBeenCalledWith('c.legalName ILIKE :q', { q: '%nordic%' });
+    expect(qb.andWhere).toHaveBeenCalledWith('c.status = :status', { status: 'ACTIVE' });
+  });
+
+  it('includes correct page and limit in the response', async () => {
+    const qb = makeQbMock([], 0);
+    companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+    const result = await service.findAll(ctx, { page: 3, limit: 20 } as ListCompaniesDto);
+
+    expect(result.page).toBe(3);
+    expect(result.limit).toBe(20);
   });
 });

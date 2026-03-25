@@ -4,6 +4,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { CompaniesService } from './companies.service';
+import { ListCompaniesDto } from './dto/list-companies.dto';
 import { LookupCompanyDto } from './dto/lookup-company.dto';
 
 @Controller('companies')
@@ -18,7 +19,7 @@ export class CompaniesController {
   }
 
   @Get()
-  findAll(@TenantId() tenantId: string, @CurrentUser('sub') actorId: string | undefined, @Query() query: any) {
+  findAll(@TenantId() tenantId: string, @CurrentUser('sub') actorId: string | undefined, @Query() query: ListCompaniesDto) {
     const ctx: TenantContext = { tenantId, actorId: actorId ?? null };
     return this.companiesService.findAll(ctx, query);
   }
