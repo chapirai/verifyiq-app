@@ -19,3 +19,4 @@ pnpm-debug.log*
 backend/dist/
 frontend/.next/
 frontend/out/
+*.tsbuildinfo

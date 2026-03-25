@@ -1,6 +1,8 @@
+import Link from 'next/link';
+
 const companies = [
-  ['556000-0001', 'Nordic Example AB', 'Active'],
-  ['556000-0002', 'Baltic Compliance AB', 'Pending refresh'],
+  ['5560000001', 'Nordic Example AB', 'Active'],
+  ['5560000002', 'Baltic Compliance AB', 'Pending refresh'],
 ];
 
 export default function CompaniesPage() {
@@ -21,9 +23,17 @@ export default function CompaniesPage() {
           </thead>
           <tbody>
             {companies.map(([org, name, status]) => (
-              <tr key={org} className="border-t border-border">
-                <td className="px-4 py-3">{org}</td>
-                <td className="px-4 py-3">{name}</td>
+              <tr key={org} className="border-t border-border transition hover:bg-slate-900/40">
+                <td className="px-4 py-3">
+                  <Link href={`/companies/${org}`} className="text-accent hover:underline">
+                    {org}
+                  </Link>
+                </td>
+                <td className="px-4 py-3">
+                  <Link href={`/companies/${org}`} className="hover:underline">
+                    {name}
+                  </Link>
+                </td>
                 <td className="px-4 py-3">{status}</td>
               </tr>
             ))}

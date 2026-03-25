@@ -69,6 +69,38 @@ export interface CompanyLookupPayload {
   organisationInformationsmangd?: string[];
 }
 
+export interface CompanyLookupByOrgNumberPayload {
+  orgNumber: string;
+  force_refresh?: boolean;
+}
+
+export type FreshnessStatus = 'fresh' | 'stale' | 'expired';
+export type LookupSource = 'DB' | 'API';
+
+export interface CompanyMetadata {
+  source: LookupSource;
+  fetched_at: string;
+  age_days: number;
+  freshness: FreshnessStatus;
+  cache_ttl_days: number;
+}
+
+export interface CompanyData {
+  organisationNumber?: string;
+  legalName?: string;
+  companyForm?: string | null;
+  status?: string | null;
+  registeredAt?: string | null;
+  countryCode?: string | null;
+  businessDescription?: string | null;
+  [key: string]: unknown;
+}
+
+export interface CompanyLookupResponse {
+  company: CompanyData;
+  metadata: CompanyMetadata;
+}
+
 const defaultTenantSlug = process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG || 'demo-bank';
 
 export const api = {
@@ -104,8 +136,15 @@ export const api = {
     }
   },
 
-  async lookupCompany(payload: CompanyLookupPayload) {
+  async lookupCompany(payload: CompanyLookupPayload): Promise<unknown> {
     const response = await httpClient.post('/companies/lookup', payload);
+    return response.data;
+  },
+
+  async lookupCompanyByOrgNumber(
+    payload: CompanyLookupByOrgNumberPayload,
+  ): Promise<CompanyLookupResponse> {
+    const response = await httpClient.post<CompanyLookupResponse>('/companies/lookup', payload);
     return response.data;
   },
 
