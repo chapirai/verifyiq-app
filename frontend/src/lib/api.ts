@@ -64,6 +64,23 @@ export interface LoginResponse {
   };
 }
 
+export interface CompanySearchResult {
+  orgNumber: string;
+  legalName: string | null;
+  status: string | null;
+  countryCode: string | null;
+  fetchedAt: string | null;
+}
+
+export interface CompanySearchResponse {
+  results: CompanySearchResult[];
+  metadata: {
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
+
 export interface CompanyLookupPayload {
   identitetsbeteckning: string;
   organisationInformationsmangd?: string[];
@@ -150,6 +167,13 @@ export const api = {
 
   async listCompanies() {
     const response = await httpClient.get('/companies');
+    return response.data;
+  },
+
+  async searchCompanies(q: string, page = 1, limit = 10): Promise<CompanySearchResponse> {
+    const response = await httpClient.get<CompanySearchResponse>('/companies', {
+      params: { q, page, limit },
+    });
     return response.data;
   },
 
