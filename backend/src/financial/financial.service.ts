@@ -7,8 +7,6 @@ import { CreateFinancialStatementDto } from './dto/create-financial-statement.dt
 import { CreditRatingEntity } from './entities/credit-rating.entity';
 import { FinancialStatementEntity } from './entities/financial-statement.entity';
 
-const STUB_TENANT_ID = '00000000-0000-0000-0000-000000000001';
-
 @Injectable()
 export class FinancialService {
   constructor(

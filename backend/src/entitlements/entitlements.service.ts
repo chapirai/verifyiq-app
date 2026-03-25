@@ -63,7 +63,7 @@ export class EntitlementsService {
       action: 'entitlement.set',
       resourceType: 'dataset_entitlement',
       resourceId: saved.id,
-      metadata: dto as Record<string, unknown>,
+      metadata: dto as unknown as Record<string, unknown>,
     });
 
     return saved;

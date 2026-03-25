@@ -7,8 +7,6 @@ import { RunCreditDecisionDto } from './dto/run-credit-decision.dto';
 import { CreditDecisionResultEntity } from './entities/credit-decision-result.entity';
 import { CreditDecisionTemplateEntity } from './entities/credit-decision-template.entity';
 
-const STUB_TENANT_ID = '00000000-0000-0000-0000-000000000001';
-
 type RuleOperator = 'gt' | 'lt' | 'gte' | 'lte' | 'eq' | 'neq' | 'in' | 'not_in';
 
 interface DecisionRule {
@@ -93,7 +91,7 @@ export class CreditDecisioningService {
       if (!template) throw new NotFoundException('Template not found');
     }
 
-    const rules: DecisionRule[] = (template?.rules ?? []) as DecisionRule[];
+    const rules: DecisionRule[] = ((template?.rules ?? []) as unknown) as DecisionRule[];
     const inputData: Record<string, unknown> = dto.inputData ?? {};
     const ruleResults: Array<Record<string, unknown>> = [];
     let score = 0;
