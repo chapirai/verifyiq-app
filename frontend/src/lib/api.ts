@@ -128,4 +128,31 @@ export const api = {
     const response = await httpClient.get('/monitoring/alerts');
     return response.data;
   },
+
+  bolagsverket: {
+    async enrich(payload: { identitetsbeteckning: string; forceRefresh?: boolean }) {
+      const response = await httpClient.post('/bolagsverket/enrich', payload);
+      return response.data;
+    },
+    async enrichPerson(payload: { personnummer: string; forceRefresh?: boolean }) {
+      const response = await httpClient.post('/bolagsverket/enrich/person', payload);
+      return response.data;
+    },
+    async getSnapshots(orgNr: string) {
+      const response = await httpClient.get(`/bolagsverket/snapshots?orgNr=${encodeURIComponent(orgNr)}`);
+      return response.data;
+    },
+    async getStoredDocuments(orgNr: string) {
+      const response = await httpClient.get(`/bolagsverket/stored-documents?orgNr=${encodeURIComponent(orgNr)}`);
+      return response.data;
+    },
+    async company(orgNr: string) {
+      const response = await httpClient.post('/bolagsverket/company', { identitetsbeteckning: orgNr });
+      return response.data;
+    },
+    async documentList(orgNr: string) {
+      const response = await httpClient.post('/bolagsverket/documents', { identitetsbeteckning: orgNr });
+      return response.data;
+    },
+  },
 };

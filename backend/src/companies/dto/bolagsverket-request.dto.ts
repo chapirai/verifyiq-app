@@ -128,3 +128,27 @@ export class BolagsverketFinancialReportsDto {
   @IsString()
   tomdatum?: string;
 }
+
+export class BvEnrichDto {
+  @IsString()
+  @Matches(ID_REGEX, {
+    message:
+      'identitetsbeteckning must be a 10-digit organisationsnummer, 12-digit personnummer/samordningsnummer, or 10-digit GD-nummer (302XXXXXXX)',
+  })
+  identitetsbeteckning!: string;
+
+  @IsOptional()
+  forceRefresh?: boolean;
+}
+
+export class BvPersonEnrichDto {
+  @IsString()
+  @Matches(ID_REGEX, {
+    message:
+      'personnummer must be a 10-digit or 12-digit Swedish personnummer/samordningsnummer',
+  })
+  personnummer!: string;
+
+  @IsOptional()
+  forceRefresh?: boolean;
+}

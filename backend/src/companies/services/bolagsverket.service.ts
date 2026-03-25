@@ -12,9 +12,18 @@ import {
   OrganisationInformationResponse,
   OrganisationsengagemangResponse,
 } from '../integrations/bolagsverket.types';
+import { BvCacheService } from './bv-cache.service';
+import { BvPersistenceService } from './bv-persistence.service';
+import { BvFetchSnapshotEntity } from '../entities/bv-fetch-snapshot.entity';
 
 /** Allowed tolerance when validating share-capital arithmetic (1 %). */
 const SHARE_CAPITAL_TOLERANCE = 0.01;
+
+/**
+ * Number of external Bolagsverket API calls made by getCompleteCompanyData:
+ * 1 × fetchHighValueDataset + 1 × fetchOrganisationInformation + 1 × fetchDocumentList.
+ */
+const ENRICH_API_CALL_COUNT = 3;
 
 export interface CompleteCompanyProfile {
   normalisedData: NormalisedCompany;
@@ -52,6 +61,8 @@ export class BolagsverketService {
   constructor(
     private readonly client: BolagsverketClient,
     private readonly mapper: BolagsverketMapper,
+    private readonly bvCacheService: BvCacheService,
+    private readonly bvPersistenceService: BvPersistenceService,
   ) {}
 
   // ── Health ──────────────────────────────────────────────────────────────────
@@ -296,5 +307,159 @@ export class BolagsverketService {
     }
 
     return { isValid: errors.length === 0, errors, warnings };
+  }
+
+  // ── Enrichment (cache-aware) ─────────────────────────────────────────────────
+
+  /**
+   * Fetch and persist a complete company profile, using cache when available.
+   * Skips the Bolagsverket API if a fresh snapshot (< 30 days) already exists.
+   */
+  async enrichAndSave(
+    tenantId: string,
+    identitetsbeteckning: string,
+    forceRefresh = false,
+  ): Promise<{
+    result: CompleteCompanyProfile;
+    snapshot: BvFetchSnapshotEntity;
+    isFromCache: boolean;
+    ageInDays: number | null;
+  }> {
+    // 1. Check cache
+    if (!forceRefresh) {
+      const cacheCheck = await this.bvCacheService.checkFreshness(tenantId, identitetsbeteckning);
+      if (cacheCheck.isFresh && cacheCheck.snapshot) {
+        this.logger.log(
+          `Cache hit for ${identitetsbeteckning} (age: ${cacheCheck.ageInDays} days)`,
+        );
+        const cachedResult: CompleteCompanyProfile = {
+          normalisedData: cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany,
+          highValueDataset: null,
+          organisationInformation: [],
+          documents: null,
+          retrievedAt: cacheCheck.snapshot.fetchedAt.toISOString(),
+        };
+        return {
+          result: cachedResult,
+          snapshot: cacheCheck.snapshot,
+          isFromCache: true,
+          ageInDays: cacheCheck.ageInDays,
+        };
+      }
+    }
+
+    // 2. Fetch fresh data
+    let fetchStatus: 'success' | 'error' | 'partial' = 'success';
+    let errorMessage: string | undefined;
+    let result!: CompleteCompanyProfile;
+    let apiCallCount = 0;
+
+    try {
+      result = await this.getCompleteCompanyData(identitetsbeteckning);
+      apiCallCount = ENRICH_API_CALL_COUNT;
+    } catch (err) {
+      fetchStatus = 'error';
+      errorMessage = String(err);
+      this.logger.error(`Enrichment failed for ${identitetsbeteckning}: ${err}`);
+      await this.bvCacheService.createSnapshot({
+        tenantId,
+        organisationsnummer: identitetsbeteckning,
+        identifierUsed: identitetsbeteckning,
+        identifierType: 'organisationsnummer',
+        fetchStatus: 'error',
+        isFromCache: false,
+        errorMessage,
+        fetchedAt: new Date(),
+        apiCallCount: 0,
+      });
+      throw err;
+    }
+
+    // 3. Persist normalised data
+    try {
+      const org = await this.bvPersistenceService.upsertOrganisation(tenantId, result.normalisedData, {
+        highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
+        organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
+      });
+
+      // 4. Create snapshot record
+      const snapshot = await this.bvCacheService.createSnapshot({
+        tenantId,
+        organisationId: org.id,
+        organisationsnummer: identitetsbeteckning,
+        identifierUsed: identitetsbeteckning,
+        identifierType: 'organisationsnummer',
+        fetchStatus,
+        isFromCache: false,
+        normalisedSummary: result.normalisedData as unknown as Record<string, unknown>,
+        rawPayloadSummary: (result.normalisedData.sourcePayloadSummary as Record<string, unknown>) ?? {},
+        fetchedAt: new Date(),
+        apiCallCount,
+        errorMessage,
+      });
+
+      return { result, snapshot, isFromCache: false, ageInDays: null };
+    } catch (persistErr) {
+      this.logger.warn(`Persistence failed for ${identitetsbeteckning}: ${persistErr}`);
+      const snapshot = await this.bvCacheService.createSnapshot({
+        tenantId,
+        organisationsnummer: identitetsbeteckning,
+        identifierUsed: identitetsbeteckning,
+        identifierType: 'organisationsnummer',
+        fetchStatus: 'partial',
+        isFromCache: false,
+        normalisedSummary: result.normalisedData as unknown as Record<string, unknown>,
+        rawPayloadSummary: (result.normalisedData.sourcePayloadSummary as Record<string, unknown>) ?? {},
+        fetchedAt: new Date(),
+        apiCallCount,
+        errorMessage: String(persistErr),
+      });
+      return { result, snapshot, isFromCache: false, ageInDays: null };
+    }
+  }
+
+  /**
+   * Look up all organisations where a person holds officer positions,
+   * with cache-aware freshness checking.
+   */
+  async enrichPersonEngagements(
+    tenantId: string,
+    personnummer: string,
+    forceRefresh = false,
+  ): Promise<{
+    engagements: OrganisationsengagemangResponse;
+    snapshot: BvFetchSnapshotEntity;
+    isFromCache: boolean;
+    ageInDays: number | null;
+  }> {
+    if (!forceRefresh) {
+      const cacheCheck = await this.bvCacheService.checkFreshness(tenantId, personnummer);
+      if (cacheCheck.isFresh && cacheCheck.snapshot) {
+        return {
+          engagements: cacheCheck.snapshot.normalisedSummary as unknown as OrganisationsengagemangResponse,
+          snapshot: cacheCheck.snapshot,
+          isFromCache: true,
+          ageInDays: cacheCheck.ageInDays,
+        };
+      }
+    }
+
+    const { responsePayload: engagements } =
+      await this.client.fetchOrganizationEngagements(personnummer);
+
+    const snapshot = await this.bvCacheService.createSnapshot({
+      tenantId,
+      organisationsnummer: personnummer,
+      identifierUsed: personnummer,
+      identifierType: 'personnummer',
+      fetchStatus: 'success',
+      isFromCache: false,
+      normalisedSummary: engagements as unknown as Record<string, unknown>,
+      rawPayloadSummary: {},
+      fetchedAt: new Date(),
+      apiCallCount: 1,
+    });
+
+    return { engagements, snapshot, isFromCache: false, ageInDays: null };
   }
 }

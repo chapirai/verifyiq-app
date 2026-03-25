@@ -15,6 +15,7 @@ export default () => ({
   MINIO_ENDPOINT: process.env.MINIO_ENDPOINT ?? 'localhost',
   MINIO_PORT: Number(process.env.MINIO_PORT ?? 9000),
   MINIO_USE_SSL: process.env.MINIO_USE_SSL === 'true',
+  MINIO_REGION: process.env.MINIO_REGION ?? 'eu-west-1',
   MINIO_ROOT_USER: process.env.MINIO_ROOT_USER,
   MINIO_ROOT_PASSWORD: process.env.MINIO_ROOT_PASSWORD,
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
