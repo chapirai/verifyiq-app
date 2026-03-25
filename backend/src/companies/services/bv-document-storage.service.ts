@@ -30,7 +30,7 @@ export class BvDocumentStorageService {
     this.minioClient = new Minio.Client({
       endPoint: this.configService.get<string>('MINIO_ENDPOINT', 'localhost'),
       port: this.configService.get<number>('MINIO_PORT', 9000),
-      useSSL: this.configService.get<boolean>('MINIO_USE_SSL', false),
+      useSSL: this.configService.get<string>('MINIO_USE_SSL', 'false').toLowerCase() === 'true',
       accessKey: this.configService.get<string>('AWS_ACCESS_KEY_ID', 'minioadmin'),
       secretKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY', 'minioadmin'),
     });
