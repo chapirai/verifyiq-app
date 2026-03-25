@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { BolagsverketClient } from '../integrations/bolagsverket.client';
 import { BolagsverketMapper, DEFAULT_COMPANY_NAME, NormalisedCompany } from '../integrations/bolagsverket.mapper';
 import {
@@ -91,14 +91,30 @@ export class BolagsverketService {
     const documents =
       docResult.status === 'fulfilled' ? docResult.value.responsePayload : null;
 
+    const failedDatasets: string[] = [];
     if (hvdResult.status === 'rejected') {
       this.logger.warn(`fetchHighValueDataset failed for ${identitetsbeteckning}: ${hvdResult.reason}`);
+      failedDatasets.push(`highValueDataset: ${hvdResult.reason}`);
     }
     if (richResult.status === 'rejected') {
       this.logger.warn(`fetchOrganisationInformation failed for ${identitetsbeteckning}: ${richResult.reason}`);
+      failedDatasets.push(`organisationInformation: ${richResult.reason}`);
     }
     if (docResult.status === 'rejected') {
       this.logger.warn(`fetchDocumentList failed for ${identitetsbeteckning}: ${docResult.reason}`);
+      failedDatasets.push(`documentList: ${docResult.reason}`);
+    }
+
+    if (failedDatasets.length === 3) {
+      throw new BadGatewayException(
+        `All Bolagsverket API calls failed for ${identitetsbeteckning}: ${failedDatasets.join('; ')}`,
+      );
+    }
+
+    if (failedDatasets.length > 0) {
+      this.logger.warn(
+        `Partial Bolagsverket data for ${identitetsbeteckning}: ${failedDatasets.length}/3 datasets unavailable`,
+      );
     }
 
     const normalisedData = this.mapper.map(highValueDataset, organisationInformation);
@@ -361,17 +377,21 @@ export class BolagsverketService {
       fetchStatus = 'error';
       errorMessage = String(err);
       this.logger.error(`Enrichment failed for ${identitetsbeteckning}: ${err}`);
-      await this.bvCacheService.createSnapshot({
-        tenantId,
-        organisationsnummer: identitetsbeteckning,
-        identifierUsed: identitetsbeteckning,
-        identifierType: 'organisationsnummer',
-        fetchStatus: 'error',
-        isFromCache: false,
-        errorMessage,
-        fetchedAt: new Date(),
-        apiCallCount: 0,
-      });
+      try {
+        await this.bvCacheService.createSnapshot({
+          tenantId,
+          organisationsnummer: identitetsbeteckning,
+          identifierUsed: identitetsbeteckning,
+          identifierType: 'organisationsnummer',
+          fetchStatus: 'error',
+          isFromCache: false,
+          errorMessage,
+          fetchedAt: new Date(),
+          apiCallCount: 0,
+        });
+      } catch (snapshotErr) {
+        this.logger.error(`Failed to create error snapshot for ${identitetsbeteckning}: ${snapshotErr}`);
+      }
       throw err;
     }
 
