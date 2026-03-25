@@ -49,7 +49,7 @@ export default function CompanyProfilePage() {
   const params = useParams();
   const orgNumber = typeof params.orgNumber === 'string' ? params.orgNumber : '';
 
-  const { data, loading, error, refreshing, refresh } = useCompanyLookup(orgNumber);
+  const { data, loading, error, refreshing, cooldownRemaining, refresh } = useCompanyLookup(orgNumber);
 
   const company = data?.company;
   const metadata = data?.metadata;
@@ -112,7 +112,9 @@ export default function CompanyProfilePage() {
             </div>
             <button
               onClick={() => refresh()}
-              disabled={refreshing}
+              disabled={refreshing || cooldownRemaining > 0}
+              title={cooldownRemaining > 0 ? `Please wait ${cooldownRemaining}s before refreshing again` : 'Fetch fresh data from API (bypasses cache)'}
+              aria-label="Refresh company data"
               className="flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {refreshing ? (
@@ -138,6 +140,24 @@ export default function CompanyProfilePage() {
                     />
                   </svg>
                   Refreshing…
+                </>
+              ) : cooldownRemaining > 0 ? (
+                <>
+                  <svg
+                    className="h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Refresh ({cooldownRemaining}s)
                 </>
               ) : (
                 <>

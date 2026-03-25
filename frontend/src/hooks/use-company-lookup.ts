@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, CompanyLookupResponse } from '@/lib/api';
+import { useToast } from '@/components/ui/ToastProvider';
 
 const RECENTLY_VIEWED_KEY = 'verifyiq:recently-viewed-companies';
 const MAX_RECENTLY_VIEWED = 10;
+const REFRESH_COOLDOWN_MS = 5000;
 
 interface ApiError {
   response?: {
@@ -42,6 +44,8 @@ export type CompanyLookupState = {
   loading: boolean;
   error: string | null;
   refreshing: boolean;
+  /** Seconds remaining in the post-refresh cooldown (0 when not in cooldown). */
+  cooldownRemaining: number;
   fetch: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -51,13 +55,51 @@ export function useCompanyLookup(orgNumber: string): CompanyLookupState {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+
+  /** Absolute timestamp (ms) when the cooldown expires. */
+  const cooldownUntilRef = useRef<number>(0);
+  const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const { addToast } = useToast();
+
+  const startCooldown = useCallback(() => {
+    cooldownUntilRef.current = Date.now() + REFRESH_COOLDOWN_MS;
+    setCooldownRemaining(Math.ceil(REFRESH_COOLDOWN_MS / 1000));
+
+    if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+
+    cooldownTimerRef.current = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((cooldownUntilRef.current - Date.now()) / 1000));
+      setCooldownRemaining(remaining);
+      if (remaining === 0 && cooldownTimerRef.current) {
+        clearInterval(cooldownTimerRef.current);
+        cooldownTimerRef.current = null;
+      }
+    }, 1000);
+  }, []);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+    };
+  }, []);
 
   const doFetch = useCallback(
     async (forceRefresh: boolean) => {
       if (!orgNumber) return;
       const isRefresh = forceRefresh;
+
       if (isRefresh) {
+        // Enforce client-side rate limit
+        if (Date.now() < cooldownUntilRef.current) {
+          const secsLeft = Math.ceil((cooldownUntilRef.current - Date.now()) / 1000);
+          addToast(`Please wait ${secsLeft} second${secsLeft === 1 ? '' : 's'} before refreshing again`, 'info');
+          return;
+        }
         setRefreshing(true);
+        addToast('Refreshing data…', 'info');
       } else {
         setLoading(true);
         setError(null);
@@ -71,29 +113,44 @@ export function useCompanyLookup(orgNumber: string): CompanyLookupState {
         setData(result);
         setError(null);
         saveRecentlyViewed(orgNumber);
+
+        if (isRefresh) {
+          addToast('Data refreshed successfully', 'success');
+          startCooldown();
+        }
       } catch (err: unknown) {
         const apiErr = isApiError(err) ? err : null;
         const status = apiErr?.response?.status;
+
+        let userMessage: string;
         if (status === 404) {
-          setError('Company not found. Please check the organisation number and try again.');
+          userMessage = 'Company not found. Please check the organisation number and try again.';
         } else if (status === 400) {
-          setError('Invalid organisation number format. Please use a 10-digit or 12-digit number.');
+          userMessage = 'Invalid organisation number format. Please use a 10-digit or 12-digit number.';
         } else if (status != null && status >= 500) {
-          setError('Service is temporarily unavailable. Please try again later.');
+          userMessage = isRefresh
+            ? 'Service error. Please try again later.'
+            : 'Service is temporarily unavailable. Please try again later.';
         } else if (err instanceof Error && err.message.toLowerCase().includes('timeout')) {
-          setError('Request timed out. Please try again.');
+          userMessage = isRefresh ? 'Refresh timed out. Please try again.' : 'Request timed out. Please try again.';
         } else if (err instanceof Error && err.message.toLowerCase().includes('network')) {
-          setError('Network error. Please check your connection and try again.');
+          userMessage = 'Network error. Check your connection.';
         } else {
-          const msg = apiErr?.response?.data?.message ?? (err instanceof Error ? err.message : 'An unexpected error occurred.');
-          setError(typeof msg === 'string' ? msg : 'An unexpected error occurred.');
+          const msg = apiErr?.response?.data?.message ?? (err instanceof Error ? err.message : null);
+          userMessage = typeof msg === 'string' ? msg : isRefresh ? 'Refresh failed. Please try again.' : 'An unexpected error occurred.';
+        }
+
+        if (isRefresh) {
+          addToast(`Refresh failed: ${userMessage}`, 'error', () => doFetch(true));
+        } else {
+          setError(userMessage);
         }
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [orgNumber],
+    [orgNumber, addToast, startCooldown],
   );
 
   const fetch = useCallback(() => doFetch(false), [doFetch]);
@@ -103,5 +160,5 @@ export function useCompanyLookup(orgNumber: string): CompanyLookupState {
     fetch();
   }, [fetch]);
 
-  return { data, loading, error, refreshing, fetch, refresh };
+  return { data, loading, error, refreshing, cooldownRemaining, fetch, refresh };
 }
