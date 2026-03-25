@@ -436,11 +436,49 @@ export class EnterpriseDatasetTables1000000000004 implements MigrationInterface 
 
       CREATE INDEX IF NOT EXISTS idx_business_prohibitions_tenant_active
         ON business_prohibitions (tenant_id, is_active);
+
+      -- ---------------------------------------------------------------------------
+      -- 16. Extend monitoring_subscriptions with new dataset-aware columns
+      -- ---------------------------------------------------------------------------
+      ALTER TABLE monitoring_subscriptions
+        ADD COLUMN IF NOT EXISTS subject_type         VARCHAR(64)  NOT NULL DEFAULT 'company',
+        ADD COLUMN IF NOT EXISTS organisation_number  VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS personnummer         VARCHAR(32),
+        ADD COLUMN IF NOT EXISTS dataset_families     JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS alert_config         JSONB        NOT NULL DEFAULT '{}'::jsonb;
+
+      -- ---------------------------------------------------------------------------
+      -- 17. Extend monitoring_alerts with dataset-family and acknowledgement columns
+      -- ---------------------------------------------------------------------------
+      ALTER TABLE monitoring_alerts
+        ADD COLUMN IF NOT EXISTS dataset_family          VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS organisation_number     VARCHAR(32),
+        ADD COLUMN IF NOT EXISTS personnummer            VARCHAR(32),
+        ADD COLUMN IF NOT EXISTS is_acknowledged         BOOLEAN      NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS acknowledged_at         TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS acknowledged_by_user_id UUID;
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
+      -- Revert monitoring_alerts extensions
+      ALTER TABLE monitoring_alerts
+        DROP COLUMN IF EXISTS acknowledged_by_user_id,
+        DROP COLUMN IF EXISTS acknowledged_at,
+        DROP COLUMN IF EXISTS is_acknowledged,
+        DROP COLUMN IF EXISTS personnummer,
+        DROP COLUMN IF EXISTS organisation_number,
+        DROP COLUMN IF EXISTS dataset_family;
+
+      -- Revert monitoring_subscriptions extensions
+      ALTER TABLE monitoring_subscriptions
+        DROP COLUMN IF EXISTS alert_config,
+        DROP COLUMN IF EXISTS dataset_families,
+        DROP COLUMN IF EXISTS personnummer,
+        DROP COLUMN IF EXISTS organisation_number,
+        DROP COLUMN IF EXISTS subject_type;
+
       -- Drop in reverse dependency order (most dependent first).
       DROP TABLE IF EXISTS business_prohibitions;
       DROP TABLE IF EXISTS company_cases;

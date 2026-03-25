@@ -8,6 +8,14 @@ const nav: { href: Route; label: string }[] = [
   { href: '/onboarding', label: 'Onboarding' },
   { href: '/screening', label: 'Screening' },
   { href: '/monitoring', label: 'Monitoring' },
+  { href: '/ownership', label: 'Ownership' },
+  { href: '/financial', label: 'Financial & Ratings' },
+  { href: '/risk-indicators', label: 'Risk Indicators' },
+  { href: '/credit-decisioning', label: 'Credit Decisions' },
+  { href: '/property', label: 'Property' },
+  { href: '/person-enrichment', label: 'Person Enrichment' },
+  { href: '/company-cases', label: 'Company Cases' },
+  { href: '/entitlements', label: 'Dataset Entitlements' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
