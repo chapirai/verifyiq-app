@@ -1,0 +1,99 @@
+name: "Create Issue: P2-T1 Snapshot Entity & Storage Model"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create GitHub Issue P2-T1
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: "P2-T1: Design Snapshot Entity & Storage Model for Immutable Company Data History",
+              labels: ["phase-2", "workstream-A", "backend", "database"],
+              body: `TICKET ID: P2-T1
+PHASE: 2 — Snapshots, Cache, Lineage & Data Storage
+WORKSTREAM: A — Snapshots
+TITLE: Design Snapshot Entity & Storage Model for Immutable Company Data History
+PURPOSE: Define the database schema and TypeORM entity for immutable, point-in-time snapshots of company data, so that every version of a company record is permanently preserved and auditable
+USER: System (triggered by every successful company lookup)
+INPUT: Enriched company data returned from Bolagsverket API or DB
+OUTPUT: A new snapshot row saved in the DB capturing the exact state of company data at a given point in time
+
+DEPENDENCIES: Phase 1 (P1-T2 lookup flow must exist)
+
+BACKEND LAYER:
+
+Entity: CompanySnapshotEntity
+  Table name: company_snapshots
+  Fields:
+    - id: UUID (PK, auto-generated)
+    - orgNumber: string (indexed, NOT NULL) — Swedish organisation number
+    - snapshotData: jsonb (NOT NULL) — full raw company payload at time of snapshot
+    - dataSource: enum ('DB_CACHE' | 'API') — where data originated
+    - fetchedAt: timestamptz (NOT NULL) — when data was originally fetched from source
+    - createdAt: timestamptz (auto, NOT NULL) — when snapshot row was written
+    - tenantId: UUID (indexed, NOT NULL) — tenant isolation
+    - correlationId: UUID (nullable) — links snapshot to originating lookup request
+    - schemaVersion: string (NOT NULL, default '1.0') — payload schema version for future migrations
+    - checksum: string (NOT NULL) — SHA-256 of snapshotData for integrity verification
+
+Indexes:
+    - (orgNumber, createdAt DESC) — for fetching snapshot history
+    - (tenantId, orgNumber) — for tenant-scoped queries
+    - (correlationId) — for linking snapshots to audit logs
+    - (checksum) — for deduplication checks
+
+Constraints:
+    - snapshotData must be valid JSON (DB-level CHECK constraint)
+    - fetchedAt must be <= createdAt
+    - tenantId + orgNumber + fetchedAt must be unique (no duplicate snapshots for same fetch)
+
+Migration: 1000000000004-CompanySnapshots.ts
+  - Creates company_snapshots table
+  - Adds all indexes listed above
+  - Adds check constraint on snapshotData
+  - Down migration: drops table cleanly
+
+TypeORM Module Registration:
+  - Register CompanySnapshotEntity in CompaniesModule (entities array)
+  - Ensure TypeORM can find the entity via glob or explicit import
+
+DATA DESIGN NOTES:
+  - Snapshots are IMMUTABLE — never updated after creation, only inserted
+  - snapshotData stores the full normalised company payload (same shape as CompanyData type)
+  - schemaVersion allows future payload migrations without losing old snapshots
+  - checksum enables change detection (P2-D1 will use this)
+  - tenantId enables full multi-tenant data isolation at DB level
+
+ACCEPTANCE CRITERIA:
+  □ CompanySnapshotEntity file created under backend/src/companies/entities/
+  □ All fields typed correctly (UUID, jsonb, enum, timestamptz)
+  □ Migration file created and runs cleanly (up + down)
+  □ All indexes created in migration
+  □ Entity registered in CompaniesModule
+  □ checksum field stores SHA-256 hex string of snapshotData JSON
+  □ schemaVersion defaults to '1.0'
+  □ Unique constraint on (tenantId, orgNumber, fetchedAt)
+  □ No TypeORM or migration errors in test DB
+  □ Entity matches CompanyData type shape for snapshotData
+
+TESTING:
+  - Unit test: entity can be instantiated and fields assigned
+  - Migration test: up migration creates table + indexes; down drops cleanly
+  - DB test: insert a snapshot row, read it back, verify all fields
+  - DB test: attempt duplicate (tenantId, orgNumber, fetchedAt) — must fail with unique violation
+
+ERROR HANDLING:
+  - Migration failure: down() must cleanly roll back table creation
+  - Duplicate insert: DB constraint violation — handled by Persistence Service (P2-T2)
+  - Invalid JSON in snapshotData: DB CHECK constraint rejects at write time`
+            });
+            console.log('Issue P2-T1 created successfully');
