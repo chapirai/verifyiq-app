@@ -6,11 +6,30 @@ import { api, CompanyLookupResponse } from '@/lib/api';
 const RECENTLY_VIEWED_KEY = 'verifyiq:recently-viewed-companies';
 const MAX_RECENTLY_VIEWED = 10;
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: { message?: string };
+  };
+  message?: string;
+}
+
+function isApiError(err: unknown): err is ApiError {
+  return typeof err === 'object' && err !== null;
+}
+
 function saveRecentlyViewed(orgNumber: string) {
   if (typeof window === 'undefined') return;
   try {
     const raw = localStorage.getItem(RECENTLY_VIEWED_KEY);
-    const existing: string[] = raw ? (JSON.parse(raw) as unknown[]).filter((v): v is string => typeof v === 'string') : [];
+    const existing: string[] = (() => {
+      try {
+        const parsed: unknown = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+      } catch {
+        return [];
+      }
+    })();
     const updated = [orgNumber, ...existing.filter((n) => n !== orgNumber)].slice(0, MAX_RECENTLY_VIEWED);
     localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(updated));
   } catch {
@@ -53,8 +72,8 @@ export function useCompanyLookup(orgNumber: string): CompanyLookupState {
         setError(null);
         saveRecentlyViewed(orgNumber);
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
-        const status = axiosErr?.response?.status;
+        const apiErr = isApiError(err) ? err : null;
+        const status = apiErr?.response?.status;
         if (status === 404) {
           setError('Company not found. Please check the organisation number and try again.');
         } else if (status === 400) {
@@ -66,7 +85,7 @@ export function useCompanyLookup(orgNumber: string): CompanyLookupState {
         } else if (err instanceof Error && err.message.toLowerCase().includes('network')) {
           setError('Network error. Please check your connection and try again.');
         } else {
-          const msg = axiosErr?.response?.data?.message ?? (err instanceof Error ? err.message : 'An unexpected error occurred.');
+          const msg = apiErr?.response?.data?.message ?? (err instanceof Error ? err.message : 'An unexpected error occurred.');
           setError(typeof msg === 'string' ? msg : 'An unexpected error occurred.');
         }
       } finally {

@@ -136,7 +136,7 @@ export const api = {
     }
   },
 
-  async lookupCompany(payload: CompanyLookupPayload) {
+  async lookupCompany(payload: CompanyLookupPayload): Promise<unknown> {
     const response = await httpClient.post('/companies/lookup', payload);
     return response.data;
   },

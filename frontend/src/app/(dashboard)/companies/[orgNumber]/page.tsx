@@ -32,7 +32,8 @@ function LoadingSkeleton() {
       <div className="rounded-2xl border border-border bg-card p-6">
         <SkeletonBlock className="mb-4 h-4 w-28" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {/* Static skeleton blocks - index key is stable since this list never reorders */}
+        {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="space-y-1.5">
               <SkeletonBlock className="h-3 w-20" />
               <SkeletonBlock className="h-4 w-32" />
