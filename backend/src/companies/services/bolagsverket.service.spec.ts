@@ -1,3 +1,4 @@
+import { BadGatewayException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BolagsverketService, DataValidationResult } from './bolagsverket.service';
 import { BolagsverketClient } from '../integrations/bolagsverket.client';
@@ -134,6 +135,81 @@ describe('BolagsverketService', () => {
       expect(result.organisationNumber).toBe('5560000001');
       expect(result.legalName).toBe('Test AB');
       expect(result.companyForm).toBe('Aktiebolag');
+    });
+  });
+
+  describe('getCompleteCompanyData', () => {
+    let clientMock: jest.Mocked<BolagsverketClient>;
+    let mapperMock: jest.Mocked<BolagsverketMapper>;
+
+    beforeEach(async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          BolagsverketService,
+          {
+            provide: BolagsverketClient,
+            useValue: {
+              fetchHighValueDataset: jest.fn(),
+              fetchOrganisationInformation: jest.fn(),
+              fetchDocumentList: jest.fn(),
+            },
+          },
+          {
+            provide: BolagsverketMapper,
+            useValue: { map: jest.fn() },
+          },
+          { provide: BvCacheService, useValue: {} },
+          { provide: BvPersistenceService, useValue: {} },
+        ],
+      }).compile();
+
+      service = module.get<BolagsverketService>(BolagsverketService);
+      clientMock = module.get(BolagsverketClient);
+      mapperMock = module.get(BolagsverketMapper);
+    });
+
+    it('throws BadGatewayException when all three API calls fail', async () => {
+      clientMock.fetchHighValueDataset.mockRejectedValue(new Error('HVD error'));
+      clientMock.fetchOrganisationInformation.mockRejectedValue(new Error('Org error'));
+      clientMock.fetchDocumentList.mockRejectedValue(new Error('Doc error'));
+
+      await expect(service.getCompleteCompanyData('5560210261')).rejects.toBeInstanceOf(
+        BadGatewayException,
+      );
+    });
+
+    it('includes the org number in the BadGatewayException message when all calls fail', async () => {
+      clientMock.fetchHighValueDataset.mockRejectedValue(new Error('HVD error'));
+      clientMock.fetchOrganisationInformation.mockRejectedValue(new Error('Org error'));
+      clientMock.fetchDocumentList.mockRejectedValue(new Error('Doc error'));
+
+      await expect(service.getCompleteCompanyData('5560210261')).rejects.toThrow('5560210261');
+    });
+
+    it('succeeds with partial data when only one API call fails', async () => {
+      const hvdPayload = { organisation: { identitetsbeteckning: '5560210261', namn: 'Test AB' } };
+      const richPayload = [{ identitetsbeteckning: '5560210261' }];
+
+      clientMock.fetchHighValueDataset.mockResolvedValue({
+        requestPayload: { identitetsbeteckning: '5560210261' },
+        responsePayload: hvdPayload as any,
+        requestId: 'req-1',
+      });
+      clientMock.fetchOrganisationInformation.mockResolvedValue({
+        requestPayload: {},
+        responsePayload: richPayload as any,
+        requestId: 'req-2',
+      });
+      clientMock.fetchDocumentList.mockRejectedValue(new Error('Doc error'));
+
+      const normalisedCompany = makeNormalisedCompany({ organisationNumber: '5560210261' });
+      mapperMock.map.mockReturnValue(normalisedCompany);
+
+      const result = await service.getCompleteCompanyData('5560210261');
+
+      expect(result.normalisedData).toBe(normalisedCompany);
+      expect(result.highValueDataset).toBe(hvdPayload);
+      expect(result.documents).toBeNull();
     });
   });
 });

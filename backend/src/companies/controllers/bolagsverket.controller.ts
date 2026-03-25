@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, InternalServerErrorException, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import {
   BolagsverketArendeDto,
@@ -138,11 +138,20 @@ export class BolagsverketController {
   @Post('enrich')
   async enrich(@Body() dto: BvEnrichDto, @Req() req: any) {
     const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
-    return this.bolagsverketService.enrichAndSave(
-      tenantId,
-      dto.identitetsbeteckning,
-      dto.forceRefresh,
-    );
+    try {
+      return await this.bolagsverketService.enrichAndSave(
+        tenantId,
+        dto.identitetsbeteckning,
+        dto.forceRefresh,
+      );
+    } catch (err) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
+      throw new InternalServerErrorException(
+        `Failed to enrich company ${dto.identitetsbeteckning}: ${String(err)}`,
+      );
+    }
   }
 
   /**
