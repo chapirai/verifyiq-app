@@ -19,6 +19,12 @@ import { BvFetchSnapshotEntity } from '../entities/bv-fetch-snapshot.entity';
 /** Allowed tolerance when validating share-capital arithmetic (1 %). */
 const SHARE_CAPITAL_TOLERANCE = 0.01;
 
+/**
+ * Number of external Bolagsverket API calls made by getCompleteCompanyData:
+ * 1 × fetchHighValueDataset + 1 × fetchOrganisationInformation + 1 × fetchDocumentList.
+ */
+const ENRICH_API_CALL_COUNT = 3;
+
 export interface CompleteCompanyProfile {
   normalisedData: NormalisedCompany;
   highValueDataset: HighValueDatasetResponse | null;
@@ -350,7 +356,7 @@ export class BolagsverketService {
 
     try {
       result = await this.getCompleteCompanyData(identitetsbeteckning);
-      apiCallCount = 3; // HVD + org info + docs
+      apiCallCount = ENRICH_API_CALL_COUNT;
     } catch (err) {
       fetchStatus = 'error';
       errorMessage = String(err);

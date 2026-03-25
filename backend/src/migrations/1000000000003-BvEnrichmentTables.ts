@@ -72,7 +72,7 @@ export class BvEnrichmentTables1000000000003 implements MigrationInterface {
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_bv_stored_docs_dedup
         ON bolagsverket_stored_documents (tenant_id, organisationsnummer, document_id_source, document_year)
-        WHERE document_id_source IS NOT NULL;
+        WHERE document_id_source IS NOT NULL AND document_year IS NOT NULL;
     `);
   }
 

@@ -3,7 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { firstValueFrom } from 'rxjs';
 import * as Minio from 'minio';
 import { BvStoredDocumentEntity } from '../entities/bv-stored-document.entity';
@@ -17,6 +17,8 @@ export class BvDocumentStorageService {
   private readonly minioClient: Minio.Client;
   private readonly bucket: string;
 
+  private readonly region: string;
+
   constructor(
     @InjectRepository(BvStoredDocumentEntity)
     private readonly docRepo: Repository<BvStoredDocumentEntity>,
@@ -24,6 +26,7 @@ export class BvDocumentStorageService {
     private readonly configService: ConfigService,
   ) {
     this.bucket = this.configService.get<string>('S3_BUCKET', 'verifyiq-documents');
+    this.region = this.configService.get<string>('MINIO_REGION', 'eu-west-1');
     this.minioClient = new Minio.Client({
       endPoint: this.configService.get<string>('MINIO_ENDPOINT', 'localhost'),
       port: this.configService.get<number>('MINIO_PORT', 9000),
@@ -133,15 +136,18 @@ export class BvDocumentStorageService {
       return this.docRepo.save(dup);
     }
 
-    // Build storage key
-    const storageKey = `bolagsverket/${tenantId}/${organisationsnummer}/${documentIdSource ?? 'document'}-${documentYear ?? 'unknown'}.pdf`;
+    // Build storage key – use UUID segment when source ID or year are unavailable
+    // to prevent collisions between documents with missing metadata.
+    const docId = documentIdSource ?? randomUUID();
+    const yearSegment = documentYear ?? randomUUID().slice(0, 8);
+    const storageKey = `bolagsverket/${tenantId}/${organisationsnummer}/${docId}-${yearSegment}.pdf`;
     const fileName = `${documentIdSource ?? 'document'}-${documentYear ?? ''}.pdf`;
 
     // Ensure bucket exists
     try {
       const exists = await this.minioClient.bucketExists(this.bucket);
       if (!exists) {
-        await this.minioClient.makeBucket(this.bucket, 'eu-west-1');
+        await this.minioClient.makeBucket(this.bucket, this.region);
       }
     } catch (err) {
       this.logger.warn(`Could not check/create MinIO bucket: ${err}`);
