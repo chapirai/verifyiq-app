@@ -14,7 +14,9 @@ import { DocumentsModule } from './documents/documents.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { PartiesModule } from './parties/parties.module';
+import { CreditDecisioningModule } from './credit-decisioning/credit-decisioning.module';
 import { EntitlementsModule } from './entitlements/entitlements.module';
+import { FinancialModule } from './financial/financial.module';
 import { OwnershipModule } from './ownership/ownership.module';
 import { ReportsModule } from './reports/reports.module';
 import { RiskModule } from './risk/risk.module';
@@ -70,6 +72,8 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     ReportsModule,
     OwnershipModule,
     EntitlementsModule,
+    FinancialModule,
+    CreditDecisioningModule,
   ],
   controllers: [AppController],
 })
