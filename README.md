@@ -220,3 +220,71 @@ cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 | MinIO API | <http://localhost:9000> |
 | MinIO Console | <http://localhost:9001> |
 
+## Bolagsverket Enrichment Module
+
+### Overview
+
+The enrichment module retrieves company and person data from the Swedish Companies Registration Office (Bolagsverket), persists it locally, and serves subsequent requests from a 30-day cache to avoid redundant API calls.
+
+### Cache / Snapshot system
+
+Every lookup creates a `bolagsverket_fetch_snapshots` row recording the identifier searched, the fetch status, whether the result was served from cache, and a full copy of the normalised payload. On subsequent requests, `BvCacheService.checkFreshness()` queries the most recent successful snapshot; if it is **< 30 days old** the cached payload is returned immediately without hitting the Bolagsverket API.
+
+Set `forceRefresh: true` in the request body to bypass the cache.
+
+### API endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/bolagsverket/enrich` | Full enrichment (HVD + org info + docs) with 30-day cache |
+| `POST` | `/api/v1/bolagsverket/enrich/person` | Officer-engagement lookup by personnummer with cache |
+| `GET` | `/api/v1/bolagsverket/snapshots?orgNr=…` | List fetch history for an org/person number |
+| `GET` | `/api/v1/bolagsverket/stored-documents?orgNr=…` | List MinIO-stored documents for an org |
+| `GET` | `/api/v1/bolagsverket/stored-documents/:id/download` | Pre-signed 15-minute download URL |
+
+#### Enrich request body
+
+```json
+{ "identitetsbeteckning": "5560000001", "forceRefresh": false }
+```
+
+#### Person engagements request body
+
+```json
+{ "personnummer": "197001011234", "forceRefresh": false }
+```
+
+### Environment variables
+
+| Variable | Notes |
+|---|---|
+| `BV_CLIENT_ID` | Bolagsverket OAuth client ID |
+| `BV_CLIENT_SECRET` | Bolagsverket OAuth client secret |
+| `MINIO_ENDPOINT` | MinIO hostname (default: `localhost`) |
+| `MINIO_PORT` | MinIO port (default: `9000`) |
+| `MINIO_USE_SSL` | `true` in production |
+| `AWS_ACCESS_KEY_ID` | MinIO access key (same as `MINIO_ROOT_USER` in local dev) |
+| `AWS_SECRET_ACCESS_KEY` | MinIO secret key (same as `MINIO_ROOT_PASSWORD` in local dev) |
+| `S3_BUCKET` | Object storage bucket name (default: `verifyiq-documents`) |
+
+### Triggering a refresh
+
+To force a fresh fetch from the Bolagsverket API, include `"forceRefresh": true`:
+
+```bash
+curl -X POST http://localhost:4000/api/v1/bolagsverket/enrich \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"identitetsbeteckning":"5560000001","forceRefresh":true}'
+```
+
+### Document storage
+
+Annual report PDFs are downloaded from Bolagsverket and stored in MinIO under the key pattern:
+
+```
+bolagsverket/{tenantId}/{organisationsnummer}/{documentId}-{year}.pdf
+```
+
+Duplicate detection uses SHA-256 checksums; identical files are recorded with `is_duplicate = true` and share the same storage key rather than re-uploading.
+

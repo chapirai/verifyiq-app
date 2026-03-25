@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import {
   BolagsverketArendeDto,
@@ -8,13 +8,21 @@ import {
   BolagsverketLookupDto,
   BolagsverketShareCapitalHistoryDto,
   BolagsverketSignatoryPowerDto,
+  BvEnrichDto,
+  BvPersonEnrichDto,
 } from '../dto/bolagsverket-request.dto';
 import { BolagsverketService } from '../services/bolagsverket.service';
+import { BvCacheService } from '../services/bv-cache.service';
+import { BvDocumentStorageService } from '../services/bv-document-storage.service';
 
 @Controller('bolagsverket')
 @UseGuards(JwtAuthGuard)
 export class BolagsverketController {
-  constructor(private readonly bolagsverketService: BolagsverketService) {}
+  constructor(
+    private readonly bolagsverketService: BolagsverketService,
+    private readonly bvCacheService: BvCacheService,
+    private readonly bvDocumentStorageService: BvDocumentStorageService,
+  ) {}
 
   /** GET /bolagsverket/health – check Bolagsverket API availability. */
   @Get('health')
@@ -121,5 +129,62 @@ export class BolagsverketController {
   @Post('financial-snapshot')
   getFinancialSnapshot(@Body() dto: BolagsverketDocumentListDto) {
     return this.bolagsverketService.getFinancialSnapshot(dto.identitetsbeteckning);
+  }
+
+  /**
+   * POST /bolagsverket/enrich
+   * Full enrichment with persistence and cache checking (30-day TTL).
+   */
+  @Post('enrich')
+  async enrich(@Body() dto: BvEnrichDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    return this.bolagsverketService.enrichAndSave(
+      tenantId,
+      dto.identitetsbeteckning,
+      dto.forceRefresh,
+    );
+  }
+
+  /**
+   * POST /bolagsverket/enrich/person
+   * Engagements search by personnummer with cache checking.
+   */
+  @Post('enrich/person')
+  async enrichPerson(@Body() dto: BvPersonEnrichDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    return this.bolagsverketService.enrichPersonEngagements(
+      tenantId,
+      dto.personnummer,
+      dto.forceRefresh,
+    );
+  }
+
+  /**
+   * GET /bolagsverket/snapshots?orgNr=…
+   * List fetch snapshots for an organisation.
+   */
+  @Get('snapshots')
+  async getSnapshots(@Query('orgNr') orgNr: string, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    return this.bvCacheService.listSnapshots(tenantId, orgNr);
+  }
+
+  /**
+   * GET /bolagsverket/stored-documents?orgNr=…
+   * List stored documents for an organisation.
+   */
+  @Get('stored-documents')
+  async getStoredDocuments(@Query('orgNr') orgNr: string, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    return this.bvDocumentStorageService.listStoredDocuments(tenantId, orgNr);
+  }
+
+  /**
+   * GET /bolagsverket/stored-documents/:id/download
+   * Generate a pre-signed MinIO download URL for a stored document.
+   */
+  @Get('stored-documents/:id/download')
+  async downloadStoredDocument(@Param('id') id: string) {
+    return this.bvDocumentStorageService.getDownloadUrl(id);
   }
 }

@@ -4,6 +4,7 @@ import type { Route } from 'next';
 const nav: { href: Route; label: string }[] = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/companies', label: 'Companies' },
+  { href: '/companies/bolagsverket', label: 'Bolagsverket' },
   { href: '/onboarding', label: 'Onboarding' },
   { href: '/screening', label: 'Screening' },
   { href: '/monitoring', label: 'Monitoring' },
