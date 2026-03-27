@@ -1,0 +1,44 @@
+name: Create GitHub Issues from YAML files
+
+# Triggers:
+#   1. Automatically when YAML files inside .github/issues/ are pushed to main/master.
+#   2. Manually via the "Run workflow" button in the Actions tab
+#      (useful after adding issue files on a branch or locally).
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '.github/issues/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (print issues without creating them)"
+        required: false
+        default: "false"
+
+permissions:
+  issues: write   # needed to create issues
+  contents: read
+
+jobs:
+  create-issues:
+    name: Create issues from YAML definitions
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Create GitHub Issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: node scripts/create-issues.js

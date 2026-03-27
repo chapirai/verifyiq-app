@@ -288,3 +288,64 @@ bolagsverket/{tenantId}/{organisationsnummer}/{documentId}-{year}.pdf
 
 Duplicate detection uses SHA-256 checksums; identical files are recorded with `is_duplicate = true` and share the same storage key rather than re-uploading.
 
+---
+
+## Creating GitHub Issues in bulk
+
+You can define issues in YAML files and have them created automatically via GitHub Actions, or run the script locally.
+
+### 1. Create a YAML file in `.github/issues/`
+
+Each file can define a single issue or a list of issues:
+
+```yaml
+# .github/issues/my-sprint.yml
+
+issues:
+  - title: "Add authentication flow"
+    body: |
+      ## Goal
+      Implement JWT-based login and refresh tokens.
+
+      ## Acceptance criteria
+      - [ ] Login endpoint returns access + refresh tokens
+      - [ ] Refresh endpoint rotates tokens
+    labels: ["enhancement", "backend"]
+    assignees: ["your-github-username"]
+
+  - title: "Fix company lookup 500 error"
+    body: "Reproduce by calling GET /api/v1/companies/lookup with an invalid org number."
+    labels: ["bug"]
+```
+
+> See `.github/issues/example.yml` for the full schema reference.
+
+### 2. Automatic creation (GitHub Actions)
+
+Push or merge the YAML file to `main`/`master`. The workflow
+`.github/workflows/create-issues.yml` runs automatically and creates all issues
+that don't already exist (duplicate titles are skipped).
+
+You can also trigger the workflow manually via
+**Actions → Create GitHub Issues from YAML files → Run workflow**.
+
+### 3. Local creation (CLI)
+
+```bash
+# Requires a Personal Access Token with `issues: write` scope
+GITHUB_TOKEN=<your_github_pat> GITHUB_REPOSITORY=chapirai/verifyiq-app \
+  node scripts/create-issues.js
+```
+
+### Issue file schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `title` | string | ✅ | Issue title |
+| `body` | string | | Issue body (Markdown supported) |
+| `labels` | string[] | | Label names (must exist in the repo) |
+| `assignees` | string[] | | GitHub usernames to assign |
+| `milestone` | number | | Milestone number |
+
+Use a top-level `issues: [...]` list to define multiple issues per file.
+

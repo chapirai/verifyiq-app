@@ -1,0 +1,57 @@
+# Bulk Issue Definitions
+#
+# Place one or more YAML files in this folder (.github/issues/).
+# Each file can define a single issue or a list of issues.
+#
+# SINGLE ISSUE format:
+#   title:    "Issue title"          (required)
+#   body:     "Issue body / description"
+#   labels:   ["label1", "label2"]
+#   assignees: ["github-username"]
+#   milestone: 1                     # milestone number (optional)
+#
+# MULTIPLE ISSUES format – use a top-level `issues` list:
+#   issues:
+#     - title: "First issue"
+#       body: "Description…"
+#       labels: ["bug"]
+#     - title: "Second issue"
+#       body: "Description…"
+#       labels: ["enhancement"]
+#
+# ──────────────────────────────────────────────────────────────
+# To create the issues, run:
+#
+#   GITHUB_TOKEN=<token> GITHUB_REPOSITORY=owner/repo \
+#     node scripts/create-issues.js
+#
+# Or push/merge changes to this folder – the
+# .github/workflows/create-issues.yml workflow will run
+# automatically and create any new issues defined here.
+# ──────────────────────────────────────────────────────────────
+
+# Example – remove or replace this before committing real issues:
+issues:
+  - title: "Example: Set up CI pipeline"
+    body: |
+      ## Goal
+      Configure a basic CI pipeline using GitHub Actions that:
+      - Runs lint on both `frontend/` and `backend/`
+      - Runs unit tests for both workspaces
+      - Builds the Docker images defined in `docker-compose.yml`
+
+      ## Acceptance criteria
+      - [ ] Workflow file added to `.github/workflows/`
+      - [ ] Pipeline passes on every pull request
+      - [ ] Status badge added to README
+    labels: ["enhancement", "ci/cd"]
+
+  - title: "Example: Add end-to-end tests"
+    body: |
+      ## Goal
+      Add E2E test coverage for the main user flows using Playwright or Cypress.
+
+      ## Acceptance criteria
+      - [ ] At minimum, cover the company-lookup flow
+      - [ ] Tests run in CI
+    labels: ["enhancement", "testing"]
