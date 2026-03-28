@@ -125,10 +125,12 @@ describe('BolagsverketService', () => {
     it('maps a minimal HVD response correctly', () => {
       const mapper = new BolagsverketMapper();
       const hvd = {
-        organisationsnummer: '5560000001',
-        namn: [{ namn: 'Test AB', typ: { klartext: 'FIRMA' } }],
-        organisationsform: { klartext: 'Aktiebolag' },
-        status: [{ status: { klartext: 'REGISTRERAD' }, arAktuell: true }],
+        organisation: {
+          identitetsbeteckning: '5560000001',
+          namn: 'Test AB',
+          organisationsform: 'Aktiebolag',
+          organisationsstatusar: [{ status: 'REGISTRERAD' }],
+        },
       } as any;
 
       const result = mapper.map(hvd, []);

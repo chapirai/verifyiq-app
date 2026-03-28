@@ -1,15 +1,15 @@
 import { GatewayTimeoutException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuditService } from '../../audit/audit.service';
-import { TenantContext } from '../../common/interfaces/tenant-context.interface';
-import { CompaniesService } from '../companies.service';
-import { ListCompaniesDto } from '../dto/list-companies.dto';
-import { LookupCompanyDto } from '../dto/lookup-company.dto';
-import { BvFetchSnapshotEntity } from '../entities/bv-fetch-snapshot.entity';
-import { CompanyEntity } from '../entities/company.entity';
-import { BolagsverketService } from '../services/bolagsverket.service';
-import { CACHE_TTL_DAYS } from '../services/bv-cache.service';
+import { AuditService } from '../audit/audit.service';
+import { TenantContext } from '../common/interfaces/tenant-context.interface';
+import { CompaniesService } from './companies.service';
+import { ListCompaniesDto } from './dto/list-companies.dto';
+import { LookupCompanyDto } from './dto/lookup-company.dto';
+import { BvFetchSnapshotEntity } from './entities/bv-fetch-snapshot.entity';
+import { CompanyEntity } from './entities/company.entity';
+import { BolagsverketService } from './services/bolagsverket.service';
+import { CACHE_TTL_DAYS } from './services/bv-cache.service';
 
 const TENANT_ID = 'tenant-abc';
 const ORG_NR = '5560000001';
@@ -33,7 +33,26 @@ function makeEnrichResult(isFromCache: boolean, ageInDays: number | null) {
   const snapshot = makeSnapshot(ageInDays ?? 0);
   return {
     result: {
-      normalisedData: { organisationNumber: ORG_NR, legalName: 'Test AB' },
+      normalisedData: {
+        organisationNumber: ORG_NR,
+        legalName: 'Test AB',
+        companyForm: null,
+        status: null,
+        registeredAt: null,
+        countryCode: 'SE',
+        businessDescription: null,
+        signatoryText: null,
+        officers: [],
+        shareInformation: {},
+        financialReports: [],
+        addresses: [],
+        allNames: [],
+        permits: [],
+        financialYear: null,
+        industryCode: null,
+        deregisteredAt: null,
+        sourcePayloadSummary: {},
+      },
       highValueDataset: null,
       organisationInformation: [],
       documents: null,
@@ -287,7 +306,7 @@ describe('CompaniesService – findAll', () => {
 
     await service.findAll(ctx, {});
 
-    const calls: string[] = qb.andWhere.mock.calls.map((c: unknown[]) => c[0]);
+    const calls = qb.andWhere.mock.calls.map((c: unknown[]) => c[0] as string);
     expect(calls.some((c) => c.includes('legalName'))).toBe(false);
   });
 
