@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import SearchForm from '@/components/SearchForm';
 import { api } from '@/lib/api';
+import { useRecentSearches } from '@/hooks/use-recent-searches';
 
 interface ApiError {
   response?: { status?: number; data?: { message?: string } };
@@ -30,6 +31,7 @@ export default function SearchPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { updateSearchMetadata } = useRecentSearches();
 
   const handleSearch = useCallback(
     async (orgNumber: string) => {
@@ -37,8 +39,15 @@ export default function SearchPage() {
       setError(null);
       try {
         const result = await api.lookupCompanyByOrgNumber({ orgNumber });
+        // Persist backend-provided source/freshness metadata in recent searches
+        updateSearchMetadata(orgNumber, {
+          source: result.metadata.source,
+          freshness: result.metadata.freshness,
+          fetched_at: result.metadata.fetched_at,
+          age_days: result.metadata.age_days,
+        });
         const foundOrgNumber = result.company?.organisationNumber ?? orgNumber;
-        router.push(`/companies/${encodeURIComponent(foundOrgNumber)}`);
+        router.push(`/companies/${encodeURIComponent(String(foundOrgNumber))}`);
       } catch (err: unknown) {
         const apiErr = isApiError(err) ? err : null;
         if (apiErr?.response?.status === 404) {
@@ -49,7 +58,7 @@ export default function SearchPage() {
         }
       }
     },
-    [router],
+    [router, updateSearchMetadata],
   );
 
   return (
@@ -59,7 +68,7 @@ export default function SearchPage() {
         <p className="text-sm text-slate-400">Company Lookup</p>
         <h1 className="mt-1 text-3xl font-semibold">Company Search</h1>
         <p className="mt-2 text-sm text-slate-400">
-          Search for a Swedish company by its 12-digit organisation number to initiate a KYC lookup.
+          Search for a Swedish company by its organisation number to initiate a KYC lookup.
         </p>
       </div>
 

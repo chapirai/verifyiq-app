@@ -400,4 +400,103 @@ describe('CompaniesService – findAll', () => {
     expect(result.page).toBe(3);
     expect(result.limit).toBe(20);
   });
+
+  describe('audit logging', () => {
+    let auditService: jest.Mocked<AuditService>;
+
+    beforeEach(async () => {
+      companyRepo = { createQueryBuilder: jest.fn() };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          CompaniesService,
+          {
+            provide: BolagsverketService,
+            useValue: { enrichAndSave: jest.fn() },
+          },
+          {
+            provide: AuditService,
+            useValue: { log: jest.fn().mockResolvedValue(undefined) },
+          },
+          {
+            provide: getRepositoryToken(CompanyEntity),
+            useValue: companyRepo,
+          },
+        ],
+      }).compile();
+
+      service = module.get<CompaniesService>(CompaniesService);
+      auditService = module.get(AuditService);
+    });
+
+    it('emits a company.search audit event for every findAll call', async () => {
+      const qb = makeQbMock([], 0);
+      companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.findAll(ctx, {});
+
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: TENANT_ID,
+          actorId: 'user-1',
+          action: 'company.search',
+          resourceType: 'company',
+        }),
+      );
+    });
+
+    it('includes query parameters in the audit metadata', async () => {
+      const qb = makeQbMock([], 0);
+      companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.findAll(ctx, { q: 'nordic', status: 'ACTIVE' } as ListCompaniesDto);
+
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            q: 'nordic',
+            status: 'ACTIVE',
+          }),
+        }),
+      );
+    });
+
+    it('uses org_number as resourceId when q is absent and org_number is provided', async () => {
+      const qb = makeQbMock([], 0);
+      companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.findAll(ctx, { org_number: ORG_NR } as ListCompaniesDto);
+
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceId: ORG_NR,
+        }),
+      );
+    });
+
+    it('uses q as resourceId when q is provided', async () => {
+      const qb = makeQbMock([], 0);
+      companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.findAll(ctx, { q: 'nordic' } as ListCompaniesDto);
+
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceId: 'nordic',
+        }),
+      );
+    });
+
+    it('uses "*" as resourceId when neither q nor org_number is provided', async () => {
+      const qb = makeQbMock([], 0);
+      companyRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.findAll(ctx, {});
+
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceId: '*',
+        }),
+      );
+    });
+  });
 });
