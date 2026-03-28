@@ -7,12 +7,78 @@ import {
   identifierError,
   IDENTIFIER_TYPE_LABELS,
 } from '@/utils/validation/validateIdentifier';
-import { useRecentSearches } from '@/hooks/use-recent-searches';
+import { useRecentSearches, type RecentSearchEntry } from '@/hooks/use-recent-searches';
 
 interface SearchFormProps {
   onSearch: (identifier: string) => void;
   loading?: boolean;
 }
+
+// ─── Small presentational helpers ────────────────────────────────────────────
+
+function FreshnessDot({ freshness }: { freshness: 'fresh' | 'stale' | 'expired' }) {
+  const colorClass =
+    freshness === 'fresh'
+      ? 'bg-emerald-400'
+      : freshness === 'stale'
+        ? 'bg-yellow-400'
+        : 'bg-red-400';
+  return (
+    <span
+      className={`h-1.5 w-1.5 rounded-full ${colorClass}`}
+      aria-label={`Freshness: ${freshness}`}
+      role="img"
+    />
+  );
+}
+
+function SourceLabel({ source }: { source: 'DB' | 'API' }) {
+  const isDB = source === 'DB';
+  const label = isDB ? 'Database cache' : 'Live API';
+  return (
+    <span
+      className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+        isDB ? 'bg-emerald-900/60 text-emerald-300' : 'bg-blue-900/60 text-blue-300'
+      }`}
+      title={label}
+      aria-label={`Source: ${label}`}
+    >
+      {isDB ? 'DB' : 'API'}
+    </span>
+  );
+}
+
+function RecentSearchItem({
+  entry,
+  onClick,
+}: {
+  entry: RecentSearchEntry;
+  onClick: (identifier: string) => void;
+}) {
+  const metaSummary = entry.metadata
+    ? ` — ${entry.metadata.freshness} data from ${entry.metadata.source === 'DB' ? 'database cache' : 'live API'}`
+    : '';
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onClick(entry.identifier)}
+        aria-label={`Search for company ${entry.identifier}${metaSummary}`}
+        className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 transition hover:border-indigo-500 hover:text-white"
+      >
+        <span className="font-mono text-xs text-slate-300">{entry.identifier}</span>
+        {entry.metadata && (
+          <span className="flex items-center gap-1" aria-hidden="true">
+            <FreshnessDot freshness={entry.metadata.freshness} />
+            <SourceLabel source={entry.metadata.source} />
+          </span>
+        )}
+      </button>
+    </li>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SearchForm({ onSearch, loading = false }: SearchFormProps) {
   const [value, setValue] = useState('');
@@ -48,11 +114,11 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
   }, []);
 
   const handleRecentClick = useCallback(
-    (recent: string) => {
-      setValue(recent);
+    (identifier: string) => {
+      setValue(identifier);
       setTouched(true);
-      addSearch(recent);
-      onSearch(recent);
+      addSearch(identifier);
+      onSearch(identifier);
     },
     [addSearch, onSearch],
   );
@@ -131,16 +197,12 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
             </button>
           </div>
           <ul className="flex flex-wrap gap-2">
-            {searches.map((recent) => (
-              <li key={recent}>
-                <button
-                  type="button"
-                  onClick={() => handleRecentClick(recent)}
-                  className="rounded-lg border border-border bg-background px-3 py-1.5 font-mono text-xs text-slate-300 transition hover:border-indigo-500 hover:text-white"
-                >
-                  {recent}
-                </button>
-              </li>
+            {searches.map((entry) => (
+              <RecentSearchItem
+                key={entry.identifier}
+                entry={entry}
+                onClick={handleRecentClick}
+              />
             ))}
           </ul>
         </div>

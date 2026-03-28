@@ -173,6 +173,22 @@ export class CompaniesService {
 
     const [data, total] = await qb.skip(offset).take(limit).getManyAndCount();
 
+    await this.auditService.log({
+      tenantId: ctx.tenantId,
+      actorId: ctx.actorId ?? null,
+      action: 'company.search',
+      resourceType: 'company',
+      resourceId: query.q ?? query.org_number ?? '*',
+      metadata: {
+        q: query.q ?? null,
+        org_number: query.org_number ?? null,
+        status: query.status ?? null,
+        page,
+        limit,
+        total,
+      },
+    });
+
     return {
       data,
       total,
