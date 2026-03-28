@@ -12,9 +12,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ALL_INFORMATION_CATEGORIES } from '../integrations/bolagsverket.types';
-
-/** Regex patterns for Swedish identity numbers. */
-const ID_REGEX = /^(\d{10}|\d{12}|302\d{7})$/;
+import { ID_REGEX } from '../utils/identifier-validator';
 
 export class BolagsverketLookupDto {
   @IsString()

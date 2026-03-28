@@ -1,14 +1,14 @@
 /**
  * Validates a Swedish organisation number.
  *
- * Accepts 12 consecutive digits (NNNNNNNNNNNN), optionally separated by
- * a single hyphen or space at position 8 (e.g. NNNNNNNN-NNNN or NNNNNNNN NNNN).
+ * Accepts 10 or 12 consecutive digits, optionally separated by a single
+ * hyphen or space (e.g. "5560000001", "556000-0001", "202100123456").
  *
- * Returns true when the stripped digit string is exactly 12 digits long.
+ * Returns true when the stripped digit string is exactly 10 or 12 digits long.
  */
 export function validateOrgNumber(value: string): boolean {
   const digits = value.replace(/[\s-]/g, '');
-  return /^\d{12}$/.test(digits);
+  return /^(\d{10}|\d{12})$/.test(digits);
 }
 
 /**
@@ -17,5 +17,5 @@ export function validateOrgNumber(value: string): boolean {
  */
 export function orgNumberError(value: string): string | null {
   if (!value.trim()) return null;
-  return validateOrgNumber(value) ? null : 'Enter a valid 12-digit Swedish organisation number';
+  return validateOrgNumber(value) ? null : 'Enter a valid 10-digit or 12-digit Swedish organisation number';
 }

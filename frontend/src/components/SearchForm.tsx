@@ -1,11 +1,16 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { validateOrgNumber, orgNumberError } from '@/utils/validation/validateOrgNumber';
+import {
+  classifyIdentifier,
+  validateIdentifier,
+  identifierError,
+  IDENTIFIER_TYPE_LABELS,
+} from '@/utils/validation/validateIdentifier';
 import { useRecentSearches } from '@/hooks/use-recent-searches';
 
 interface SearchFormProps {
-  onSearch: (orgNumber: string) => void;
+  onSearch: (identifier: string) => void;
   loading?: boolean;
 }
 
@@ -14,8 +19,9 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
   const [touched, setTouched] = useState(false);
   const { searches, addSearch, clearSearches } = useRecentSearches();
 
-  const isValid = validateOrgNumber(value);
-  const error = touched ? orgNumberError(value) : null;
+  const isValid = validateIdentifier(value);
+  const identifierType = classifyIdentifier(value);
+  const error = touched ? identifierError(value) : null;
 
   const handleSubmit = useCallback(() => {
     if (!isValid || loading) return;
@@ -58,19 +64,19 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex-1">
             <label
-              htmlFor="org-number-input"
+              htmlFor="identifier-input"
               className="mb-1 block text-xs uppercase tracking-widest text-slate-400"
             >
-              Swedish Organisation Number
+              Swedish Organisation Number or Personnummer
             </label>
             <input
-              id="org-number-input"
+              id="identifier-input"
               type="text"
               value={value}
               onChange={handleChange}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              placeholder="e.g. 202100123456"
+              placeholder="e.g. 5560000001 or 197001011234"
               autoComplete="off"
               spellCheck={false}
               className={[
@@ -85,7 +91,9 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
             />
             {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
             {!error && isValid && (
-              <p className="mt-1.5 text-xs text-emerald-400">✓ Valid organisation number</p>
+              <p className="mt-1.5 text-xs text-emerald-400">
+                ✓ Valid {IDENTIFIER_TYPE_LABELS[identifierType]}
+              </p>
             )}
           </div>
 
@@ -103,8 +111,7 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
         </div>
 
         <p className="mt-3 text-xs text-slate-500">
-          Enter a 12-digit Swedish organisation number (NNNNNNNNNNNN or with optional hyphen/space
-          separator).
+          Enter a 10-digit or 12-digit Swedish organisation number, or a 12-digit personnummer.
         </p>
       </div>
 
