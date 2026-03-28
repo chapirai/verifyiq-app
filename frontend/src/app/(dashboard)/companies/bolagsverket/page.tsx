@@ -2,6 +2,13 @@
 
 import { useState, useCallback } from 'react';
 import { api } from '@/lib/api';
+import {
+  classifyIdentifier,
+  validateIdentifier,
+  identifierError,
+  IDENTIFIER_TYPE_LABELS,
+  normaliseIdentifier,
+} from '@/utils/validation/validateIdentifier';
 
 interface OfficerRow {
   namn?: string | null;
@@ -48,39 +55,45 @@ interface EnrichResult {
 
 export default function BolagsverketPage() {
   const [identifier, setIdentifier] = useState('');
+  const [touched, setTouched] = useState(false);
   const [forceRefresh, setForceRefresh] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enrichResult, setEnrichResult] = useState<EnrichResult | null>(null);
   const [snapshots, setSnapshots] = useState<SnapshotRow[]>([]);
 
+  const isValid = validateIdentifier(identifier);
+  const identifierType = classifyIdentifier(identifier);
+  const validationError = touched ? identifierError(identifier) : null;
+
   const handleSearch = useCallback(async () => {
-    if (!identifier.trim()) return;
+    setTouched(true);
+    if (!identifier.trim() || !isValid) return;
     setLoading(true);
     setError(null);
     setEnrichResult(null);
     setSnapshots([]);
 
     try {
-      const isPerson = /^\d{12}$/.test(identifier.trim());
+      const stripped = normaliseIdentifier(identifier.trim());
+      const isPerson = classifyIdentifier(stripped) === 'personnummer';
 
       let result: EnrichResult;
       if (isPerson) {
         result = await api.bolagsverket.enrichPerson({
-          personnummer: identifier.trim(),
+          personnummer: stripped,
           forceRefresh,
         });
       } else {
         result = await api.bolagsverket.enrich({
-          identitetsbeteckning: identifier.trim(),
+          identitetsbeteckning: stripped,
           forceRefresh,
         });
       }
       setEnrichResult(result);
 
       // Load last 5 snapshots
-      const orgNr = identifier.trim();
-      const snapshotData = await api.bolagsverket.getSnapshots(orgNr);
+      const snapshotData = await api.bolagsverket.getSnapshots(stripped);
       setSnapshots(Array.isArray(snapshotData) ? snapshotData.slice(0, 5) : []);
     } catch (err: unknown) {
       const msg =
@@ -93,7 +106,7 @@ export default function BolagsverketPage() {
     } finally {
       setLoading(false);
     }
-  }, [identifier, forceRefresh]);
+  }, [identifier, isValid, forceRefresh]);
 
   const normalisedData = enrichResult?.result?.normalisedData;
   const isFromCache = enrichResult?.isFromCache;
@@ -113,17 +126,40 @@ export default function BolagsverketPage() {
       <div className="rounded-2xl border border-border bg-card p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label className="mb-1 block text-xs uppercase tracking-widest text-slate-400">
+            <label
+              htmlFor="bv-identifier-input"
+              className="mb-1 block text-xs uppercase tracking-widest text-slate-400"
+            >
               Organisation / Person number
             </label>
             <input
+              id="bv-identifier-input"
               type="text"
               value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              onChange={(e) => { setIdentifier(e.target.value); }}
+              onBlur={() => setTouched(true)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="5560000001  or  197001011234"
-              className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              autoComplete="off"
+              spellCheck={false}
+              className={[
+                'w-full rounded-xl border bg-background px-4 py-2.5 text-sm text-white placeholder-slate-500 transition',
+                'focus:outline-none focus:ring-2',
+                validationError
+                  ? 'border-red-500 focus:ring-red-500/50'
+                  : isValid
+                    ? 'border-emerald-500 focus:ring-emerald-500/50'
+                    : 'border-border focus:ring-indigo-500',
+              ].join(' ')}
             />
+            {validationError && (
+              <p className="mt-1.5 text-xs text-red-400">{validationError}</p>
+            )}
+            {!validationError && isValid && (
+              <p className="mt-1.5 text-xs text-emerald-400">
+                ✓ Valid {IDENTIFIER_TYPE_LABELS[identifierType]}
+              </p>
+            )}
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
             <input

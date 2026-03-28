@@ -13,7 +13,7 @@
     "baseUrl": "./",
     "incremental": true,
     "strictPropertyInitialization": false,
-    "types": ["node"],
+    "types": ["node", "jest"],
     "paths": {
       "src/*": ["src/*"]
     }
