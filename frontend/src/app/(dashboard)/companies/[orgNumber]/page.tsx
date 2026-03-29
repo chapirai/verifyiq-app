@@ -1,13 +1,22 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
+import { useCompanyFreshness } from '@/hooks/use-company-freshness';
+import { useSnapshotHistory } from '@/hooks/use-snapshot-history';
+import { useChangeEvents } from '@/hooks/use-change-events';
 import { useCompanyLookup } from '@/hooks/use-company-lookup';
 import { CompanyHeader } from '@/components/company/CompanyHeader';
 import { CompanyDetailsGrid } from '@/components/company/CompanyDetailsGrid';
 import { FreshnessIndicator } from '@/components/company/FreshnessIndicator';
 import { DataSourceBadge } from '@/components/company/DataSourceBadge';
 import { TabNavigation } from '@/components/company/TabNavigation';
+import { FreshnessPanel } from '@/components/company/FreshnessPanel';
+import { SourcePanel } from '@/components/company/SourcePanel';
+import { SnapshotHistoryPanel } from '@/components/company/SnapshotHistoryPanel';
+import { ChangeSummaryPanel } from '@/components/company/ChangeSummaryPanel';
 
 function SkeletonBlock({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-lg bg-slate-800 ${className ?? ''}`} />;
@@ -49,7 +58,29 @@ export default function CompanyProfilePage() {
   const params = useParams();
   const orgNumber = typeof params.orgNumber === 'string' ? params.orgNumber : '';
 
+  const { user } = useAuth();
+  const canViewSensitive = ['admin', 'audit', 'evidence', 'compliance'].includes(user?.role ?? '');
+  const [snapshotLimit, setSnapshotLimit] = useState(10);
+
   const { data, loading, error, refreshing, cooldownRemaining, refresh } = useCompanyLookup(orgNumber);
+  const {
+    data: freshnessData,
+    loading: freshnessLoading,
+    error: freshnessError,
+    retry: retryFreshness,
+  } = useCompanyFreshness(orgNumber);
+  const {
+    data: snapshotHistory,
+    loading: snapshotLoading,
+    error: snapshotError,
+    retry: retrySnapshots,
+  } = useSnapshotHistory(orgNumber, snapshotLimit);
+  const {
+    data: changeEvents,
+    loading: changeLoading,
+    error: changeError,
+    retry: retryChanges,
+  } = useChangeEvents(orgNumber, 6, canViewSensitive);
 
   const company = data?.company;
   const metadata = data?.metadata;
@@ -195,6 +226,38 @@ export default function CompanyProfilePage() {
             companyForm={company.companyForm}
             countryCode={company.countryCode}
             businessDescription={company.businessDescription}
+          />
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            <FreshnessPanel
+              data={freshnessData}
+              loading={freshnessLoading}
+              error={freshnessError}
+              onRetry={retryFreshness}
+            />
+            <SourcePanel
+              data={freshnessData}
+              loading={freshnessLoading}
+              error={freshnessError}
+              onRetry={retryFreshness}
+            />
+            <ChangeSummaryPanel
+              events={changeEvents}
+              loading={changeLoading}
+              error={changeError}
+              onRetry={retryChanges}
+              canViewSensitive={canViewSensitive}
+            />
+          </div>
+
+          <SnapshotHistoryPanel
+            snapshots={snapshotHistory}
+            loading={snapshotLoading}
+            error={snapshotError}
+            onRetry={retrySnapshots}
+            pageSize={snapshotLimit}
+            onPageSizeChange={setSnapshotLimit}
+            canViewSensitive={canViewSensitive}
           />
         </>
       )}
