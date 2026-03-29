@@ -233,7 +233,7 @@ export class CachePolicyEvaluationService {
       isExpired,
       shouldTriggerRefresh,
       staleFallbackAllowed: p.staleFallbackAllowed,
-      costFlags: { ...(p.forceRefreshCostFlags as Record<string, unknown>) },
+      costFlags: { ...p.forceRefreshCostFlags },
       policyId: policy?.id ?? SAFE_DEFAULT_POLICY.id,
       usedSystemDefault,
       dataAgeHours,

@@ -14,7 +14,7 @@ import {
 } from '../integrations/bolagsverket.types';
 import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
-import { BvFetchSnapshotEntity } from '../entities/bv-fetch-snapshot.entity';
+import { BvFetchSnapshotEntity, SnapshotPolicyDecision } from '../entities/bv-fetch-snapshot.entity';
 import { RawPayloadStorageService } from './raw-payload-storage.service';
 import { CachePolicyEvaluationService } from './cache-policy-evaluation.service';
 
@@ -358,8 +358,7 @@ export class BolagsverketService {
         const ageInHours =
           (Date.now() - cacheCheck.snapshot.fetchedAt.getTime()) / (1000 * 60 * 60);
 
-        let policyDecisionLabel: import('../entities/bv-fetch-snapshot.entity').SnapshotPolicyDecision =
-          'cache_hit';
+        let policyDecisionLabel: SnapshotPolicyDecision = 'cache_hit';
         let isStaleFallback = false;
         let shouldServeCache = false;
 
