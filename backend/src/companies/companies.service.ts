@@ -80,6 +80,8 @@ export class CompaniesService {
       ctx.tenantId,
       dto.orgNumber,
       dto.force_refresh ?? false,
+      correlationId,
+      ctx.actorId ?? null,
     );
 
     const timeoutPromise = new Promise<never>((_, reject) =>
@@ -106,12 +108,15 @@ export class CompaniesService {
       age_days: ageDays,
       freshness: computeFreshness(ageDays),
       cache_ttl_days: CACHE_TTL_DAYS,
+      snapshot_id: snapshot.id,
+      correlation_id: correlationId,
+      policy_decision: snapshot.policyDecision ?? (isFromCache ? 'cache_hit' : 'fresh_fetch'),
     };
 
     const company = result.normalisedData as unknown as Record<string, unknown>;
 
     this.logger.log(
-      `[${correlationId}] Lookup complete source=${source} age=${ageDays}d freshness=${metadata.freshness}`,
+      `[${correlationId}] Lookup complete source=${source} age=${ageDays}d freshness=${metadata.freshness} snapshotId=${snapshot.id}`,
     );
 
     await this.auditService.log({
@@ -127,6 +132,8 @@ export class CompaniesService {
         ageDays,
         freshness: metadata.freshness,
         forceRefresh: dto.force_refresh ?? false,
+        snapshotId: snapshot.id,
+        policyDecision: metadata.policy_decision,
       },
     });
 
