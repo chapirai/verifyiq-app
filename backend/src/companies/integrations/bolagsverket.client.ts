@@ -12,7 +12,7 @@ import { firstValueFrom } from 'rxjs';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { AxiosRequestConfig } from 'axios';
-import { basename } from 'path';
+import { sanitizeBolagsverketFilename } from './bolagsverket.utils';
 import {
   ALL_INFORMATION_CATEGORIES,
   AktiekapitalforandringResponse,
@@ -436,25 +436,7 @@ export class BolagsverketClient {
     const quotedMatch = disposition?.match(/filename\s*=\s*"([^"]+)"/i);
     const unquotedMatch = disposition?.match(/filename\s*=\s*([^;]+)/i);
     const rawFileName = utf8Match?.[1] ?? quotedMatch?.[1] ?? unquotedMatch?.[1];
-    const decodedFileName = rawFileName
-      ? (() => {
-          try {
-            return decodeURIComponent(rawFileName);
-          } catch {
-            return rawFileName;
-          }
-        })()
-      : undefined;
-    const normalizedFileName = decodedFileName ? decodedFileName.replace(/\\/g, '/') : undefined;
-    const baseFileName = normalizedFileName ? basename(normalizedFileName) : undefined;
-    const safeFileName = baseFileName
-      ? baseFileName
-          .replace(/[\\/]/g, '_')
-          .replace(/[\u0000-\u001F\u007F]/g, '')
-          .replace(/["';]/g, '')
-          .trim()
-          .slice(0, 255)
-      : undefined;
+    const safeFileName = sanitizeBolagsverketFilename(rawFileName);
 
     return {
       requestPayload: payload,

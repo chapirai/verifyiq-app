@@ -12,6 +12,7 @@ import {
   OrganisationInformationResponse,
   OrganisationsengagemangResponse,
 } from '../integrations/bolagsverket.types';
+import { sanitizeBolagsverketFilename } from '../integrations/bolagsverket.utils';
 import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
 import { BvFetchSnapshotEntity, SnapshotPolicyDecision } from '../entities/bv-fetch-snapshot.entity';
@@ -110,10 +111,11 @@ export class BolagsverketService {
 
   async getDocument(dokumentId: string): Promise<DocumentDownload> {
     const result = await this.client.fetchDocument(dokumentId);
+    const safeDocumentId = sanitizeBolagsverketFilename(dokumentId) ?? 'document';
     return {
       data: result.responsePayload,
       contentType: result.contentType,
-      fileName: result.fileName ?? `bolagsverket-${dokumentId}.zip`,
+      fileName: result.fileName ?? `bolagsverket-${safeDocumentId}.zip`,
       requestId: result.requestId,
     };
   }
