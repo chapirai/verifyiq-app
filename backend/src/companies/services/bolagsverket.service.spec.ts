@@ -7,6 +7,8 @@ import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
 import { RawPayloadStorageService } from './raw-payload-storage.service';
 import { CachePolicyEvaluationService } from './cache-policy-evaluation.service';
+import { SnapshotChainService } from './snapshot-chain.service';
+import { SnapshotComparisonService } from './snapshot-comparison.service';
 
 function makeNormalisedCompany(overrides: Partial<NormalisedCompany> = {}): NormalisedCompany {
   return {
@@ -68,6 +70,8 @@ describe('BolagsverketService', () => {
             getPolicyById: jest.fn().mockResolvedValue(null),
           },
         },
+        { provide: SnapshotChainService, useValue: { linkSnapshot: jest.fn() } },
+        { provide: SnapshotComparisonService, useValue: { compareSnapshots: jest.fn() } },
       ],
     }).compile();
 
@@ -204,6 +208,8 @@ describe('BolagsverketService', () => {
               getPolicyForTenant: jest.fn().mockResolvedValue(null),
             },
           },
+          { provide: SnapshotChainService, useValue: { linkSnapshot: jest.fn() } },
+          { provide: SnapshotComparisonService, useValue: { compareSnapshots: jest.fn() } },
         ],
       }).compile();
 
