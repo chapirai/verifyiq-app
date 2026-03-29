@@ -284,7 +284,9 @@ export class BolagsverketClient {
     const parsed = tokenSchema.parse(response.data);
     const expiresIn = Number(parsed.expires_in);
     if (!Number.isFinite(expiresIn) || expiresIn <= 0) {
-      throw new InternalServerErrorException('Bolagsverket token response missing valid expires_in');
+      throw new InternalServerErrorException(
+        `Bolagsverket token response contains invalid expires_in: ${String(parsed.expires_in)}`,
+      );
     }
 
     return {
@@ -430,7 +432,7 @@ export class BolagsverketClient {
     const buffer = Buffer.from(responseData);
     const contentType = responseHeaders?.['content-type'] ?? 'application/zip';
     const disposition = responseHeaders?.['content-disposition'];
-    const utf8Match = disposition?.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+    const utf8Match = disposition?.match(/filename\*\s*=\s*UTF-8''?([^;]+)/i);
     const quotedMatch = disposition?.match(/filename\s*=\s*"([^"]+)"/i);
     const unquotedMatch = disposition?.match(/filename\s*=\s*([^;]+)/i);
     const rawFileName = utf8Match?.[1] ?? quotedMatch?.[1] ?? unquotedMatch?.[1];
@@ -443,12 +445,10 @@ export class BolagsverketClient {
           }
         })()
       : undefined;
-    const safeFileName = decodedFileName
-      ? basename(decodedFileName)
-          .replace(/[\\/]/g, '_')
-          .replace(/[\u0000-\u001F\u007F]/g, '')
-          .trim()
-          .slice(0, 255)
+    const normalizedFileName = decodedFileName ? decodedFileName.replace(/\\/g, '/') : undefined;
+    const baseFileName = normalizedFileName ? basename(normalizedFileName) : undefined;
+    const safeFileName = baseFileName
+      ? baseFileName.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, 255)
       : undefined;
 
     return {
