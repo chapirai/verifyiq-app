@@ -1,4 +1,10 @@
-import { GatewayTimeoutException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  GatewayTimeoutException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
@@ -6,7 +12,7 @@ import { AuditEventType } from '../audit/audit-event.entity';
 import { AuditService } from '../audit/audit.service';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { ListCompaniesDto } from './dto/list-companies.dto';
-import { CACHE_TTL_DAYS } from './services/bv-cache.service';
+import { CACHE_TTL_DAYS, BvCacheService } from './services/bv-cache.service';
 import { BolagsverketService } from './services/bolagsverket.service';
 import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
 import { RefreshDecisionService } from './services/refresh-decision.service';
@@ -20,12 +26,23 @@ import {
   LookupCompanyResponseDto,
 } from './dto/lookup-company.dto';
 import { CompanyEntity } from './entities/company.entity';
+import { BvFetchSnapshotEntity, SnapshotPolicyDecision } from './entities/bv-fetch-snapshot.entity';
+import { FailureStateService } from './services/failure-state.service';
+import { NormalisedCompany } from './integrations/bolagsverket.mapper';
+import {
+  DocumentListResponse,
+  HighValueDatasetResponse,
+  OrganisationInformationResponse,
+} from './integrations/bolagsverket.types';
 
 /** Timeout for external Bolagsverket API calls (ms). */
 const API_TIMEOUT_MS = 10_000;
 
 /** Stale threshold: data older than TTL but within this window is 'stale'. */
 const STALE_THRESHOLD_DAYS = CACHE_TTL_DAYS * 2; // 60 days
+const MS_PER_HOUR = 1000 * 60 * 60;
+
+type EnrichResponse = Awaited<ReturnType<BolagsverketService['enrichAndSave']>>;
 
 /**
  * Compute FreshnessStatus using policy-derived thresholds (hours → days).
@@ -55,6 +72,8 @@ export class CompaniesService {
     private readonly bolagsverketService: BolagsverketService,
     private readonly cachePolicyEvaluationService: CachePolicyEvaluationService,
     private readonly refreshDecisionService: RefreshDecisionService,
+    private readonly failureStateService: FailureStateService,
+    private readonly bvCacheService: BvCacheService,
     private readonly lineageCapture: LineageMetadataCaptureService,
     @InjectRepository(CompanyEntity)
     private readonly companyRepo: Repository<CompanyEntity>,
@@ -134,6 +153,14 @@ export class CompaniesService {
     // policy internally.  This call serves as an explicit orchestration hook
     // for quota checks and produces an audit trail of the intent to refresh.
     let refreshDecision: Awaited<ReturnType<RefreshDecisionService['decide']>> | null = null;
+    let fallbackUsed = false;
+    let failureStateLabel: string | null = null;
+    const recoveryStatus = await this.failureStateService.getRecoveryStatusForEntity(
+      ctx.tenantId,
+      'company',
+      dto.orgNumber,
+    );
+    const isApiAvailable = recoveryStatus.canRetry;
 
     try {
       refreshDecision = await this.refreshDecisionService.decide({
@@ -144,31 +171,164 @@ export class CompaniesService {
         entityType: 'company',
         correlationId,
         actorId,
+        isApiAvailable,
       });
 
       this.logger.log(
         `[${correlationId}] [P02-T05] refresh decision: serve_from=${refreshDecision.serve_from} reason=${refreshDecision.reason}`,
       );
 
-      const enrichPromise = this.bolagsverketService.enrichAndSave(
-        ctx.tenantId,
-        dto.orgNumber,
-        dto.force_refresh ?? false,
-        correlationId,
-        actorId,
-      );
+      let result: Awaited<ReturnType<BolagsverketService['enrichAndSave']>>['result'];
+      let snapshot: Awaited<ReturnType<BolagsverketService['enrichAndSave']>>['snapshot'];
+      let isFromCache = false;
+      let ageInDays: number | null = null;
+      let policyDecisionOverride: SnapshotPolicyDecision | null = null;
 
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new GatewayTimeoutException('Bolagsverket API request timed out')),
-          API_TIMEOUT_MS,
-        ),
-      );
+      if (!isApiAvailable) {
+        const fallback = await this._attemptStaleFallback(
+          ctx.tenantId,
+          dto.orgNumber,
+          correlationId,
+          actorId,
+          recoveryStatus.failureReason ?? 'provider_unavailable_backoff',
+        );
+        if (fallback) {
+          ({ result, snapshot, isFromCache, ageInDays } = fallback);
+          fallbackUsed = true;
+          failureStateLabel = 'DEGRADED';
+          policyDecisionOverride = 'stale_fallback';
+          await this.failureStateService.recordFailure({
+            tenantId: ctx.tenantId,
+            entityType: 'company',
+            entityId: dto.orgNumber,
+            failureState: recoveryStatus.state,
+            failureReason: recoveryStatus.failureReason ?? 'provider_unavailable_backoff',
+            isRecoverable: recoveryStatus.isRecoverable,
+            fallbackUsed: true,
+            staleDataTimestamp: snapshot.fetchedAt,
+            correlationId,
+            actorId,
+            incrementRetry: false,
+          });
+          void this.auditService.emitAuditEvent({
+            tenantId: ctx.tenantId,
+            userId: actorId,
+            eventType: AuditEventType.STALE_SERVED,
+            action: 'company.cache',
+            status: 'provider_unavailable_backoff',
+            resourceId: dto.orgNumber,
+            correlationId,
+            metadata: {
+              ...lookupMetadata,
+              failureState: recoveryStatus.state,
+              failureReason: recoveryStatus.failureReason ?? 'provider_unavailable_backoff',
+            },
+          });
+        } else {
+          await this.failureStateService.recordFailure({
+            tenantId: ctx.tenantId,
+            entityType: 'company',
+            entityId: dto.orgNumber,
+            failureState: 'NO_DATA_AVAILABLE',
+            failureReason: recoveryStatus.failureReason ?? 'provider_unavailable_backoff',
+            isRecoverable: recoveryStatus.isRecoverable,
+            fallbackUsed: false,
+            staleDataTimestamp: null,
+            correlationId,
+            actorId,
+            incrementRetry: false,
+          });
+          throw new ServiceUnavailableException('Provider unavailable and no cached data available');
+        }
+      } else {
+        const enrichPromise = this.bolagsverketService.enrichAndSave(
+          ctx.tenantId,
+          dto.orgNumber,
+          dto.force_refresh ?? false,
+          correlationId,
+          actorId,
+        );
 
-      const { result, snapshot, isFromCache, ageInDays } = await Promise.race([
-        enrichPromise,
-        timeoutPromise,
-      ]);
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new GatewayTimeoutException('Bolagsverket API request timed out')),
+            API_TIMEOUT_MS,
+          ),
+        );
+
+        try {
+          const enrichResult = await Promise.race([enrichPromise, timeoutPromise]);
+          result = enrichResult.result;
+          snapshot = enrichResult.snapshot;
+          isFromCache = enrichResult.isFromCache;
+          ageInDays = enrichResult.ageInDays;
+          if (!isFromCache && snapshot.fetchStatus === 'success') {
+            await this.failureStateService.recordSuccess({
+              tenantId: ctx.tenantId,
+              entityType: 'company',
+              entityId: dto.orgNumber,
+              correlationId,
+              actorId,
+            });
+          }
+        } catch (err) {
+          const classification = this.failureStateService.classifyFailure(err);
+          const fallback = await this._attemptStaleFallback(
+            ctx.tenantId,
+            dto.orgNumber,
+            correlationId,
+            actorId,
+            classification.failureReason,
+          );
+          if (!fallback) {
+            await this.failureStateService.recordFailure({
+              tenantId: ctx.tenantId,
+              entityType: 'company',
+              entityId: dto.orgNumber,
+              failureState: 'NO_DATA_AVAILABLE',
+              failureReason: classification.failureReason,
+              isRecoverable: classification.isRecoverable,
+              fallbackUsed: false,
+              staleDataTimestamp: null,
+              correlationId,
+              actorId,
+            });
+            throw err;
+          }
+
+          ({ result, snapshot, isFromCache, ageInDays } = fallback);
+          fallbackUsed = true;
+          failureStateLabel = 'DEGRADED';
+          policyDecisionOverride = 'stale_fallback';
+
+          await this.failureStateService.recordFailure({
+            tenantId: ctx.tenantId,
+            entityType: 'company',
+            entityId: dto.orgNumber,
+            failureState: classification.failureState,
+            failureReason: classification.failureReason,
+            isRecoverable: classification.isRecoverable,
+            fallbackUsed: true,
+            staleDataTimestamp: snapshot.fetchedAt,
+            correlationId,
+            actorId,
+          });
+          void this.auditService.emitAuditEvent({
+            tenantId: ctx.tenantId,
+            userId: actorId,
+            eventType: AuditEventType.STALE_SERVED,
+            action: 'company.cache',
+            status: 'provider_failure_fallback',
+            resourceId: dto.orgNumber,
+            correlationId,
+            metadata: {
+              ...lookupMetadata,
+              failureState: classification.failureState,
+              failureReason: classification.failureReason,
+            },
+          });
+        }
+      }
 
       const source = isFromCache ? 'DB' : 'API';
       const ageDays = ageInDays ?? 0;
@@ -189,6 +349,12 @@ export class CompaniesService {
         // Non-blocking: safe to ignore — defaults are used
       }
 
+      const policyDecision =
+        policyDecisionOverride ??
+        snapshot.policyDecision ??
+        (isFromCache ? 'cache_hit' : 'fresh_fetch');
+      const degraded = policyDecision === 'stale_fallback' || fallbackUsed;
+      const resolvedFailureState = degraded ? failureStateLabel ?? 'DEGRADED' : null;
       const metadata: CompanyMetadataDto = {
         source,
         fetched_at: fetchedAt,
@@ -197,7 +363,9 @@ export class CompaniesService {
         cache_ttl_days: CACHE_TTL_DAYS,
         snapshot_id: snapshot.id,
         correlation_id: correlationId,
-        policy_decision: snapshot.policyDecision ?? (isFromCache ? 'cache_hit' : 'fresh_fetch'),
+        policy_decision: policyDecision,
+        degraded,
+        failure_state: resolvedFailureState,
       };
 
       const company = result.normalisedData as unknown as Record<string, unknown>;
@@ -315,6 +483,71 @@ export class CompaniesService {
 
       throw err;
     }
+  }
+
+  private async _attemptStaleFallback(
+    tenantId: string,
+    orgNumber: string,
+    correlationId: string,
+    actorId: string | null,
+    failureReason: string,
+  ): Promise<EnrichResponse | null> {
+    const cacheCheck = await this.bvCacheService.checkFreshness(tenantId, orgNumber);
+    if (!cacheCheck || !cacheCheck.snapshot) return null;
+
+    const ageHours = (Date.now() - cacheCheck.snapshot.fetchedAt.getTime()) / MS_PER_HOUR;
+
+    let staleFallbackAllowed = true;
+    try {
+      const policyResult = await this.cachePolicyEvaluationService.evaluate(
+        tenantId,
+        ageHours,
+        {
+          entityType: 'company',
+          entityId: orgNumber,
+          correlationId,
+          actorId,
+          orgNumber,
+        },
+      );
+      staleFallbackAllowed = policyResult.staleFallbackAllowed;
+    } catch (policyErr) {
+      this.logger.warn(
+        `[P02-T10] Policy evaluation failed while attempting stale fallback for ${orgNumber}; defaulting to allow. ${policyErr}`,
+      );
+      staleFallbackAllowed = true;
+    }
+
+    if (!staleFallbackAllowed) {
+      this.logger.warn(
+        `[P02-T10] Stale fallback disallowed by policy for ${orgNumber}. Failure reason: ${failureReason}`,
+      );
+      return null;
+    }
+
+    const updatedSnapshot: BvFetchSnapshotEntity = {
+      ...cacheCheck.snapshot,
+      policyDecision: 'stale_fallback',
+      isStaleFallback: true,
+    };
+
+    const rawSummary = (updatedSnapshot.rawPayloadSummary ?? {}) as Record<string, unknown>;
+    const fallbackResult: EnrichResponse['result'] = {
+      normalisedData: updatedSnapshot.normalisedSummary as unknown as NormalisedCompany,
+      highValueDataset:
+        (rawSummary.highValueDataset as HighValueDatasetResponse | undefined) ?? null,
+      organisationInformation:
+        (rawSummary.organisationInformation as OrganisationInformationResponse[] | undefined) ?? [],
+      documents: (rawSummary.documents as DocumentListResponse | undefined) ?? null,
+      retrievedAt: updatedSnapshot.fetchedAt.toISOString(),
+    };
+
+    return {
+      result: fallbackResult,
+      snapshot: updatedSnapshot,
+      isFromCache: true,
+      ageInDays: cacheCheck.ageInDays,
+    };
   }
 
   /** @deprecated Use orchestrateLookup instead. Kept for backward compatibility. */

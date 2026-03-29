@@ -39,6 +39,8 @@ import { CompanyChangeEventEntity } from './entities/company-change-event.entity
 import { SnapshotComparisonService } from './services/snapshot-comparison.service';
 import { ChangeEventQueryService } from './services/change-event-query.service';
 import { ChangeEventController } from './controllers/change-event.controller';
+import { FailureStateEntity } from './entities/failure-state.entity';
+import { FailureStateService } from './services/failure-state.service';
 
 @Module({
   imports: [
@@ -55,6 +57,7 @@ import { ChangeEventController } from './controllers/change-event.controller';
       CachePolicyEntity,
       LineageMetadataEntity,
       CompanyChangeEventEntity,
+      FailureStateEntity,
     ]),
     HttpModule,
     AuditModule,
@@ -81,6 +84,7 @@ import { ChangeEventController } from './controllers/change-event.controller';
     LineageQueryService,
     SnapshotComparisonService,
     ChangeEventQueryService,
+    FailureStateService,
   ],
   exports: [
     CompaniesService,
@@ -100,6 +104,7 @@ import { ChangeEventController } from './controllers/change-event.controller';
     LineageQueryService,
     SnapshotComparisonService,
     ChangeEventQueryService,
+    FailureStateService,
   ],
 })
 export class CompaniesModule {}

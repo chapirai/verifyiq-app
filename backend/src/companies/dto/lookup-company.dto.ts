@@ -30,6 +30,10 @@ export class CompanyMetadataDto {
   correlation_id!: string;
   /** Policy decision that produced the snapshot (cache_hit | fresh_fetch | force_refresh | stale_fallback). */
   policy_decision!: string;
+  /** True when stale fallback was used due to provider failure or policy. */
+  degraded!: boolean;
+  /** Failure state label when degraded fallback is used. */
+  failure_state!: string | null;
 }
 
 export class LookupCompanyResponseDto {

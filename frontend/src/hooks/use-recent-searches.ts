@@ -11,6 +11,7 @@ export interface RecentSearchMetadata {
   freshness: 'fresh' | 'stale' | 'expired';
   fetched_at: string;
   age_days: number;
+  degraded?: boolean;
 }
 
 /** A single entry in the recent searches list. */
