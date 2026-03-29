@@ -161,6 +161,12 @@ describe('SnapshotComparisonService', () => {
       expect(service._deepEqual('x', null)).toBe(false);
     });
 
+    it('returns true for objects with same keys in different order', () => {
+      const a = { b: 2, a: 1 };
+      const b = { a: 1, b: 2 };
+      expect(service._deepEqual(a, b)).toBe(true);
+    });
+
     it('returns false for null vs undefined', () => {
       expect(service._deepEqual(null, undefined)).toBe(false);
     });

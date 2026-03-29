@@ -301,6 +301,8 @@ export class SnapshotComparisonService {
 
   /**
    * Deep equality check that handles primitives, arrays, objects, and nulls.
+   * Object keys are sorted before JSON serialisation to ensure deterministic
+   * comparison regardless of insertion order.
    */
   _deepEqual(a: unknown, b: unknown): boolean {
     if (a === b) return true;
@@ -309,12 +311,28 @@ export class SnapshotComparisonService {
     if (typeof a !== typeof b) return false;
     if (typeof a !== 'object') return false;
 
-    // JSON-based deep comparison — handles nested objects and arrays uniformly.
+    // Normalise key order before comparison to avoid false negatives caused
+    // by objects with identical properties in different insertion orders.
     try {
-      return JSON.stringify(a) === JSON.stringify(b);
+      return JSON.stringify(this._sortedKeys(a)) === JSON.stringify(this._sortedKeys(b));
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Recursively sort all object keys (alphabetically) so that serialisation
+   * produces a deterministic string regardless of insertion order.
+   * Arrays are preserved as-is (element order is significant).
+   */
+  private _sortedKeys(value: unknown): unknown {
+    if (value === null || typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value.map((item) => this._sortedKeys(item));
+    return Object.fromEntries(
+      Object.keys(value as Record<string, unknown>)
+        .sort()
+        .map((key) => [key, this._sortedKeys((value as Record<string, unknown>)[key])]),
+    );
   }
 
   /** Persist a sentinel UNKNOWN change event when a comparison fails. */
