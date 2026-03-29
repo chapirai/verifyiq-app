@@ -37,6 +37,9 @@ export class AddAuditUsageEvents1000000000015 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS idx_audit_events_created_at
         ON audit_events (created_at);
 
+      CREATE INDEX IF NOT EXISTS idx_audit_events_tenant_created
+        ON audit_events (tenant_id, created_at);
+
       CREATE INDEX IF NOT EXISTS idx_audit_events_correlation_id
         ON audit_events (correlation_id)
         WHERE correlation_id IS NOT NULL;
@@ -65,6 +68,9 @@ export class AddAuditUsageEvents1000000000015 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS idx_usage_events_created_at
         ON usage_events (created_at);
 
+      CREATE INDEX IF NOT EXISTS idx_usage_events_tenant_created
+        ON usage_events (tenant_id, created_at);
+
       CREATE INDEX IF NOT EXISTS idx_usage_events_correlation_id
         ON usage_events (correlation_id)
         WHERE correlation_id IS NOT NULL;
@@ -74,6 +80,7 @@ export class AddAuditUsageEvents1000000000015 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       DROP INDEX IF EXISTS idx_usage_events_correlation_id;
+      DROP INDEX IF EXISTS idx_usage_events_tenant_created;
       DROP INDEX IF EXISTS idx_usage_events_created_at;
       DROP INDEX IF EXISTS idx_usage_events_event_type;
       DROP INDEX IF EXISTS idx_usage_events_user_id;
@@ -81,6 +88,7 @@ export class AddAuditUsageEvents1000000000015 implements MigrationInterface {
       DROP TABLE IF EXISTS usage_events;
 
       DROP INDEX IF EXISTS idx_audit_events_correlation_id;
+      DROP INDEX IF EXISTS idx_audit_events_tenant_created;
       DROP INDEX IF EXISTS idx_audit_events_created_at;
       DROP INDEX IF EXISTS idx_audit_events_event_type;
       DROP INDEX IF EXISTS idx_audit_events_user_id;

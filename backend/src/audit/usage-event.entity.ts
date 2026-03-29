@@ -5,6 +5,7 @@ import { AuditEventType } from './audit-event.entity';
  * P02-T09: Usage event entity for cost and billing analysis.
  */
 @Entity({ name: 'usage_events' })
+@Index(['tenantId', 'createdAt'])
 @Index(['userId'])
 @Index(['eventType'])
 @Index(['createdAt'])
