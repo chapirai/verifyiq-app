@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { BolagsverketClient } from './bolagsverket.client';
 
@@ -20,7 +20,10 @@ describe('BolagsverketClient', () => {
         return value ?? defaultValue;
       }),
     };
-    return new BolagsverketClient(httpService as any, configService as any);
+    const integrationTokenService = {
+      getTenantAccessToken: jest.fn(),
+    };
+    return new BolagsverketClient(httpService as any, configService as any, integrationTokenService as any);
   };
 
   const makeTokenGetMock = (token = 'token-1') =>
@@ -92,6 +95,55 @@ describe('BolagsverketClient', () => {
       expect(token1).toBe('token-1');
       expect(token2).toBe('token-2');
       expect(getMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses tenant-scoped token service when tenant context exists', async () => {
+      const postMock = jest.fn();
+      const getMock = jest.fn();
+      const httpService = { post: postMock, get: getMock };
+      const configService = {
+        get: jest.fn((key: string, defaultValue?: string) => (baseConfig as Record<string, string>)[key] ?? defaultValue),
+      };
+      const integrationTokenService = {
+        getTenantAccessToken: jest.fn().mockResolvedValue('tenant-token-1'),
+      };
+      const client = new BolagsverketClient(httpService as any, configService as any, integrationTokenService as any);
+
+      const token = await client.getAccessToken('hvd', {
+        tenantId: 'tenant-1',
+        actorId: 'actor-1',
+        correlationId: 'corr-1',
+      });
+
+      expect(token).toBe('tenant-token-1');
+      expect(integrationTokenService.getTenantAccessToken).toHaveBeenCalledWith(
+        'tenant-1',
+        'hvd',
+        'corr-1',
+        'actor-1',
+      );
+      expect(getMock).not.toHaveBeenCalled();
+    });
+
+    it('de-duplicates parallel token requests for non-tenant context', async () => {
+      const postMock = jest.fn();
+      let release: any = null;
+      const getMock = jest.fn(() => new Observable((subscriber) => {
+        release = () => {
+          subscriber.next({ data: { access_token: 'parallel-token', expires_in: 3600 } });
+          subscriber.complete();
+        };
+      }));
+      const client = makeClient(postMock, getMock);
+
+      const first = client.getAccessToken();
+      const second = client.getAccessToken();
+      if (release) release();
+      const [token1, token2] = await Promise.all([first, second]);
+
+      expect(token1).toBe('parallel-token');
+      expect(token2).toBe('parallel-token');
+      expect(getMock).toHaveBeenCalledTimes(1);
     });
 
     it('stores independent token cache entries per auth/scope', async () => {

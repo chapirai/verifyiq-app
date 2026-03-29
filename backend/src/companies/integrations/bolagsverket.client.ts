@@ -12,6 +12,7 @@ import { firstValueFrom } from 'rxjs';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { AxiosRequestConfig } from 'axios';
+import { IntegrationTokenService } from '../services/integration-token.service';
 import { sanitizeBolagsverketFilename } from './bolagsverket.utils';
 import {
   ALL_INFORMATION_CATEGORIES,
@@ -76,7 +77,16 @@ export class BolagsverketClient {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly integrationTokenService: IntegrationTokenService,
   ) {}
+
+  private getTenantIdFromContext(context?: {
+    tenantId?: string;
+    actorId?: string | null;
+    correlationId?: string | null;
+  }): string | null {
+    return context?.tenantId ?? null;
+  }
 
   // ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -169,8 +179,11 @@ export class BolagsverketClient {
     return typeof raw === 'string' && raw.toLowerCase() === 'true';
   }
 
-  private async buildHvdHeaders(extraHeaders: Record<string, string> = {}): Promise<Record<string, string>> {
-    const token = await this.getAccessToken('hvd');
+  private async buildHvdHeaders(
+    extraHeaders: Record<string, string> = {},
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+  ): Promise<Record<string, string>> {
+    const token = await this.getAccessToken('hvd', context);
     return {
       'content-type': 'application/json',
       Authorization: `Bearer ${token}`,
@@ -179,15 +192,19 @@ export class BolagsverketClient {
     };
   }
 
-  private async buildForetagsinfoHeaders(extraHeaders: Record<string, string> = {}): Promise<Record<string, string>> {
+  private async buildForetagsinfoHeaders(
+    extraHeaders: Record<string, string> = {},
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+  ): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       'x-request-id': randomUUID(),
       ...extraHeaders,
     };
 
-    if (this.isForetagsinfoOAuthEnabled()) {
-      const token = await this.getAccessToken('org');
+    const tenantId = this.getTenantIdFromContext(context);
+    if (tenantId || this.isForetagsinfoOAuthEnabled()) {
+      const token = await this.getAccessToken('org', context);
       headers['Authorization'] = `Bearer ${token}`;
       return headers;
     }
@@ -257,6 +274,7 @@ export class BolagsverketClient {
       auth?: 'hvd' | 'org';
       responseType?: AxiosRequestConfig['responseType'];
       extraHeaders?: Record<string, string>;
+      context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null };
     },
   ): Promise<{ responseData: T; requestId: string; responseHeaders?: Record<string, string> }> {
     let attempt = 0;
@@ -264,8 +282,8 @@ export class BolagsverketClient {
 
     while (true) {
       const headers = options?.auth === 'org'
-        ? await this.buildForetagsinfoHeaders(options?.extraHeaders)
-        : await this.buildHvdHeaders(options?.extraHeaders);
+        ? await this.buildForetagsinfoHeaders(options?.extraHeaders, options?.context)
+        : await this.buildHvdHeaders(options?.extraHeaders, options?.context);
       const requestId = headers['x-request-id'];
       try {
         const config: AxiosRequestConfig = {
@@ -391,7 +409,20 @@ export class BolagsverketClient {
    * - `hvd`: Värdefulla Datamängder token settings (`BV_HVD_*`).
    * - `org`: Företagsinformation OAuth mode settings (`BV_FORETAGSINFO_*`).
    */
-  async getAccessToken(auth: 'hvd' | 'org' = 'hvd'): Promise<string> {
+  async getAccessToken(
+    auth: 'hvd' | 'org' = 'hvd',
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+  ): Promise<string> {
+    const tenantId = this.getTenantIdFromContext(context);
+    if (tenantId) {
+      return this.integrationTokenService.getTenantAccessToken(
+        tenantId,
+        auth,
+        context?.correlationId ?? null,
+        context?.actorId ?? null,
+      );
+    }
+
     const cacheKey = this.getTokenCacheKey(auth);
     if (this.isTokenValid(cacheKey)) {
       this.tokenMetrics.cacheHits++;
@@ -491,7 +522,10 @@ export class BolagsverketClient {
   }
 
   /** POST /vardefulla-datamangder/v1/organisationer – high-value dataset. */
-  async fetchHighValueDataset(identitetsbeteckning: string): Promise<{
+  async fetchHighValueDataset(
+    identitetsbeteckning: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+  ): Promise<{
     requestPayload: { identitetsbeteckning: string };
     responsePayload: HighValueDatasetResponse;
     requestId: string;
@@ -501,13 +535,16 @@ export class BolagsverketClient {
       'post',
       this.buildUrl(this.getHvdBaseUrl(), '/organisationer'),
       payload,
-      { auth: 'hvd' },
+      { auth: 'hvd', context },
     );
     return { requestPayload: payload, responsePayload: responseData, requestId };
   }
 
   /** POST /vardefulla-datamangder/v1/dokumentlista – retrieve available documents. */
-  async fetchDocumentList(identitetsbeteckning: string): Promise<{
+  async fetchDocumentList(
+    identitetsbeteckning: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+  ): Promise<{
     requestPayload: { identitetsbeteckning: string };
     responsePayload: DocumentListResponse;
     requestId: string;
@@ -517,13 +554,16 @@ export class BolagsverketClient {
       'post',
       this.buildUrl(this.getHvdBaseUrl(), '/dokumentlista'),
       payload,
-      { auth: 'hvd' },
+      { auth: 'hvd', context },
     );
     return { requestPayload: payload, responsePayload: responseData, requestId };
   }
 
   /** GET/POST /vardefulla-datamangder/v1/dokument – download document ZIP. */
-  async fetchDocument(dokumentId: string): Promise<{
+  async fetchDocument(
+    dokumentId: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+  ): Promise<{
     requestPayload: { dokumentId: string } | null;
     responsePayload: Buffer;
     requestId: string;
@@ -546,6 +586,7 @@ export class BolagsverketClient {
         auth: 'hvd',
         responseType: 'arraybuffer',
         extraHeaders: { Accept: 'application/zip' },
+        context,
       },
     );
 
@@ -576,6 +617,7 @@ export class BolagsverketClient {
     identitetsbeteckning: string,
     informationCategories: string[] = [...ALL_INFORMATION_CATEGORIES],
     tidpunkt?: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
   ): Promise<{
     requestPayload: Record<string, unknown>;
     responsePayload: OrganisationInformationResponse[];
@@ -592,7 +634,7 @@ export class BolagsverketClient {
       'post',
       this.buildUrl(this.getOrganisationBaseUrl(), '/organisationsinformation'),
       payload,
-      { auth: 'org' },
+      { auth: 'org', context },
     );
     const responseArray = this.ensureArray(responseData);
     return { requestPayload: payload, responsePayload: responseArray, requestId };
@@ -607,6 +649,7 @@ export class BolagsverketClient {
     organisationIdentitetsbeteckning?: string,
     fromdatum?: string,
     tomdatum?: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
   ): Promise<{
     requestPayload: Record<string, unknown>;
     responsePayload: ArendeResponse;
@@ -622,7 +665,7 @@ export class BolagsverketClient {
       'post',
       this.buildUrl(this.getOrganisationBaseUrl(), '/arenden'),
       payload,
-      { auth: 'org' },
+      { auth: 'org', context },
     );
     const responseArray = this.ensureArray(responseData);
     return { requestPayload: payload, responsePayload: responseArray, requestId };
@@ -635,6 +678,7 @@ export class BolagsverketClient {
   async verifySignatoryPower(
     funktionarIdentitetsbeteckning: string,
     organisationIdentitetsbeteckning: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
   ): Promise<{
     requestPayload: Record<string, unknown>;
     responsePayload: FirmateckningsalternativResponse;
@@ -645,7 +689,7 @@ export class BolagsverketClient {
       'post',
       this.buildUrl(this.getOrganisationBaseUrl(), '/firmateckningsalternativ'),
       payload,
-      { auth: 'org' },
+      { auth: 'org', context },
     );
     return { requestPayload: payload, responsePayload: responseData, requestId };
   }
@@ -658,6 +702,7 @@ export class BolagsverketClient {
     identitetsbeteckning: string,
     fromdatum?: string,
     tomdatum?: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
   ): Promise<{
     requestPayload: Record<string, unknown>;
     responsePayload: AktiekapitalforandringResponse;
@@ -671,7 +716,7 @@ export class BolagsverketClient {
       'post',
       this.buildUrl(this.getOrganisationBaseUrl(), '/aktiekapitalforandringar'),
       payload,
-      { auth: 'org' },
+      { auth: 'org', context },
     );
     return { requestPayload: payload, responsePayload: responseData, requestId };
   }
@@ -687,6 +732,7 @@ export class BolagsverketClient {
     sortAttribute?: SortAttributeEngagemang,
     sortOrder?: SortOrder,
     filters?: BvFiltrering,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
   ): Promise<{
     requestPayload: Record<string, unknown>;
     responsePayload: OrganisationsengagemangResponse;
@@ -706,7 +752,7 @@ export class BolagsverketClient {
       'post',
       this.buildUrl(this.getOrganisationBaseUrl(), '/organisationsengagemang'),
       payload,
-      { auth: 'org' },
+      { auth: 'org', context },
     );
     return { requestPayload: payload, responsePayload: responseData, requestId };
   }
@@ -719,6 +765,7 @@ export class BolagsverketClient {
     identitetsbeteckning: string,
     fromdatum?: string,
     tomdatum?: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
   ): Promise<{
     requestPayload: Record<string, unknown>;
     responsePayload: FinansiellaRapporterResponse;
@@ -732,7 +779,7 @@ export class BolagsverketClient {
       'post',
       this.buildUrl(this.getOrganisationBaseUrl(), '/finansiellarapporter'),
       payload,
-      { auth: 'org' },
+      { auth: 'org', context },
     );
     return { requestPayload: payload, responsePayload: responseData, requestId };
   }

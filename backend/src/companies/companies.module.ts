@@ -42,6 +42,8 @@ import { ChangeEventController } from './controllers/change-event.controller';
 import { FailureStateEntity } from './entities/failure-state.entity';
 import { FailureStateService } from './services/failure-state.service';
 import { CompanyMetadataService } from './services/company-metadata.service';
+import { IntegrationTokenEntity } from './entities/integration-token.entity';
+import { IntegrationTokenService } from './services/integration-token.service';
 
 @Module({
   imports: [
@@ -59,6 +61,7 @@ import { CompanyMetadataService } from './services/company-metadata.service';
       LineageMetadataEntity,
       CompanyChangeEventEntity,
       FailureStateEntity,
+      IntegrationTokenEntity,
     ]),
     HttpModule,
     AuditModule,
@@ -87,6 +90,7 @@ import { CompanyMetadataService } from './services/company-metadata.service';
     ChangeEventQueryService,
     FailureStateService,
     CompanyMetadataService,
+    IntegrationTokenService,
   ],
   exports: [
     CompaniesService,
@@ -108,6 +112,7 @@ import { CompanyMetadataService } from './services/company-metadata.service';
     ChangeEventQueryService,
     FailureStateService,
     CompanyMetadataService,
+    IntegrationTokenService,
   ],
 })
 export class CompaniesModule {}

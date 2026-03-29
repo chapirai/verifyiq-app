@@ -14,6 +14,7 @@ const envSchema = z.object({
   REDIS_PASSWORD: z.string().default(''),
   JWT_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
+  INTEGRATION_TOKEN_ENCRYPTION_KEY: z.string().min(16).optional(),
   MINIO_ENDPOINT: z.string().min(1),
   MINIO_PORT: z.coerce.number().int().positive(),
   MINIO_USE_SSL: z.enum(['true', 'false']).or(z.boolean().transform(v => (v ? 'true' : 'false'))).default('false'),

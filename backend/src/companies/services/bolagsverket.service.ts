@@ -68,6 +68,12 @@ export interface DataValidationResult {
   errors: string[];
 }
 
+interface BvRequestContext {
+  tenantId: string;
+  actorId?: string | null;
+  correlationId?: string | null;
+}
+
 @Injectable()
 export class BolagsverketService {
   private readonly logger = new Logger(BolagsverketService.name);
@@ -108,13 +114,16 @@ export class BolagsverketService {
     return this.client.revokeAccessToken();
   }
 
-  async getHighValueCompanyInformation(identitetsbeteckning: string): Promise<HighValueDatasetResponse> {
-    const { responsePayload } = await this.client.fetchHighValueDataset(identitetsbeteckning);
+  async getHighValueCompanyInformation(
+    identitetsbeteckning: string,
+    context?: BvRequestContext,
+  ): Promise<HighValueDatasetResponse> {
+    const { responsePayload } = await this.client.fetchHighValueDataset(identitetsbeteckning, context);
     return responsePayload;
   }
 
-  async getDocument(dokumentId: string): Promise<DocumentDownload> {
-    const result = await this.client.fetchDocument(dokumentId);
+  async getDocument(dokumentId: string, context?: BvRequestContext): Promise<DocumentDownload> {
+    const result = await this.client.fetchDocument(dokumentId, context);
     const safeDocumentId = sanitizeBolagsverketFilename(dokumentId) ?? 'document';
     return {
       data: result.responsePayload,
@@ -130,11 +139,14 @@ export class BolagsverketService {
    * Fetch high-value dataset + all organisational information in parallel,
    * then normalise into a single profile.
    */
-  async getCompleteCompanyData(identitetsbeteckning: string): Promise<CompleteCompanyProfile> {
+  async getCompleteCompanyData(
+    identitetsbeteckning: string,
+    context?: BvRequestContext,
+  ): Promise<CompleteCompanyProfile> {
     const [hvdResult, richResult, docResult] = await Promise.allSettled([
-      this.client.fetchHighValueDataset(identitetsbeteckning),
-      this.client.fetchOrganisationInformation(identitetsbeteckning),
-      this.client.fetchDocumentList(identitetsbeteckning),
+      this.client.fetchHighValueDataset(identitetsbeteckning, context),
+      this.client.fetchOrganisationInformation(identitetsbeteckning, undefined, undefined, context),
+      this.client.fetchDocumentList(identitetsbeteckning, context),
     ]);
 
     const highValueDataset =
@@ -187,11 +199,13 @@ export class BolagsverketService {
     identitetsbeteckning: string,
     informationCategories?: string[],
     tidpunkt?: string,
+    context?: BvRequestContext,
   ): Promise<OrganisationInformationResponse[]> {
     const { responsePayload } = await this.client.fetchOrganisationInformation(
       identitetsbeteckning,
       informationCategories,
       tidpunkt,
+      context,
     );
     return responsePayload;
   }
@@ -200,11 +214,16 @@ export class BolagsverketService {
     identitetsbeteckning: string,
     pageNumber = 1,
     pageSize = 20,
+    context?: BvRequestContext,
   ): Promise<OrganisationsengagemangResponse> {
     const { responsePayload } = await this.client.fetchOrganizationEngagements(
       identitetsbeteckning,
       pageNumber,
       pageSize,
+      undefined,
+      undefined,
+      undefined,
+      context,
     );
     return responsePayload;
   }
@@ -214,11 +233,14 @@ export class BolagsverketService {
   async getOfficerInformation(
     identitetsbeteckning: string,
     officerType: 'all' | 'signatories' | 'board' = 'all',
+    context?: BvRequestContext,
   ): Promise<OfficerProfile[]> {
-    const { responsePayload } = await this.client.fetchOrganisationInformation(identitetsbeteckning, [
-      'FUNKTIONARER',
-      'FIRMATECKNING',
-    ]);
+    const { responsePayload } = await this.client.fetchOrganisationInformation(
+      identitetsbeteckning,
+      ['FUNKTIONARER', 'FIRMATECKNING'],
+      undefined,
+      context,
+    );
     const orgInfo = responsePayload[0];
     const officers: BvOfficer[] = orgInfo?.funktionarer ?? [];
 
@@ -246,14 +268,17 @@ export class BolagsverketService {
 
   // ── Financial snapshot ──────────────────────────────────────────────────────
 
-  async getFinancialSnapshot(identitetsbeteckning: string): Promise<FinancialSnapshot> {
+  async getFinancialSnapshot(
+    identitetsbeteckning: string,
+    context?: BvRequestContext,
+  ): Promise<FinancialSnapshot> {
     const [richResult, docResult] = await Promise.allSettled([
       this.client.fetchOrganisationInformation(identitetsbeteckning, [
         'AKTIEINFORMATION',
         'RAKENSKAPSÅR',
         'FINANSIELLA_RAPPORTER',
-      ]),
-      this.client.fetchDocumentList(identitetsbeteckning),
+      ], undefined, context),
+      this.client.fetchDocumentList(identitetsbeteckning, context),
     ]);
 
     const orgInfo =
@@ -274,10 +299,12 @@ export class BolagsverketService {
   async getSignatoryOptions(
     funktionarIdentitetsbeteckning: string,
     organisationIdentitetsbeteckning: string,
+    context?: BvRequestContext,
   ): Promise<FirmateckningsalternativResponse> {
     const { responsePayload } = await this.client.verifySignatoryPower(
       funktionarIdentitetsbeteckning,
       organisationIdentitetsbeteckning,
+      context,
     );
     return responsePayload;
   }
@@ -288,11 +315,13 @@ export class BolagsverketService {
     identitetsbeteckning: string,
     fromdatum?: string,
     tomdatum?: string,
+    context?: BvRequestContext,
   ): Promise<AktiekapitalforandringResponse> {
     const { responsePayload } = await this.client.fetchShareCapitalHistory(
       identitetsbeteckning,
       fromdatum,
       tomdatum,
+      context,
     );
     return responsePayload;
   }
@@ -304,12 +333,14 @@ export class BolagsverketService {
     organisationIdentitetsbeteckning?: string,
     fromdatum?: string,
     tomdatum?: string,
+    context?: BvRequestContext,
   ): Promise<ArendeResponse> {
     const { responsePayload } = await this.client.fetchArendeInformation(
       arendenummer,
       organisationIdentitetsbeteckning,
       fromdatum,
       tomdatum,
+      context,
     );
     return responsePayload;
   }
@@ -320,11 +351,16 @@ export class BolagsverketService {
     identitetsbeteckning: string,
     pageNumber = 1,
     pageSize = 20,
+    context?: BvRequestContext,
   ): Promise<OrganisationsengagemangResponse> {
     const { responsePayload } = await this.client.fetchOrganizationEngagements(
       identitetsbeteckning,
       pageNumber,
       pageSize,
+      undefined,
+      undefined,
+      undefined,
+      context,
     );
     return responsePayload;
   }
@@ -335,19 +371,24 @@ export class BolagsverketService {
     identitetsbeteckning: string,
     fromdatum?: string,
     tomdatum?: string,
+    context?: BvRequestContext,
   ): Promise<FinansiellaRapporterResponse> {
     const { responsePayload } = await this.client.fetchFinancialReports(
       identitetsbeteckning,
       fromdatum,
       tomdatum,
+      context,
     );
     return responsePayload;
   }
 
   // ── Document list ────────────────────────────────────────────────────────────
 
-  async getDocumentList(identitetsbeteckning: string): Promise<DocumentListResponse> {
-    const { responsePayload } = await this.client.fetchDocumentList(identitetsbeteckning);
+  async getDocumentList(
+    identitetsbeteckning: string,
+    context?: BvRequestContext,
+  ): Promise<DocumentListResponse> {
+    const { responsePayload } = await this.client.fetchDocumentList(identitetsbeteckning, context);
     return responsePayload;
   }
 
@@ -605,7 +646,11 @@ export class BolagsverketService {
     });
 
     try {
-      result = await this.getCompleteCompanyData(identitetsbeteckning);
+      result = await this.getCompleteCompanyData(identitetsbeteckning, {
+        tenantId,
+        actorId,
+        correlationId,
+      });
       apiCallCount = ENRICH_API_CALL_COUNT;
     } catch (err) {
       fetchStatus = 'error';
