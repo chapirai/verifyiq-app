@@ -35,6 +35,10 @@ import { LineageMetadataEntity } from './entities/lineage-metadata.entity';
 import { LineageMetadataCaptureService } from './services/lineage-metadata-capture.service';
 import { LineageQueryService } from './services/lineage-query.service';
 import { LineageController } from './controllers/lineage.controller';
+import { CompanyChangeEventEntity } from './entities/company-change-event.entity';
+import { SnapshotComparisonService } from './services/snapshot-comparison.service';
+import { ChangeEventQueryService } from './services/change-event-query.service';
+import { ChangeEventController } from './controllers/change-event.controller';
 
 @Module({
   imports: [
@@ -50,11 +54,12 @@ import { LineageController } from './controllers/lineage.controller';
       CompanyVersionEntity,
       CachePolicyEntity,
       LineageMetadataEntity,
+      CompanyChangeEventEntity,
     ]),
     HttpModule,
     AuditModule,
   ],
-  controllers: [CompaniesController, BolagsverketController, CachePolicyController, LineageController],
+  controllers: [CompaniesController, BolagsverketController, CachePolicyController, LineageController, ChangeEventController],
   providers: [
     CompaniesService,
     BolagsverketClient,
@@ -74,6 +79,8 @@ import { LineageController } from './controllers/lineage.controller';
     RefreshDecisionService,
     LineageMetadataCaptureService,
     LineageQueryService,
+    SnapshotComparisonService,
+    ChangeEventQueryService,
   ],
   exports: [
     CompaniesService,
@@ -91,6 +98,8 @@ import { LineageController } from './controllers/lineage.controller';
     RefreshDecisionService,
     LineageMetadataCaptureService,
     LineageQueryService,
+    SnapshotComparisonService,
+    ChangeEventQueryService,
   ],
 })
 export class CompaniesModule {}

@@ -17,6 +17,8 @@ import { BvPersistenceService } from './bv-persistence.service';
 import { BvFetchSnapshotEntity, SnapshotPolicyDecision } from '../entities/bv-fetch-snapshot.entity';
 import { RawPayloadStorageService } from './raw-payload-storage.service';
 import { CachePolicyEvaluationService } from './cache-policy-evaluation.service';
+import { SnapshotChainService } from './snapshot-chain.service';
+import { SnapshotComparisonService } from './snapshot-comparison.service';
 
 /** Allowed tolerance when validating share-capital arithmetic (1 %). */
 const SHARE_CAPITAL_TOLERANCE = 0.01;
@@ -67,6 +69,8 @@ export class BolagsverketService {
     private readonly bvPersistenceService: BvPersistenceService,
     private readonly rawPayloadStorageService: RawPayloadStorageService,
     private readonly cachePolicyEvaluationService: CachePolicyEvaluationService,
+    private readonly snapshotChainService: SnapshotChainService,
+    private readonly snapshotComparisonService: SnapshotComparisonService,
   ) {}
 
   // ── Health ──────────────────────────────────────────────────────────────────
@@ -513,9 +517,16 @@ export class BolagsverketService {
         rawPayloadId,
       });
 
+      // 6. Link snapshot into version chain and trigger comparison (P02-T08)
+      // Both operations are best-effort: failures must NOT block snapshot creation.
+      this._linkAndCompareSnapshot(tenantId, snapshot.id, identitetsbeteckning).catch((err) =>
+        this.logger.warn(
+          `[P02-T08] Post-snapshot link/compare failed for ${identitetsbeteckning}: ${err}`,
+        ),
+      );
+
       return { result, snapshot, isFromCache: false, ageInDays: null };
     } catch (persistErr) {
-      this.logger.warn(`Persistence failed for ${identitetsbeteckning}: ${persistErr}`);
       const snapshot = await this.bvCacheService.createSnapshot({
         tenantId,
         organisationsnummer: identitetsbeteckning,
@@ -591,5 +602,31 @@ export class BolagsverketService {
     });
 
     return { engagements, snapshot, isFromCache: false, ageInDays: null };
+  }
+
+  // ── P02-T08: Post-snapshot chain link and comparison ────────────────────────
+
+  /**
+   * Link a newly-created snapshot into the version chain, then trigger a
+   * comparison against its predecessor.
+   *
+   * Runs asynchronously after snapshot creation — failures here must never
+   * propagate to the caller.
+   */
+  private async _linkAndCompareSnapshot(
+    tenantId: string,
+    snapshotId: string,
+    organisationsnummer: string,
+  ): Promise<void> {
+    const linked = await this.snapshotChainService.linkSnapshot(
+      tenantId,
+      snapshotId,
+      organisationsnummer,
+    );
+    await this.snapshotComparisonService.compareSnapshots(
+      tenantId,
+      linked.id,
+      linked.previousSnapshotId ?? null,
+    );
   }
 }
