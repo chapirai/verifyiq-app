@@ -100,6 +100,10 @@ export class BolagsverketService {
     return this.client.getAccessToken();
   }
 
+  getTokenCacheStatus() {
+    return this.client.getTokenCacheStatus();
+  }
+
   async revokeAccessToken(): Promise<{ revoked: boolean; error?: string }> {
     return this.client.revokeAccessToken();
   }

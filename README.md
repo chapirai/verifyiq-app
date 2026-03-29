@@ -271,6 +271,11 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 | `BV_HVD_SCOPES` | OAuth scopes (default: `vardefulla-datamangder:read vardefulla-datamangder:ping`) |
 | `BV_HVD_DOCUMENT_PATH` | Document download path (default: `/dokument`) |
 | `BV_FORETAGSINFO_BASE_URL` | Override base URL for Företagsinformation |
+| `BV_FORETAGSINFO_USE_OAUTH` | Set `true` to fetch Företagsinformation tokens via OAuth client-credentials |
+| `BV_FORETAGSINFO_TOKEN_URL` | Optional token endpoint override for Företagsinformation OAuth mode |
+| `BV_FORETAGSINFO_SCOPES` | Optional OAuth scopes for Företagsinformation token requests |
+| `BV_FORETAGSINFO_CLIENT_ID` | Optional Företagsinformation-specific OAuth client ID |
+| `BV_FORETAGSINFO_CLIENT_SECRET` | Optional Företagsinformation-specific OAuth client secret |
 | `BV_FORETAGSINFO_BEARER_TOKEN` | Bearer token for Företagsinformation API |
 | `BV_FORETAGSINFO_AUTH_HEADER` | Custom header name (default: `Authorization`) |
 | `BV_FORETAGSINFO_AUTH_VALUE` | Full auth header value override (use instead of bearer token) |
@@ -280,6 +285,31 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 | `AWS_ACCESS_KEY_ID` | MinIO access key (same as `MINIO_ROOT_USER` in local dev) |
 | `AWS_SECRET_ACCESS_KEY` | MinIO secret key (same as `MINIO_ROOT_PASSWORD` in local dev) |
 | `S3_BUCKET` | Object storage bucket name (default: `verifyiq-documents`) |
+
+### Token management, troubleshooting, and credential rotation
+
+- The backend caches OAuth tokens per auth target and scope and refreshes them before expiry.
+- Token endpoint calls use Basic auth (`client_id:client_secret`) and include `X-Request-Id`.
+- Inspect token cache diagnostics at `GET /api/v1/bolagsverket/token-cache` (authenticated).
+- To rotate credentials, update `.env` (`BV_HVD_*` and optionally `BV_FORETAGSINFO_*`), restart backend, and verify a fresh token is issued via the token-cache endpoint. Existing cached tokens remain usable until expiry unless revoked.
+- For immediate cutover during rotation, revoke active tokens by running a short Nest shell/script that calls `BolagsverketService.revokeAccessToken()` (requires `BV_HVD_REVOKE_URL`), then restart the backend with new credentials.
+- If token requests fail, verify token URL, scopes, and credentials first; logs include request IDs and normalized upstream error details (`status`, `title`, `detail`, `code`, `requestId`).
+
+### Manual Bolagsverket checks (curl)
+
+```bash
+# HVD company information (via backend)
+curl -X POST http://localhost:4000/api/v1/bolagsverket/company \
+  -H "Authorization: Bearer <app-jwt>" \
+  -H "Content-Type: application/json" \
+  -d '{"identitetsbeteckning":"5565595450"}'
+
+# Företagsinformation (POST) via backend
+curl -X POST http://localhost:4000/api/v1/bolagsverket/company-information \
+  -H "Authorization: Bearer <app-jwt>" \
+  -H "Content-Type: application/json" \
+  -d '{"identitetsbeteckning":"5565595450"}'
+```
 
 ### Triggering a refresh
 
