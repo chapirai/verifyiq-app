@@ -11,6 +11,7 @@ import { CompanyEntity } from './entities/company.entity';
 import { BolagsverketService } from './services/bolagsverket.service';
 import { CACHE_TTL_DAYS } from './services/bv-cache.service';
 import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
+import { RefreshDecisionService } from './services/refresh-decision.service';
 
 const TENANT_ID = 'tenant-abc';
 const ORG_NR = '5560000001';
@@ -92,6 +93,12 @@ describe('CompaniesService – orchestrateLookup', () => {
             getPolicyForTenant: jest.fn().mockResolvedValue(null),
             listPolicies: jest.fn().mockResolvedValue([]),
             getPolicyById: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: RefreshDecisionService,
+          useValue: {
+            decide: jest.fn().mockResolvedValue({ serve_from: 'db', reason: 'policy_fresh', cost_flags: {}, force_refresh: false }),
           },
         },
         {
@@ -327,6 +334,12 @@ describe('CompaniesService – findAll', () => {
           },
         },
         {
+          provide: RefreshDecisionService,
+          useValue: {
+            decide: jest.fn().mockResolvedValue({ serve_from: 'db', reason: 'policy_fresh', cost_flags: {}, force_refresh: false }),
+          },
+        },
+        {
           provide: getRepositoryToken(CompanyEntity),
           useValue: companyRepo,
         },
@@ -490,6 +503,12 @@ describe('CompaniesService – findAll', () => {
               getPolicyForTenant: jest.fn().mockResolvedValue(null),
               listPolicies: jest.fn().mockResolvedValue([]),
               getPolicyById: jest.fn().mockResolvedValue(null),
+            },
+          },
+          {
+            provide: RefreshDecisionService,
+            useValue: {
+              decide: jest.fn().mockResolvedValue({ serve_from: 'db', reason: 'policy_fresh', cost_flags: {}, force_refresh: false }),
             },
           },
           {
