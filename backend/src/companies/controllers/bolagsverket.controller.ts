@@ -118,10 +118,9 @@ export class BolagsverketController {
   @Get('documents/:dokumentId/download')
   async downloadDocument(@Param('dokumentId') dokumentId: string, @Res({ passthrough: true }) res: Response) {
     const document = await this.bolagsverketService.getDocument(dokumentId);
-    const safeFileName = document.fileName.replace(/["\r\n]/g, '_');
     res.set({
       'Content-Type': document.contentType,
-      'Content-Disposition': `attachment; filename="${safeFileName}"`,
+      'Content-Disposition': `attachment; filename="${document.fileName}"`,
     });
     return new StreamableFile(document.data);
   }

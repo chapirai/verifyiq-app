@@ -448,7 +448,12 @@ export class BolagsverketClient {
     const normalizedFileName = decodedFileName ? decodedFileName.replace(/\\/g, '/') : undefined;
     const baseFileName = normalizedFileName ? basename(normalizedFileName) : undefined;
     const safeFileName = baseFileName
-      ? baseFileName.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, 255)
+      ? baseFileName
+          .replace(/[\\/]/g, '_')
+          .replace(/[\u0000-\u001F\u007F]/g, '')
+          .replace(/["';]/g, '')
+          .trim()
+          .slice(0, 255)
       : undefined;
 
     return {
