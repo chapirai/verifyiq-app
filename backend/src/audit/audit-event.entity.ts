@@ -19,6 +19,7 @@ export enum AuditEventType {
 }
 
 @Entity({ name: 'audit_events' })
+@Index(['tenantId', 'createdAt'])
 @Index(['userId'])
 @Index(['eventType'])
 @Index(['createdAt'])
