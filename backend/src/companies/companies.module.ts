@@ -30,6 +30,10 @@ import { CachePolicyEntity } from './entities/cache-policy.entity';
 import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
 import { CachePolicyController } from './controllers/cache-policy.controller';
 import { RefreshDecisionService } from './services/refresh-decision.service';
+import { LineageMetadataEntity } from './entities/lineage-metadata.entity';
+import { LineageMetadataCaptureService } from './services/lineage-metadata-capture.service';
+import { LineageQueryService } from './services/lineage-query.service';
+import { LineageController } from './controllers/lineage.controller';
 
 @Module({
   imports: [
@@ -44,11 +48,12 @@ import { RefreshDecisionService } from './services/refresh-decision.service';
       NormalizedCompanyEntity,
       CompanyVersionEntity,
       CachePolicyEntity,
+      LineageMetadataEntity,
     ]),
     HttpModule,
     AuditModule,
   ],
-  controllers: [CompaniesController, BolagsverketController, CachePolicyController],
+  controllers: [CompaniesController, BolagsverketController, CachePolicyController, LineageController],
   providers: [
     CompaniesService,
     BolagsverketClient,
@@ -65,6 +70,8 @@ import { RefreshDecisionService } from './services/refresh-decision.service';
     NormalizedCompanyQueryService,
     CachePolicyEvaluationService,
     RefreshDecisionService,
+    LineageMetadataCaptureService,
+    LineageQueryService,
   ],
   exports: [
     CompaniesService,
@@ -79,6 +86,8 @@ import { RefreshDecisionService } from './services/refresh-decision.service';
     NormalizedCompanyQueryService,
     CachePolicyEvaluationService,
     RefreshDecisionService,
+    LineageMetadataCaptureService,
+    LineageQueryService,
   ],
 })
 export class CompaniesModule {}

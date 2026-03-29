@@ -10,6 +10,9 @@ import { BolagsverketService } from './services/bolagsverket.service';
 import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
 import { RefreshDecisionService } from './services/refresh-decision.service';
 import {
+  LineageMetadataCaptureService,
+} from './services/lineage-metadata-capture.service';
+import {
   CompanyMetadataDto,
   FreshnessStatus,
   LookupCompanyDto,
@@ -51,6 +54,7 @@ export class CompaniesService {
     private readonly bolagsverketService: BolagsverketService,
     private readonly cachePolicyEvaluationService: CachePolicyEvaluationService,
     private readonly refreshDecisionService: RefreshDecisionService,
+    private readonly lineageCapture: LineageMetadataCaptureService,
     @InjectRepository(CompanyEntity)
     private readonly companyRepo: Repository<CompanyEntity>,
   ) {}
@@ -90,6 +94,21 @@ export class CompaniesService {
     dto: LookupCompanyDto,
     correlationId: string,
   ): Promise<LookupCompanyResponseDto> {
+    // P02-T06: Capture lineage metadata (best-effort; never throws).
+    this.lineageCapture.capture({
+      tenantId: ctx.tenantId,
+      userId: ctx.actorId ?? null,
+      correlationId,
+      triggerType: LineageMetadataCaptureService.resolveTriggerType({
+        forceRefresh: dto.force_refresh ?? false,
+      }),
+      httpMethod: 'POST',
+      sourceEndpoint: '/companies/lookup',
+      requestParameters: { orgNumber: dto.orgNumber, force_refresh: dto.force_refresh ?? false },
+    }).catch((err) =>
+      this.logger.warn(`[P02-T06] Lineage capture error: ${err}`),
+    );
+
     // P02-T05: Emit a pre-enrich refresh decision for auditability and
     // downstream billing/quota hook points.  Note: dataAgeHours=0 is passed
     // here because the real cache age is not yet known at this stage — the

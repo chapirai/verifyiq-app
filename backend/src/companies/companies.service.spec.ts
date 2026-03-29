@@ -11,6 +11,7 @@ import { CompanyEntity } from './entities/company.entity';
 import { BolagsverketService } from './services/bolagsverket.service';
 import { CACHE_TTL_DAYS } from './services/bv-cache.service';
 import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
+import { LineageMetadataCaptureService } from './services/lineage-metadata-capture.service';
 import { RefreshDecisionService } from './services/refresh-decision.service';
 
 const TENANT_ID = 'tenant-abc';
@@ -100,6 +101,10 @@ describe('CompaniesService – orchestrateLookup', () => {
           useValue: {
             decide: jest.fn().mockResolvedValue({ serve_from: 'db', reason: 'policy_fresh', cost_flags: {}, force_refresh: false }),
           },
+        },
+        {
+          provide: LineageMetadataCaptureService,
+          useValue: { capture: jest.fn().mockResolvedValue(null) },
         },
         {
           provide: getRepositoryToken(CompanyEntity),
@@ -340,6 +345,10 @@ describe('CompaniesService – findAll', () => {
           },
         },
         {
+          provide: LineageMetadataCaptureService,
+          useValue: { capture: jest.fn().mockResolvedValue(null) },
+        },
+        {
           provide: getRepositoryToken(CompanyEntity),
           useValue: companyRepo,
         },
@@ -510,6 +519,10 @@ describe('CompaniesService – findAll', () => {
             useValue: {
               decide: jest.fn().mockResolvedValue({ serve_from: 'db', reason: 'policy_fresh', cost_flags: {}, force_refresh: false }),
             },
+          },
+          {
+            provide: LineageMetadataCaptureService,
+            useValue: { capture: jest.fn().mockResolvedValue(null) },
           },
           {
             provide: getRepositoryToken(CompanyEntity),
