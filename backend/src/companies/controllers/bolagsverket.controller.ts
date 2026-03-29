@@ -1,4 +1,5 @@
-import { Body, Controller, ForbiddenException, Get, HttpException, InternalServerErrorException, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpException, InternalServerErrorException, Param, Post, Query, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AuditEventType } from '../../audit/audit-event.entity';
 import { AuditService } from '../../audit/audit.service';
@@ -89,12 +90,39 @@ export class BolagsverketController {
   }
 
   /**
+   * POST /bolagsverket/company-information
+   * Retrieve company information from Företagsinformation API.
+   */
+  @Post('company-information')
+  getCompanyInformation(@Body() dto: BolagsverketLookupDto) {
+    return this.bolagsverketService.getCompanyInformation(
+      dto.identitetsbeteckning,
+      dto.informationCategories,
+      dto.tidpunkt,
+    );
+  }
+
+  /**
    * POST /bolagsverket/documents
    * List available annual reports and financial documents for an organisation.
    */
   @Post('documents')
   getDocumentList(@Body() dto: BolagsverketDocumentListDto) {
     return this.bolagsverketService.getDocumentList(dto.identitetsbeteckning);
+  }
+
+  /**
+   * GET /bolagsverket/documents/:dokumentId/download
+   * Download a document ZIP from Bolagsverket (Värdefulla Datamängder).
+   */
+  @Get('documents/:dokumentId/download')
+  async downloadDocument(@Param('dokumentId') dokumentId: string, @Res({ passthrough: true }) res: Response) {
+    const document = await this.bolagsverketService.getDocument(dokumentId);
+    res.set({
+      'Content-Type': document.contentType,
+      'Content-Disposition': `attachment; filename="${document.fileName}"`,
+    });
+    return new StreamableFile(document.data);
   }
 
   /**
@@ -112,7 +140,7 @@ export class BolagsverketController {
    */
   @Post('signatory-power')
   verifySignatoryPower(@Body() dto: BolagsverketSignatoryPowerDto) {
-    return this.bolagsverketService.verifySignatoryPower(
+    return this.bolagsverketService.getSignatoryOptions(
       dto.funktionarIdentitetsbeteckning,
       dto.organisationIdentitetsbeteckning,
     );
@@ -124,7 +152,7 @@ export class BolagsverketController {
    */
   @Post('share-capital-history')
   getShareCapitalHistory(@Body() dto: BolagsverketShareCapitalHistoryDto) {
-    return this.bolagsverketService.getShareCapitalHistory(
+    return this.bolagsverketService.getShareCapitalChanges(
       dto.identitetsbeteckning,
       dto.fromdatum,
       dto.tomdatum,
@@ -137,7 +165,7 @@ export class BolagsverketController {
    */
   @Post('cases')
   getCaseInformation(@Body() dto: BolagsverketArendeDto) {
-    return this.bolagsverketService.getCaseInformation(
+    return this.bolagsverketService.getCases(
       dto.arendenummer,
       dto.organisationIdentitetsbeteckning,
       dto.fromdatum,
@@ -151,7 +179,7 @@ export class BolagsverketController {
    */
   @Post('engagements')
   getEngagements(@Body() dto: BolagsverketEngagemangDto) {
-    return this.bolagsverketService.getOrganizationEngagements(
+    return this.bolagsverketService.getOrganisationEngagements(
       dto.identitetsbeteckning,
       dto.paginering?.sida,
       dto.paginering?.antalPerSida,

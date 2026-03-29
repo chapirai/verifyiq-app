@@ -11,6 +11,15 @@ export type JaNej = 'JA' | 'NEJ';
 export type SortOrder = 'ASC' | 'DESC';
 export type SortAttributeEngagemang = 'ORGANISATIONSFORM' | 'REGISTRERINGSTIDPUNKT';
 
+// ── OAuth (Värdefulla datamängder) ───────────────────────────────────────────
+
+export interface OAuthTokenResponse {
+  access_token: string;
+  token_type?: string;
+  expires_in: number;
+  scope?: string;
+}
+
 /** A "fel" field indicates that data from a specific source is unavailable. */
 export interface BvFel {
   typ?: string;

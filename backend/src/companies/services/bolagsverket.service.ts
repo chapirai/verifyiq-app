@@ -12,6 +12,7 @@ import {
   OrganisationInformationResponse,
   OrganisationsengagemangResponse,
 } from '../integrations/bolagsverket.types';
+import { sanitizeBolagsverketFilename } from '../integrations/bolagsverket.utils';
 import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
 import { BvFetchSnapshotEntity, SnapshotPolicyDecision } from '../entities/bv-fetch-snapshot.entity';
@@ -54,6 +55,13 @@ export interface FinancialSnapshot {
   documents: DocumentListResponse | null;
 }
 
+export interface DocumentDownload {
+  data: Buffer;
+  contentType: string;
+  fileName: string;
+  requestId: string;
+}
+
 export interface DataValidationResult {
   isValid: boolean;
   warnings: string[];
@@ -80,6 +88,36 @@ export class BolagsverketService {
 
   async healthCheck(): Promise<{ status: string }> {
     return this.client.healthCheck();
+  }
+
+  async isAlive(): Promise<{ status: string }> {
+    return this.healthCheck();
+  }
+
+  // ── Värdefulla datamängder (OAuth) ──────────────────────────────────────────
+
+  async getAccessToken(): Promise<string> {
+    return this.client.getAccessToken();
+  }
+
+  async revokeAccessToken(): Promise<{ revoked: boolean; error?: string }> {
+    return this.client.revokeAccessToken();
+  }
+
+  async getHighValueCompanyInformation(identitetsbeteckning: string): Promise<HighValueDatasetResponse> {
+    const { responsePayload } = await this.client.fetchHighValueDataset(identitetsbeteckning);
+    return responsePayload;
+  }
+
+  async getDocument(dokumentId: string): Promise<DocumentDownload> {
+    const result = await this.client.fetchDocument(dokumentId);
+    const safeDocumentId = sanitizeBolagsverketFilename(dokumentId) ?? 'document';
+    return {
+      data: result.responsePayload,
+      contentType: result.contentType,
+      fileName: result.fileName ?? `bolagsverket-${safeDocumentId}.zip`,
+      requestId: result.requestId,
+    };
   }
 
   // ── Complete company profile ─────────────────────────────────────────────────
@@ -137,6 +175,34 @@ export class BolagsverketService {
       documents,
       retrievedAt: new Date().toISOString(),
     };
+  }
+
+  // ── Företagsinformation (organisation data) ─────────────────────────────────
+
+  async getCompanyInformation(
+    identitetsbeteckning: string,
+    informationCategories?: string[],
+    tidpunkt?: string,
+  ): Promise<OrganisationInformationResponse[]> {
+    const { responsePayload } = await this.client.fetchOrganisationInformation(
+      identitetsbeteckning,
+      informationCategories,
+      tidpunkt,
+    );
+    return responsePayload;
+  }
+
+  async getPersonInformation(
+    identitetsbeteckning: string,
+    pageNumber = 1,
+    pageSize = 20,
+  ): Promise<OrganisationsengagemangResponse> {
+    const { responsePayload } = await this.client.fetchOrganizationEngagements(
+      identitetsbeteckning,
+      pageNumber,
+      pageSize,
+    );
+    return responsePayload;
   }
 
   // ── Officers ────────────────────────────────────────────────────────────────
@@ -201,7 +267,7 @@ export class BolagsverketService {
 
   // ── Signatory power ──────────────────────────────────────────────────────────
 
-  async verifySignatoryPower(
+  async getSignatoryOptions(
     funktionarIdentitetsbeteckning: string,
     organisationIdentitetsbeteckning: string,
   ): Promise<FirmateckningsalternativResponse> {
@@ -214,7 +280,7 @@ export class BolagsverketService {
 
   // ── Share capital history ────────────────────────────────────────────────────
 
-  async getShareCapitalHistory(
+  async getShareCapitalChanges(
     identitetsbeteckning: string,
     fromdatum?: string,
     tomdatum?: string,
@@ -229,7 +295,7 @@ export class BolagsverketService {
 
   // ── Cases / arenden ──────────────────────────────────────────────────────────
 
-  async getCaseInformation(
+  async getCases(
     arendenummer?: string,
     organisationIdentitetsbeteckning?: string,
     fromdatum?: string,
@@ -246,7 +312,7 @@ export class BolagsverketService {
 
   // ── Engagements ──────────────────────────────────────────────────────────────
 
-  async getOrganizationEngagements(
+  async getOrganisationEngagements(
     identitetsbeteckning: string,
     pageNumber = 1,
     pageSize = 20,

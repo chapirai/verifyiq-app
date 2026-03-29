@@ -208,7 +208,8 @@ cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 | `JWT_REFRESH_SECRET` | yes | Min 16 chars – **change the default in production!** |
 | `MINIO_ENDPOINT` / `MINIO_PORT` / `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | yes | MinIO / S3 storage |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | yes | Same as MinIO credentials for local dev |
-| `BV_CLIENT_ID` / `BV_CLIENT_SECRET` | yes | Bolagsverket API credentials |
+| `BV_CLIENT_ID` / `BV_CLIENT_SECRET` | yes | Default Bolagsverket OAuth credentials (used for HVD if specific HVD creds not supplied) |
+| `BV_FORETAGSINFO_BEARER_TOKEN` | optional | Bearer token for Företagsinformation API |
 | `NEXT_PUBLIC_API_BASE_URL` | yes | Frontend → backend URL |
 
 ## Local URLs
@@ -238,6 +239,8 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 |--------|------|-------------|
 | `POST` | `/api/v1/bolagsverket/enrich` | Full enrichment (HVD + org info + docs) with 30-day cache |
 | `POST` | `/api/v1/bolagsverket/enrich/person` | Officer-engagement lookup by personnummer with cache |
+| `POST` | `/api/v1/bolagsverket/company-information` | Företagsinformation lookup by identitetsbeteckning |
+| `GET` | `/api/v1/bolagsverket/documents/:dokumentId/download` | Download a document ZIP from Värdefulla Datamängder |
 | `GET` | `/api/v1/bolagsverket/snapshots?orgNr=…` | List fetch history for an org/person number |
 | `GET` | `/api/v1/bolagsverket/stored-documents?orgNr=…` | List MinIO-stored documents for an org |
 | `GET` | `/api/v1/bolagsverket/stored-documents/:id/download` | Pre-signed 15-minute download URL |
@@ -258,8 +261,19 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 
 | Variable | Notes |
 |---|---|
-| `BV_CLIENT_ID` | Bolagsverket OAuth client ID |
-| `BV_CLIENT_SECRET` | Bolagsverket OAuth client secret |
+| `BV_CLIENT_ID` | Default Bolagsverket OAuth client ID (used for HVD if specific HVD creds not supplied) |
+| `BV_CLIENT_SECRET` | Default Bolagsverket OAuth client secret (used for HVD if specific HVD creds not supplied) |
+| `BV_HVD_CLIENT_ID` | Optional override for Värdefulla Datamängder client ID |
+| `BV_HVD_CLIENT_SECRET` | Optional override for Värdefulla Datamängder client secret |
+| `BV_HVD_BASE_URL` | Override base URL for Värdefulla Datamängder |
+| `BV_HVD_TOKEN_URL` | OAuth token endpoint for Värdefulla Datamängder |
+| `BV_HVD_REVOKE_URL` | OAuth token revocation endpoint (optional) |
+| `BV_HVD_SCOPES` | OAuth scopes (default: `vardefulla-datamangder:read vardefulla-datamangder:ping`) |
+| `BV_HVD_DOCUMENT_PATH` | Document download path (default: `/dokument`) |
+| `BV_FORETAGSINFO_BASE_URL` | Override base URL for Företagsinformation |
+| `BV_FORETAGSINFO_BEARER_TOKEN` | Bearer token for Företagsinformation API |
+| `BV_FORETAGSINFO_AUTH_HEADER` | Custom header name (default: `Authorization`) |
+| `BV_FORETAGSINFO_AUTH_VALUE` | Full auth header value override (use instead of bearer token) |
 | `MINIO_ENDPOINT` | MinIO hostname (default: `localhost`) |
 | `MINIO_PORT` | MinIO port (default: `9000`) |
 | `MINIO_USE_SSL` | `true` in production |
@@ -287,4 +301,3 @@ bolagsverket/{tenantId}/{organisationsnummer}/{documentId}-{year}.pdf
 ```
 
 Duplicate detection uses SHA-256 checksums; identical files are recorded with `is_duplicate = true` and share the same storage key rather than re-uploading.
-
