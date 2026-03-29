@@ -5,6 +5,7 @@ import { BolagsverketClient } from '../integrations/bolagsverket.client';
 import { BolagsverketMapper, DEFAULT_COMPANY_NAME, NormalisedCompany } from '../integrations/bolagsverket.mapper';
 import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
+import { RawPayloadStorageService } from './raw-payload-storage.service';
 
 function makeNormalisedCompany(overrides: Partial<NormalisedCompany> = {}): NormalisedCompany {
   return {
@@ -45,6 +46,7 @@ describe('BolagsverketService', () => {
         { provide: BolagsverketMapper, useValue: {} },
         { provide: BvCacheService, useValue: {} },
         { provide: BvPersistenceService, useValue: {} },
+        { provide: RawPayloadStorageService, useValue: { storeRawPayload: jest.fn() } },
       ],
     }).compile();
 
@@ -162,6 +164,7 @@ describe('BolagsverketService', () => {
           },
           { provide: BvCacheService, useValue: {} },
           { provide: BvPersistenceService, useValue: {} },
+          { provide: RawPayloadStorageService, useValue: { storeRawPayload: jest.fn() } },
         ],
       }).compile();
 
