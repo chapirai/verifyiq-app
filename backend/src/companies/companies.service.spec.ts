@@ -23,6 +23,9 @@ function makeSnapshot(daysOld: number): BvFetchSnapshotEntity {
   snapshot.organisationsnummer = ORG_NR;
   snapshot.fetchStatus = 'success';
   snapshot.isFromCache = false;
+  snapshot.policyDecision = 'fresh_fetch';
+  snapshot.costImpactFlags = {};
+  snapshot.isStaleFallback = false;
   const date = new Date();
   date.setDate(date.getDate() - daysOld);
   snapshot.fetchedAt = date;
@@ -112,6 +115,44 @@ describe('CompaniesService – orchestrateLookup', () => {
     });
   });
 
+  describe('snapshot lineage metadata (P02-T01)', () => {
+    it('includes snapshot_id in the response metadata', async () => {
+      bolagsverketService.enrichAndSave.mockResolvedValue(makeEnrichResult(false, null));
+
+      const response = await service.orchestrateLookup(ctx, { orgNumber: ORG_NR });
+
+      expect(response.metadata.snapshot_id).toBe('snap-id');
+    });
+
+    it('includes a non-empty correlation_id in the response metadata', async () => {
+      bolagsverketService.enrichAndSave.mockResolvedValue(makeEnrichResult(false, null));
+
+      const response = await service.orchestrateLookup(ctx, { orgNumber: ORG_NR });
+
+      expect(typeof response.metadata.correlation_id).toBe('string');
+      expect(response.metadata.correlation_id.length).toBeGreaterThan(0);
+    });
+
+    it('includes policy_decision in the response metadata', async () => {
+      bolagsverketService.enrichAndSave.mockResolvedValue(makeEnrichResult(false, null));
+
+      const response = await service.orchestrateLookup(ctx, { orgNumber: ORG_NR });
+
+      expect(typeof response.metadata.policy_decision).toBe('string');
+    });
+
+    it('passes correlationId and actorId to enrichAndSave', async () => {
+      bolagsverketService.enrichAndSave.mockResolvedValue(makeEnrichResult(false, null));
+
+      await service.orchestrateLookup(ctx, { orgNumber: ORG_NR });
+
+      const [, , , correlationId, actorId] = bolagsverketService.enrichAndSave.mock.calls[0];
+      expect(typeof correlationId).toBe('string');
+      expect((correlationId as string).length).toBeGreaterThan(0);
+      expect(actorId).toBe('user-1');
+    });
+  });
+
   describe('API call (source=API)', () => {
     it('returns source=API and freshness=fresh when data is newly fetched', async () => {
       bolagsverketService.enrichAndSave.mockResolvedValue(makeEnrichResult(false, null));
@@ -130,7 +171,13 @@ describe('CompaniesService – orchestrateLookup', () => {
       const dto: LookupCompanyDto = { orgNumber: ORG_NR, force_refresh: true };
       await service.orchestrateLookup(ctx, dto);
 
-      expect(bolagsverketService.enrichAndSave).toHaveBeenCalledWith(TENANT_ID, ORG_NR, true);
+      expect(bolagsverketService.enrichAndSave).toHaveBeenCalledWith(
+        TENANT_ID,
+        ORG_NR,
+        true,
+        expect.any(String),
+        'user-1',
+      );
     });
   });
 

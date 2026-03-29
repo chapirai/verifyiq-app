@@ -17,6 +17,7 @@ import { BolagsverketService } from './services/bolagsverket.service';
 import { BvCacheService } from './services/bv-cache.service';
 import { BvPersistenceService } from './services/bv-persistence.service';
 import { BvDocumentStorageService } from './services/bv-document-storage.service';
+import { SnapshotQueryService } from './services/snapshot-query.service';
 import { BolagsverketController } from './controllers/bolagsverket.controller';
 
 @Module({
@@ -42,7 +43,15 @@ import { BolagsverketController } from './controllers/bolagsverket.controller';
     BvCacheService,
     BvPersistenceService,
     BvDocumentStorageService,
+    SnapshotQueryService,
   ],
-  exports: [CompaniesService, BolagsverketService, BvCacheService, BvPersistenceService, BvDocumentStorageService],
+  exports: [
+    CompaniesService,
+    BolagsverketService,
+    BvCacheService,
+    BvPersistenceService,
+    BvDocumentStorageService,
+    SnapshotQueryService,
+  ],
 })
 export class CompaniesModule {}

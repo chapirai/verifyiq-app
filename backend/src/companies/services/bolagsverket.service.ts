@@ -330,11 +330,16 @@ export class BolagsverketService {
   /**
    * Fetch and persist a complete company profile, using cache when available.
    * Skips the Bolagsverket API if a fresh snapshot (< 30 days) already exists.
+   *
+   * @param correlationId  Request-scoped correlation ID for lineage tracing.
+   * @param actorId        ID of the user/service that initiated the lookup.
    */
   async enrichAndSave(
     tenantId: string,
     identitetsbeteckning: string,
     forceRefresh = false,
+    correlationId?: string | null,
+    actorId?: string | null,
   ): Promise<{
     result: CompleteCompanyProfile;
     snapshot: BvFetchSnapshotEntity;
@@ -388,6 +393,11 @@ export class BolagsverketService {
           errorMessage,
           fetchedAt: new Date(),
           apiCallCount: 0,
+          correlationId: correlationId ?? null,
+          actorId: actorId ?? null,
+          policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
+          costImpactFlags: {},
+          isStaleFallback: false,
         });
       } catch (snapshotErr) {
         this.logger.error(`Failed to create error snapshot for ${identitetsbeteckning}: ${snapshotErr}`);
@@ -416,6 +426,11 @@ export class BolagsverketService {
         fetchedAt: new Date(),
         apiCallCount,
         errorMessage,
+        correlationId: correlationId ?? null,
+        actorId: actorId ?? null,
+        policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
+        costImpactFlags: { apiCallCharged: true, apiCallCount },
+        isStaleFallback: false,
       });
 
       return { result, snapshot, isFromCache: false, ageInDays: null };
@@ -433,6 +448,11 @@ export class BolagsverketService {
         fetchedAt: new Date(),
         apiCallCount,
         errorMessage: String(persistErr),
+        correlationId: correlationId ?? null,
+        actorId: actorId ?? null,
+        policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
+        costImpactFlags: { apiCallCharged: true, apiCallCount },
+        isStaleFallback: false,
       });
       return { result, snapshot, isFromCache: false, ageInDays: null };
     }
@@ -441,11 +461,16 @@ export class BolagsverketService {
   /**
    * Look up all organisations where a person holds officer positions,
    * with cache-aware freshness checking.
+   *
+   * @param correlationId  Request-scoped correlation ID for lineage tracing.
+   * @param actorId        ID of the user/service that initiated the lookup.
    */
   async enrichPersonEngagements(
     tenantId: string,
     personnummer: string,
     forceRefresh = false,
+    correlationId?: string | null,
+    actorId?: string | null,
   ): Promise<{
     engagements: OrganisationsengagemangResponse;
     snapshot: BvFetchSnapshotEntity;
@@ -478,6 +503,11 @@ export class BolagsverketService {
       rawPayloadSummary: {},
       fetchedAt: new Date(),
       apiCallCount: 1,
+      correlationId: correlationId ?? null,
+      actorId: actorId ?? null,
+      policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
+      costImpactFlags: { apiCallCharged: true, apiCallCount: 1 },
+      isStaleFallback: false,
     });
 
     return { engagements, snapshot, isFromCache: false, ageInDays: null };
