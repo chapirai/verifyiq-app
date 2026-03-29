@@ -12,6 +12,8 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { ChangeType } from '../entities/company-change-event.entity';
 import { ChangeEventQueryService } from '../services/change-event-query.service';
 
+const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
 // ── Permission helpers ────────────────────────────────────────────────────────
 
 /**
@@ -49,7 +51,7 @@ export class ChangeEventController {
   @Get(':id')
   async getById(@Param('id') id: string, @Req() req: any) {
     assertChangeEventAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const record = await this.changeEventQueryService.getById(tenantId, id);
     if (!record) {
       throw new NotFoundException(`Change event '${id}' not found.`);
@@ -77,7 +79,7 @@ export class ChangeEventController {
     @Req() req: any,
   ) {
     assertChangeEventAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.changeEventQueryService.findByOrgNumber(tenantId, orgNumber, {
       attributeName,
       changeType: changeType as ChangeType | undefined,
@@ -98,7 +100,7 @@ export class ChangeEventController {
     @Req() req: any,
   ) {
     assertChangeEventAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const take = limit ? Math.min(parseInt(limit, 10), 200) : 200;
     return this.changeEventQueryService.findBySnapshotAfter(tenantId, snapshotId, take);
   }
@@ -117,7 +119,7 @@ export class ChangeEventController {
     @Req() req: any,
   ) {
     assertChangeEventAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.changeEventQueryService.findByAttribute(tenantId, attributeName, {
       fromDate,
       toDate,
@@ -138,7 +140,7 @@ export class ChangeEventController {
     @Req() req: any,
   ) {
     assertChangeEventAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.changeEventQueryService.findByChangeType(tenantId, changeType as ChangeType, {
       fromDate,
       toDate,
@@ -158,7 +160,7 @@ export class ChangeEventController {
     @Req() req: any,
   ) {
     assertChangeEventAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.changeEventQueryService.getChangeTypeSummary(tenantId, orgNumber, {
       fromDate,
       toDate,

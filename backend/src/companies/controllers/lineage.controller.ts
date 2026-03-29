@@ -12,6 +12,8 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { TriggerType } from '../entities/lineage-metadata.entity';
 import { LineageQueryService } from '../services/lineage-query.service';
 
+const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
 // ── Permission helpers ────────────────────────────────────────────────────────
 
 /**
@@ -49,7 +51,7 @@ export class LineageController {
   @Get(':id')
   async getById(@Param('id') id: string, @Req() req: any) {
     assertLineageAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const record = await this.lineageQueryService.getById(tenantId, id);
     if (!record) {
       throw new NotFoundException(`Lineage record '${id}' not found.`);
@@ -68,7 +70,7 @@ export class LineageController {
     @Req() req: any,
   ) {
     assertLineageAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.lineageQueryService.findByCorrelationId(tenantId, correlationId);
   }
 
@@ -83,7 +85,7 @@ export class LineageController {
     @Req() req: any,
   ) {
     assertLineageAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const take = limit ? Math.min(parseInt(limit, 10), 200) : 50;
     return this.lineageQueryService.findByUserId(tenantId, userId, take);
   }
@@ -111,7 +113,7 @@ export class LineageController {
     @Req() req: any,
   ) {
     assertLineageAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.lineageQueryService.listForAudit(tenantId, {
       correlationId,
       userId,
@@ -134,7 +136,7 @@ export class LineageController {
     @Req() req: any,
   ) {
     assertLineageAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.lineageQueryService.getTriggerTypeStats(tenantId, { fromDate, toDate });
   }
 }

@@ -17,6 +17,8 @@ import { BvDocumentStorageService } from '../services/bv-document-storage.servic
 import { SnapshotQueryService } from '../services/snapshot-query.service';
 import { RawPayloadQueryService } from '../services/raw-payload-query.service';
 
+const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
 /** Roles that are authorised to access raw provider payloads. */
 const RAW_PAYLOAD_ALLOWED_ROLES = ['admin', 'compliance'] as const;
 
@@ -153,7 +155,7 @@ export class BolagsverketController {
    */
   @Post('enrich')
   async enrich(@Body() dto: BvEnrichDto, @Req() req: any) {
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     try {
       return await this.bolagsverketService.enrichAndSave(
         tenantId,
@@ -176,7 +178,7 @@ export class BolagsverketController {
    */
   @Post('enrich/person')
   async enrichPerson(@Body() dto: BvPersonEnrichDto, @Req() req: any) {
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.bolagsverketService.enrichPersonEngagements(
       tenantId,
       dto.personnummer,
@@ -190,7 +192,7 @@ export class BolagsverketController {
    */
   @Get('snapshots')
   async getSnapshots(@Query('orgNr') orgNr: string, @Req() req: any) {
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.bvCacheService.listSnapshots(tenantId, orgNr);
   }
 
@@ -200,7 +202,7 @@ export class BolagsverketController {
    */
   @Get('snapshots/:id')
   async getSnapshotById(@Param('id') id: string, @Req() req: any) {
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.snapshotQueryService.getSnapshotById(tenantId, id);
   }
 
@@ -214,7 +216,7 @@ export class BolagsverketController {
     @Query('limit') limit: string | undefined,
     @Req() req: any,
   ) {
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const take = limit ? Math.min(parseInt(limit, 10), 100) : 20;
     return this.snapshotQueryService.getSnapshotHistory(tenantId, orgNr, take);
   }
@@ -226,7 +228,7 @@ export class BolagsverketController {
    */
   @Get('snapshots/stats')
   async getSnapshotStats(@Query('orgNr') orgNr: string, @Req() req: any) {
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.snapshotQueryService.getFetchStats(tenantId, orgNr);
   }
 
@@ -245,7 +247,7 @@ export class BolagsverketController {
     @Query('limit') limit: string | undefined,
     @Req() req: any,
   ) {
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.snapshotQueryService.listForAudit(tenantId, {
       correlationId,
       actorId,
@@ -262,7 +264,7 @@ export class BolagsverketController {
    */
   @Get('stored-documents')
   async getStoredDocuments(@Query('orgNr') orgNr: string, @Req() req: any) {
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.bvDocumentStorageService.listStoredDocuments(tenantId, orgNr);
   }
 
@@ -286,7 +288,7 @@ export class BolagsverketController {
   @Get('raw-payloads/:id')
   async getRawPayloadById(@Param('id') id: string, @Req() req: any) {
     assertRawPayloadAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.rawPayloadQueryService.getById(tenantId, id, actorId);
   }
@@ -299,7 +301,7 @@ export class BolagsverketController {
   @Get('raw-payloads/by-snapshot/:snapshotId')
   async getRawPayloadBySnapshot(@Param('snapshotId') snapshotId: string, @Req() req: any) {
     assertRawPayloadAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.rawPayloadQueryService.getBySnapshotId(tenantId, snapshotId, actorId);
   }
@@ -312,7 +314,7 @@ export class BolagsverketController {
   @Get('raw-payloads/by-checksum')
   async getRawPayloadsByChecksum(@Query('checksum') checksum: string, @Req() req: any) {
     assertRawPayloadAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.rawPayloadQueryService.getByChecksum(tenantId, checksum);
   }
 
@@ -328,7 +330,7 @@ export class BolagsverketController {
     @Req() req: any,
   ) {
     assertRawPayloadAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const take = limit ? Math.min(parseInt(limit, 10), 100) : 50;
     return this.rawPayloadQueryService.listByProviderSource(tenantId, source, take);
   }
@@ -345,7 +347,7 @@ export class BolagsverketController {
     @Req() req: any,
   ) {
     assertRawPayloadAccess(req);
-    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const take = limit ? Math.min(parseInt(limit, 10), 100) : 50;
     return this.rawPayloadQueryService.listByOrganisationsnummer(tenantId, orgNr, take);
   }
