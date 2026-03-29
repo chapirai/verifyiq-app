@@ -54,6 +54,13 @@ export interface FinancialSnapshot {
   documents: DocumentListResponse | null;
 }
 
+export interface DocumentDownload {
+  data: Buffer;
+  contentType: string;
+  fileName: string;
+  requestId: string;
+}
+
 export interface DataValidationResult {
   isValid: boolean;
   warnings: string[];
@@ -80,6 +87,35 @@ export class BolagsverketService {
 
   async healthCheck(): Promise<{ status: string }> {
     return this.client.healthCheck();
+  }
+
+  async isAlive(): Promise<{ status: string }> {
+    return this.healthCheck();
+  }
+
+  // ── Värdefulla datamängder (OAuth) ──────────────────────────────────────────
+
+  async getAccessToken(): Promise<string> {
+    return this.client.getAccessToken();
+  }
+
+  async revokeAccessToken(): Promise<{ revoked: boolean; error?: string }> {
+    return this.client.revokeAccessToken();
+  }
+
+  async getHighValueCompanyInformation(identitetsbeteckning: string): Promise<HighValueDatasetResponse> {
+    const { responsePayload } = await this.client.fetchHighValueDataset(identitetsbeteckning);
+    return responsePayload;
+  }
+
+  async getDocument(dokumentId: string): Promise<DocumentDownload> {
+    const result = await this.client.fetchDocument(dokumentId);
+    return {
+      data: result.responsePayload,
+      contentType: result.contentType,
+      fileName: result.fileName ?? `bolagsverket-${dokumentId}.zip`,
+      requestId: result.requestId,
+    };
   }
 
   // ── Complete company profile ─────────────────────────────────────────────────
@@ -137,6 +173,66 @@ export class BolagsverketService {
       documents,
       retrievedAt: new Date().toISOString(),
     };
+  }
+
+  // ── Företagsinformation (organisation data) ─────────────────────────────────
+
+  async getCompanyInformation(
+    identitetsbeteckning: string,
+    informationCategories?: string[],
+    tidpunkt?: string,
+  ): Promise<OrganisationInformationResponse[]> {
+    const { responsePayload } = await this.client.fetchOrganisationInformation(
+      identitetsbeteckning,
+      informationCategories,
+      tidpunkt,
+    );
+    return responsePayload;
+  }
+
+  async getPersonInformation(
+    identitetsbeteckning: string,
+    pageNumber = 1,
+    pageSize = 20,
+  ): Promise<OrganisationsengagemangResponse> {
+    const { responsePayload } = await this.client.fetchOrganizationEngagements(
+      identitetsbeteckning,
+      pageNumber,
+      pageSize,
+    );
+    return responsePayload;
+  }
+
+  async getSignatoryOptions(
+    funktionarIdentitetsbeteckning: string,
+    organisationIdentitetsbeteckning: string,
+  ): Promise<FirmateckningsalternativResponse> {
+    return this.verifySignatoryPower(funktionarIdentitetsbeteckning, organisationIdentitetsbeteckning);
+  }
+
+  async getCases(
+    arendenummer?: string,
+    organisationIdentitetsbeteckning?: string,
+    fromdatum?: string,
+    tomdatum?: string,
+  ): Promise<ArendeResponse> {
+    return this.getCaseInformation(arendenummer, organisationIdentitetsbeteckning, fromdatum, tomdatum);
+  }
+
+  async getShareCapitalChanges(
+    identitetsbeteckning: string,
+    fromdatum?: string,
+    tomdatum?: string,
+  ): Promise<AktiekapitalforandringResponse> {
+    return this.getShareCapitalHistory(identitetsbeteckning, fromdatum, tomdatum);
+  }
+
+  async getOrganisationEngagements(
+    identitetsbeteckning: string,
+    pageNumber = 1,
+    pageSize = 20,
+  ): Promise<OrganisationsengagemangResponse> {
+    return this.getOrganizationEngagements(identitetsbeteckning, pageNumber, pageSize);
   }
 
   // ── Officers ────────────────────────────────────────────────────────────────
