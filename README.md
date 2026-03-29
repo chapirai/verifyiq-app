@@ -292,6 +292,7 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 
 - The backend stores tenant-scoped integration tokens in `integration_tokens` and retrieves the latest valid token at runtime using tenant context from JWT/session.
 - Tokens are encrypted at rest and refreshed before expiry; a background refresh loop pre-warms expiring tenant tokens every minute.
+- You can set `INTEGRATION_TOKEN_ENCRYPTION_KEY` to use a dedicated encryption key (recommended). If omitted, encryption falls back to `JWT_SECRET`.
 - Token endpoint calls use Basic auth (`client_id:client_secret`) and include `X-Request-Id`.
 - Backend modules now pass tenant context through Bolagsverket service/client calls so each request transparently uses the correct tenant token.
 - Audit events are emitted for token refresh lifecycle operations (`REFRESH_INITIATED`, `REFRESH_COMPLETED`, `FAILURE_STATE`) under `integration.token.refresh`.

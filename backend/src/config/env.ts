@@ -12,6 +12,7 @@ export default () => ({
   REDIS_PASSWORD: process.env.REDIS_PASSWORD ?? '',
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+  INTEGRATION_TOKEN_ENCRYPTION_KEY: process.env.INTEGRATION_TOKEN_ENCRYPTION_KEY,
   MINIO_ENDPOINT: process.env.MINIO_ENDPOINT ?? 'localhost',
   MINIO_PORT: Number(process.env.MINIO_PORT ?? 9000),
   MINIO_USE_SSL: process.env.MINIO_USE_SSL === 'true',

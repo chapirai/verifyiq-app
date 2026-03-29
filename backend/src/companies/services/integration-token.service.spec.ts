@@ -18,7 +18,7 @@ describe('IntegrationTokenService', () => {
       save: jest.fn(async (entity) => ({ id: 'token-1', ...entity })),
     };
     const httpService = {
-      get: jest.fn(() =>
+      post: jest.fn(() =>
         of({
           data: { access_token: 'fresh-token', expires_in: 3600, token_type: 'Bearer', scope: 'scope:read' },
         }),
@@ -49,13 +49,13 @@ describe('IntegrationTokenService', () => {
       tenantId: 'tenant-1',
       providerKey: 'bolagsverket:hvd:scope:read',
       encryptedAccessToken: encrypted,
-      expiresAt: new Date(Date.now() + 60_000),
+      expiresAt: new Date(Date.now() + 120_000),
     });
 
     const token = await service.getTenantAccessToken('tenant-1', 'hvd');
 
     expect(token).toBe('cached-token');
-    expect(httpService.get).not.toHaveBeenCalled();
+    expect(httpService.post).not.toHaveBeenCalled();
   });
 
   it('refreshes and persists token when expired', async () => {
@@ -70,7 +70,7 @@ describe('IntegrationTokenService', () => {
     const token = await service.getTenantAccessToken('tenant-1', 'hvd', 'corr-1', 'actor-1');
 
     expect(token).toBe('fresh-token');
-    expect(httpService.get).toHaveBeenCalledTimes(1);
+    expect(httpService.post).toHaveBeenCalledTimes(1);
     expect(tokenRepo.save).toHaveBeenCalledTimes(1);
     expect(auditService.emitAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -83,7 +83,7 @@ describe('IntegrationTokenService', () => {
   it('de-duplicates parallel refresh requests for same tenant/provider', async () => {
     const { service, tokenRepo, httpService } = makeService();
     tokenRepo.findOne.mockResolvedValue(null);
-    httpService.get.mockReturnValue(
+    httpService.post.mockReturnValue(
       of({
         data: { access_token: 'parallel-fresh-token', expires_in: 3600, token_type: 'Bearer', scope: 'scope:read' },
       }),
@@ -95,6 +95,6 @@ describe('IntegrationTokenService', () => {
 
     expect(token1).toBe('parallel-fresh-token');
     expect(token2).toBe('parallel-fresh-token');
-    expect(httpService.get).toHaveBeenCalledTimes(1);
+    expect(httpService.post).toHaveBeenCalledTimes(1);
   });
 });

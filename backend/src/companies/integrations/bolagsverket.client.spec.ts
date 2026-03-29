@@ -127,10 +127,10 @@ describe('BolagsverketClient', () => {
 
     it('de-duplicates parallel token requests for non-tenant context', async () => {
       const postMock = jest.fn();
-      let resolveToken: any = null;
+      let release: any = null;
       const getMock = jest.fn(() => new Observable((subscriber) => {
-        resolveToken = (value: unknown) => {
-          subscriber.next(value);
+        release = () => {
+          subscriber.next({ data: { access_token: 'parallel-token', expires_in: 3600 } });
           subscriber.complete();
         };
       }));
@@ -138,7 +138,7 @@ describe('BolagsverketClient', () => {
 
       const first = client.getAccessToken();
       const second = client.getAccessToken();
-      if (resolveToken) resolveToken({ data: { access_token: 'parallel-token', expires_in: 3600 } });
+      if (release) release();
       const [token1, token2] = await Promise.all([first, second]);
 
       expect(token1).toBe('parallel-token');

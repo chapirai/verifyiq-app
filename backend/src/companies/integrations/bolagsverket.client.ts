@@ -85,8 +85,7 @@ export class BolagsverketClient {
     actorId?: string | null;
     correlationId?: string | null;
   }): string | null {
-    const tenantId = context?.tenantId?.trim();
-    return tenantId ? tenantId : null;
+    return context?.tenantId ?? null;
   }
 
   // ── Internal helpers ──────────────────────────────────────────────────────

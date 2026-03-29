@@ -13,6 +13,7 @@ import { AuditEventType } from '../../audit/audit-event.entity';
 import { OAuthTokenResponse } from '../integrations/bolagsverket.types';
 
 const TOKEN_REFRESH_SKEW_MS = 60_000;
+const BACKGROUND_REFRESH_THRESHOLD_MS = 5 * 60_000;
 const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 const RETRY_CONFIG = {
   maxRetries: 3,
@@ -37,8 +38,9 @@ export class IntegrationTokenService {
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
   ) {
-    const secret = this.configService.getOrThrow<string>('JWT_SECRET');
-    this.encryptionKey = createHash('sha256').update(secret).digest();
+    const encryptionSecret = this.configService.get<string>('INTEGRATION_TOKEN_ENCRYPTION_KEY')
+      ?? this.configService.getOrThrow<string>('JWT_SECRET');
+    this.encryptionKey = createHash('sha256').update(encryptionSecret).digest();
   }
 
   async getTenantAccessToken(
@@ -81,6 +83,7 @@ export class IntegrationTokenService {
 
       const entity = existing ?? this.integrationTokenRepo.create({ tenantId, providerKey });
       entity.encryptedAccessToken = this.encrypt(tokenResponse.access_token);
+      // Client-credentials token responses do not include refresh_token.
       entity.encryptedRefreshToken = null;
       entity.expiresAt = new Date(expiresAt);
       entity.tokenType = tokenResponse.token_type ?? null;
@@ -130,7 +133,7 @@ export class IntegrationTokenService {
 
   @Interval(60_000)
   async refreshExpiringTenantTokens(): Promise<void> {
-    const refreshBefore = new Date(Date.now() + 5 * 60_000);
+    const refreshBefore = new Date(Date.now() + BACKGROUND_REFRESH_THRESHOLD_MS);
     const expiringTokens = await this.integrationTokenRepo
       .createQueryBuilder('token')
       .where('token.expires_at <= :refreshBefore', { refreshBefore })
@@ -149,7 +152,7 @@ export class IntegrationTokenService {
   }
 
   private isEntityTokenValid(entity: IntegrationTokenEntity): boolean {
-    return Date.now() < entity.expiresAt.getTime();
+    return Date.now() + TOKEN_REFRESH_SKEW_MS <= entity.expiresAt.getTime();
   }
 
   private calculateExpiry(expiresInSeconds: number): number {
@@ -227,18 +230,18 @@ export class IntegrationTokenService {
     const authHeader = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
 
     let attempt = 0;
-    const maxAttempts = RETRY_CONFIG.maxRetries + 1;
+    const maxTotalAttempts = RETRY_CONFIG.maxRetries + 1;
     let retryDelayMs: number = RETRY_CONFIG.initialDelayMs;
     let lastError: unknown;
 
-    while (attempt < maxAttempts) {
+    while (attempt < maxTotalAttempts) {
       try {
         const response = await firstValueFrom(
-          this.httpService.get(tokenUrl, {
-            params: Object.fromEntries(params.entries()),
+          this.httpService.post(tokenUrl, params.toString(), {
             headers: {
               Authorization: authHeader,
               Accept: 'application/json',
+              'content-type': 'application/x-www-form-urlencoded',
               'x-request-id': requestId,
             },
           }),
@@ -263,11 +266,11 @@ export class IntegrationTokenService {
           expires_in: expiresIn,
           scope: parsed.scope,
         };
-      } catch (error: any) {
-        const status = error?.response?.status as number | undefined;
+      } catch (error: unknown) {
+        const status = this.extractErrorStatus(error);
         const isRetryable = status === undefined || RETRYABLE_STATUS_CODES.has(status);
         lastError = error;
-        if (isRetryable && attempt < maxAttempts - 1) {
+        if (isRetryable && attempt < maxTotalAttempts - 1) {
           attempt++;
           this.logger.warn(
             `Token request failed for ${auth} with ${status ?? 'network error'} – retry ${attempt}/${RETRY_CONFIG.maxRetries} in ${retryDelayMs}ms (requestId: ${requestId})`,
@@ -288,6 +291,13 @@ export class IntegrationTokenService {
     const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
     const authTag = cipher.getAuthTag();
     return `${iv.toString('base64')}.${authTag.toString('base64')}.${encrypted.toString('base64')}`;
+  }
+
+  private extractErrorStatus(error: unknown): number | undefined {
+    if (typeof error !== 'object' || error === null) return undefined;
+    const response = (error as { response?: { status?: unknown } }).response;
+    if (!response || typeof response.status !== 'number') return undefined;
+    return response.status;
   }
 
   private decrypt(value: string): string {
