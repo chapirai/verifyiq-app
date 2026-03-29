@@ -16,6 +16,7 @@ import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
 import { BvFetchSnapshotEntity } from '../entities/bv-fetch-snapshot.entity';
 import { RawPayloadStorageService } from './raw-payload-storage.service';
+import { CachePolicyEvaluationService } from './cache-policy-evaluation.service';
 
 /** Allowed tolerance when validating share-capital arithmetic (1 %). */
 const SHARE_CAPITAL_TOLERANCE = 0.01;
@@ -65,6 +66,7 @@ export class BolagsverketService {
     private readonly bvCacheService: BvCacheService,
     private readonly bvPersistenceService: BvPersistenceService,
     private readonly rawPayloadStorageService: RawPayloadStorageService,
+    private readonly cachePolicyEvaluationService: CachePolicyEvaluationService,
   ) {}
 
   // ── Health ──────────────────────────────────────────────────────────────────
@@ -348,26 +350,73 @@ export class BolagsverketService {
     isFromCache: boolean;
     ageInDays: number | null;
   }> {
-    // 1. Check cache
+    // 1. Check cache — then evaluate against the configured policy
     if (!forceRefresh) {
       const cacheCheck = await this.bvCacheService.checkFreshness(tenantId, identitetsbeteckning);
-      if (cacheCheck.isFresh && cacheCheck.snapshot) {
-        this.logger.log(
-          `Cache hit for ${identitetsbeteckning} (age: ${cacheCheck.ageInDays} days)`,
-        );
-        const cachedResult: CompleteCompanyProfile = {
-          normalisedData: cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany,
-          highValueDataset: null,
-          organisationInformation: [],
-          documents: null,
-          retrievedAt: cacheCheck.snapshot.fetchedAt.toISOString(),
-        };
-        return {
-          result: cachedResult,
-          snapshot: cacheCheck.snapshot,
-          isFromCache: true,
-          ageInDays: cacheCheck.ageInDays,
-        };
+      if (cacheCheck.snapshot) {
+        // Compute age in fractional hours for precise policy evaluation
+        const ageInHours =
+          (Date.now() - cacheCheck.snapshot.fetchedAt.getTime()) / (1000 * 60 * 60);
+
+        let policyDecisionLabel: import('../entities/bv-fetch-snapshot.entity').SnapshotPolicyDecision =
+          'cache_hit';
+        let isStaleFallback = false;
+        let shouldServeCache = false;
+
+        try {
+          const policyResult = await this.cachePolicyEvaluationService.evaluate(
+            tenantId,
+            ageInHours,
+            {
+              entityType: 'company',
+              entityId: identitetsbeteckning,
+              correlationId,
+              actorId,
+              orgNumber: identitetsbeteckning,
+            },
+          );
+
+          if (policyResult.isFresh) {
+            shouldServeCache = true;
+            policyDecisionLabel = 'cache_hit';
+          } else if (policyResult.decision === 'stale_serve') {
+            shouldServeCache = true;
+            policyDecisionLabel = 'stale_fallback';
+            isStaleFallback = true;
+          }
+          // decision === 'refresh_required' | 'provider_call' → fall through to live fetch
+        } catch (policyErr) {
+          // Policy evaluation failure: fall back to the hard-coded TTL behaviour
+          this.logger.warn(
+            `[P02-T04] Policy evaluation failed for ${identitetsbeteckning}; falling back to default freshness check. ${policyErr}`,
+          );
+          shouldServeCache = cacheCheck.isFresh;
+          policyDecisionLabel = cacheCheck.isFresh ? 'cache_hit' : 'fresh_fetch';
+        }
+
+        if (shouldServeCache) {
+          this.logger.log(
+            `Cache hit for ${identitetsbeteckning} (age: ${cacheCheck.ageInDays} days, policy: ${policyDecisionLabel})`,
+          );
+          // Update the snapshot record to reflect the current policy decision
+          const updatedSnapshot = Object.assign(cacheCheck.snapshot, {
+            policyDecision: policyDecisionLabel,
+            isStaleFallback,
+          });
+          const cachedResult: CompleteCompanyProfile = {
+            normalisedData: cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany,
+            highValueDataset: null,
+            organisationInformation: [],
+            documents: null,
+            retrievedAt: cacheCheck.snapshot.fetchedAt.toISOString(),
+          };
+          return {
+            result: cachedResult,
+            snapshot: updatedSnapshot,
+            isFromCache: true,
+            ageInDays: cacheCheck.ageInDays,
+          };
+        }
       }
     }
 

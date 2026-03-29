@@ -10,6 +10,7 @@ import { BvFetchSnapshotEntity } from './entities/bv-fetch-snapshot.entity';
 import { CompanyEntity } from './entities/company.entity';
 import { BolagsverketService } from './services/bolagsverket.service';
 import { CACHE_TTL_DAYS } from './services/bv-cache.service';
+import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
 
 const TENANT_ID = 'tenant-abc';
 const ORG_NR = '5560000001';
@@ -83,6 +84,15 @@ describe('CompaniesService – orchestrateLookup', () => {
         {
           provide: AuditService,
           useValue: { log: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: CachePolicyEvaluationService,
+          useValue: {
+            evaluate: jest.fn().mockResolvedValue({ decision: 'fresh', isFresh: true, isStale: false, isExpired: false, shouldTriggerRefresh: false, staleFallbackAllowed: true, costFlags: {}, policyId: 'default', usedSystemDefault: true, dataAgeHours: 0 }),
+            getPolicyForTenant: jest.fn().mockResolvedValue(null),
+            listPolicies: jest.fn().mockResolvedValue([]),
+            getPolicyById: jest.fn().mockResolvedValue(null),
+          },
         },
         {
           provide: getRepositoryToken(CompanyEntity),
@@ -308,6 +318,15 @@ describe('CompaniesService – findAll', () => {
           useValue: { log: jest.fn().mockResolvedValue(undefined) },
         },
         {
+          provide: CachePolicyEvaluationService,
+          useValue: {
+            evaluate: jest.fn().mockResolvedValue({ decision: 'fresh', isFresh: true, isStale: false, isExpired: false, shouldTriggerRefresh: false, staleFallbackAllowed: true, costFlags: {}, policyId: 'default', usedSystemDefault: true, dataAgeHours: 0 }),
+            getPolicyForTenant: jest.fn().mockResolvedValue(null),
+            listPolicies: jest.fn().mockResolvedValue([]),
+            getPolicyById: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
           provide: getRepositoryToken(CompanyEntity),
           useValue: companyRepo,
         },
@@ -463,6 +482,15 @@ describe('CompaniesService – findAll', () => {
           {
             provide: AuditService,
             useValue: { log: jest.fn().mockResolvedValue(undefined) },
+          },
+          {
+            provide: CachePolicyEvaluationService,
+            useValue: {
+              evaluate: jest.fn().mockResolvedValue({ decision: 'fresh', isFresh: true, isStale: false, isExpired: false, shouldTriggerRefresh: false, staleFallbackAllowed: true, costFlags: {}, policyId: 'default', usedSystemDefault: true, dataAgeHours: 0 }),
+              getPolicyForTenant: jest.fn().mockResolvedValue(null),
+              listPolicies: jest.fn().mockResolvedValue([]),
+              getPolicyById: jest.fn().mockResolvedValue(null),
+            },
           },
           {
             provide: getRepositoryToken(CompanyEntity),

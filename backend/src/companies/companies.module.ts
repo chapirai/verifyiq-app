@@ -26,6 +26,9 @@ import { NormalizedCompanyEntity } from './entities/normalized-company.entity';
 import { CompanyVersionEntity } from './entities/company-version.entity';
 import { NormalizationService } from './services/normalization.service';
 import { NormalizedCompanyQueryService } from './services/normalized-company-query.service';
+import { CachePolicyEntity } from './entities/cache-policy.entity';
+import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
+import { CachePolicyController } from './controllers/cache-policy.controller';
 
 @Module({
   imports: [
@@ -39,11 +42,12 @@ import { NormalizedCompanyQueryService } from './services/normalized-company-que
       BvRawPayloadEntity,
       NormalizedCompanyEntity,
       CompanyVersionEntity,
+      CachePolicyEntity,
     ]),
     HttpModule,
     AuditModule,
   ],
-  controllers: [CompaniesController, BolagsverketController],
+  controllers: [CompaniesController, BolagsverketController, CachePolicyController],
   providers: [
     CompaniesService,
     BolagsverketClient,
@@ -58,6 +62,7 @@ import { NormalizedCompanyQueryService } from './services/normalized-company-que
     RawPayloadQueryService,
     NormalizationService,
     NormalizedCompanyQueryService,
+    CachePolicyEvaluationService,
   ],
   exports: [
     CompaniesService,
@@ -70,6 +75,7 @@ import { NormalizedCompanyQueryService } from './services/normalized-company-que
     RawPayloadQueryService,
     NormalizationService,
     NormalizedCompanyQueryService,
+    CachePolicyEvaluationService,
   ],
 })
 export class CompaniesModule {}
