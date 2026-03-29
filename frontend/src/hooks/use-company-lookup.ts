@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, CompanyLookupResponse } from '@/lib/api';
+import { formatApiMessage } from '@/lib/api-errors';
 import { useToast } from '@/components/ui/ToastProvider';
 
 const RECENTLY_VIEWED_KEY = 'verifyiq:recently-viewed-companies';
@@ -121,10 +122,7 @@ export function useCompanyLookup(orgNumber: string): CompanyLookupState {
       } catch (err: unknown) {
         const apiErr = isApiError(err) ? err : null;
         const status = apiErr?.response?.status;
-        const apiMessage = apiErr?.response?.data?.message;
-        const resolvedApiMessage = Array.isArray(apiMessage)
-          ? apiMessage.filter(Boolean).join(' ')
-          : apiMessage;
+        const resolvedApiMessage = formatApiMessage(apiErr?.response?.data?.message);
 
         let userMessage: string;
         if (status === 404) {
@@ -135,9 +133,7 @@ export function useCompanyLookup(orgNumber: string): CompanyLookupState {
           const fallback = isRefresh
             ? 'Service error. Please try again later.'
             : 'Service is temporarily unavailable. Please try again later.';
-          userMessage = typeof resolvedApiMessage === 'string' && resolvedApiMessage.trim().length > 0
-            ? resolvedApiMessage
-            : fallback;
+          userMessage = resolvedApiMessage ?? fallback;
         } else if (err instanceof Error && err.message.toLowerCase().includes('timeout')) {
           userMessage = isRefresh ? 'Refresh timed out. Please try again.' : 'Request timed out. Please try again.';
         } else if (err instanceof Error && err.message.toLowerCase().includes('network')) {
