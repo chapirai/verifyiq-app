@@ -53,6 +53,7 @@ const DEFAULT_HVD_SCOPES = 'vardefulla-datamangder:read vardefulla-datamangder:p
 const DEFAULT_HVD_TOKEN_PATH = '/oauth2/token';
 const DEFAULT_HVD_DOCUMENT_PATH = '/dokument';
 const TOKEN_REFRESH_SKEW_MS = 60_000;
+const BEARER_PREFIX_PATTERN = /^Bearer\s+/i;
 
 @Injectable()
 export class BolagsverketClient {
@@ -155,7 +156,9 @@ export class BolagsverketClient {
       ?? this.configService.get<string>('BV_FORETAGSINFO_TOKEN')
     )?.trim();
     if (bearerToken) {
-      const normalizedValue = /^Bearer\s+/i.test(bearerToken) ? bearerToken : `Bearer ${bearerToken}`;
+      const normalizedValue = BEARER_PREFIX_PATTERN.test(bearerToken)
+        ? bearerToken.replace(BEARER_PREFIX_PATTERN, 'Bearer ')
+        : `Bearer ${bearerToken}`;
       return { name: headerName, value: normalizedValue };
     }
     return null;
