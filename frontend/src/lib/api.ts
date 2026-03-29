@@ -100,6 +100,12 @@ export interface CompanyMetadata {
   age_days: number;
   freshness: FreshnessStatus;
   cache_ttl_days: number;
+  /** ID of the snapshot record that sourced this response. */
+  snapshot_id: string;
+  /** Request-scoped correlation ID for end-to-end lineage tracing. */
+  correlation_id: string;
+  /** Policy decision (cache_hit | fresh_fetch | force_refresh | stale_fallback). */
+  policy_decision: string;
 }
 
 export interface CompanyData {

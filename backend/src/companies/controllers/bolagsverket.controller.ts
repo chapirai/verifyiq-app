@@ -14,6 +14,7 @@ import {
 import { BolagsverketService } from '../services/bolagsverket.service';
 import { BvCacheService } from '../services/bv-cache.service';
 import { BvDocumentStorageService } from '../services/bv-document-storage.service';
+import { SnapshotQueryService } from '../services/snapshot-query.service';
 
 @Controller('bolagsverket')
 @UseGuards(JwtAuthGuard)
@@ -22,6 +23,7 @@ export class BolagsverketController {
     private readonly bolagsverketService: BolagsverketService,
     private readonly bvCacheService: BvCacheService,
     private readonly bvDocumentStorageService: BvDocumentStorageService,
+    private readonly snapshotQueryService: SnapshotQueryService,
   ) {}
 
   /** GET /bolagsverket/health – check Bolagsverket API availability. */
@@ -170,12 +172,74 @@ export class BolagsverketController {
 
   /**
    * GET /bolagsverket/snapshots?orgNr=…
-   * List fetch snapshots for an organisation.
+   * List fetch snapshots for an organisation (most-recent first).
    */
   @Get('snapshots')
   async getSnapshots(@Query('orgNr') orgNr: string, @Req() req: any) {
     const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
     return this.bvCacheService.listSnapshots(tenantId, orgNr);
+  }
+
+  /**
+   * GET /bolagsverket/snapshots/:id
+   * Get a single snapshot by ID (scoped to the authenticated tenant).
+   */
+  @Get('snapshots/:id')
+  async getSnapshotById(@Param('id') id: string, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    return this.snapshotQueryService.getSnapshotById(tenantId, id);
+  }
+
+  /**
+   * GET /bolagsverket/snapshots/history?orgNr=…&limit=…
+   * Paginated fetch history for an organisation.
+   */
+  @Get('snapshots/history')
+  async getSnapshotHistory(
+    @Query('orgNr') orgNr: string,
+    @Query('limit') limit: string | undefined,
+    @Req() req: any,
+  ) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const take = limit ? Math.min(parseInt(limit, 10), 100) : 20;
+    return this.snapshotQueryService.getSnapshotHistory(tenantId, orgNr, take);
+  }
+
+  /**
+   * GET /bolagsverket/snapshots/stats?orgNr=…
+   * Aggregate fetch-history statistics for an organisation.
+   * Includes total fetches, success rate, last fetch timestamp, cache-hit count.
+   */
+  @Get('snapshots/stats')
+  async getSnapshotStats(@Query('orgNr') orgNr: string, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    return this.snapshotQueryService.getFetchStats(tenantId, orgNr);
+  }
+
+  /**
+   * GET /bolagsverket/snapshots/audit?correlationId=…&policyDecision=…&limit=…
+   * Audit / lineage query endpoint — filter snapshots by correlation ID, actor,
+   * policy decision, fetch status, or stale-fallback flag.
+   */
+  @Get('snapshots/audit')
+  async getAuditSnapshots(
+    @Query('correlationId') correlationId: string | undefined,
+    @Query('actorId') actorId: string | undefined,
+    @Query('policyDecision') policyDecision: string | undefined,
+    @Query('fetchStatus') fetchStatus: string | undefined,
+    @Query('staleFallbackOnly') staleFallbackOnly: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @Req() req: any,
+  ) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    return this.snapshotQueryService.listForAudit(tenantId, {
+      correlationId,
+      actorId,
+      policyDecision: policyDecision as any,
+      fetchStatus,
+      staleFallbackOnly: staleFallbackOnly === 'true',
+      limit: limit ? Math.min(parseInt(limit, 10), 100) : 50,
+    });
   }
 
   /**

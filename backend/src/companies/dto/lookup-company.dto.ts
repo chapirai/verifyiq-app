@@ -24,6 +24,12 @@ export class CompanyMetadataDto {
   age_days!: number;
   freshness!: FreshnessStatus;
   cache_ttl_days!: number;
+  /** ID of the snapshot record that sourced this response — for audit trail linkage. */
+  snapshot_id!: string;
+  /** Request-scoped correlation ID for end-to-end lineage tracing. */
+  correlation_id!: string;
+  /** Policy decision that produced the snapshot (cache_hit | fresh_fetch | force_refresh | stale_fallback). */
+  policy_decision!: string;
 }
 
 export class LookupCompanyResponseDto {
