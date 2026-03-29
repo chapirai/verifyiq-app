@@ -12,6 +12,8 @@ import { CompanyEntity } from './entities/company.entity';
 import { BolagsverketService } from './services/bolagsverket.service';
 import { CACHE_TTL_DAYS } from './services/bv-cache.service';
 import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
+import { FailureStateService } from './services/failure-state.service';
+import { BvCacheService } from './services/bv-cache.service';
 import { LineageMetadataCaptureService } from './services/lineage-metadata-capture.service';
 import { RefreshDecisionService } from './services/refresh-decision.service';
 
@@ -30,6 +32,12 @@ function makeSnapshot(daysOld: number): BvFetchSnapshotEntity {
   snapshot.policyDecision = 'fresh_fetch';
   snapshot.costImpactFlags = {};
   snapshot.isStaleFallback = false;
+  snapshot.normalisedSummary = {
+    organisationNumber: ORG_NR,
+    legalName: 'Test AB',
+    countryCode: 'SE',
+    sourcePayloadSummary: {},
+  };
   const date = new Date();
   date.setDate(date.getDate() - daysOld);
   snapshot.fetchedAt = date;
@@ -75,6 +83,8 @@ describe('CompaniesService – orchestrateLookup', () => {
   let service: CompaniesService;
   let bolagsverketService: jest.Mocked<BolagsverketService>;
   let auditService: jest.Mocked<AuditService>;
+  let failureStateService: jest.Mocked<FailureStateService>;
+  let bvCacheService: jest.Mocked<BvCacheService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -108,6 +118,36 @@ describe('CompaniesService – orchestrateLookup', () => {
           },
         },
         {
+          provide: FailureStateService,
+          useValue: {
+            getRecoveryStatusForEntity: jest.fn().mockResolvedValue({
+              state: 'SUCCESS',
+              isRecoverable: true,
+              retryCount: 0,
+              lastAttempted: null,
+              nextRetryAt: null,
+              canRetry: true,
+              failureReason: null,
+              fallbackUsed: false,
+            }),
+            recordSuccess: jest.fn().mockResolvedValue(null),
+            recordFailure: jest.fn().mockResolvedValue(null),
+            classifyFailure: jest.fn().mockReturnValue({
+              failureState: 'PROVIDER_ERROR',
+              failureReason: 'provider_error',
+              isRecoverable: true,
+              isPermissionFailure: false,
+              isQuotaFailure: false,
+            }),
+          },
+        },
+        {
+          provide: BvCacheService,
+          useValue: {
+            checkFreshness: jest.fn(),
+          },
+        },
+        {
           provide: LineageMetadataCaptureService,
           useValue: { capture: jest.fn().mockResolvedValue(null) },
         },
@@ -121,6 +161,8 @@ describe('CompaniesService – orchestrateLookup', () => {
     service = module.get<CompaniesService>(CompaniesService);
     bolagsverketService = module.get(BolagsverketService);
     auditService = module.get(AuditService);
+    failureStateService = module.get(FailureStateService);
+    bvCacheService = module.get(BvCacheService);
   });
 
   afterEach(() => {
@@ -138,6 +180,7 @@ describe('CompaniesService – orchestrateLookup', () => {
       expect(response.metadata.freshness).toBe('fresh');
       expect(response.metadata.age_days).toBe(5);
       expect(response.metadata.cache_ttl_days).toBe(CACHE_TTL_DAYS);
+      expect(response.metadata.degraded).toBe(false);
       expect(response.company).toBeDefined();
     });
   });
@@ -190,6 +233,7 @@ describe('CompaniesService – orchestrateLookup', () => {
       expect(response.metadata.source).toBe('API');
       expect(response.metadata.freshness).toBe('fresh');
       expect(response.metadata.age_days).toBe(0);
+      expect(response.metadata.degraded).toBe(false);
     });
 
     it('passes force_refresh=true to bolagsverketService.enrichAndSave', async () => {
@@ -251,6 +295,26 @@ describe('CompaniesService – orchestrateLookup', () => {
 
       // Both requests should call the service independently
       expect(bolagsverketService.enrichAndSave).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('stale fallback on provider failure (P02-T10)', () => {
+    it('serves stale cache data when provider fails and fallback is allowed', async () => {
+      bolagsverketService.enrichAndSave.mockRejectedValue(new Error('provider down'));
+      bvCacheService.checkFreshness.mockResolvedValue({
+        isFresh: false,
+        snapshot: makeSnapshot(40),
+        ageInDays: 40,
+      });
+
+      const response = await service.orchestrateLookup(ctx, { orgNumber: ORG_NR });
+
+      expect(response.metadata.source).toBe('DB');
+      expect(response.metadata.policy_decision).toBe('stale_fallback');
+      expect(response.metadata.degraded).toBe(true);
+      expect(response.metadata.failure_state).toBe('DEGRADED');
+      expect(response.metadata.freshness).toBe('stale');
+      expect(failureStateService.recordFailure).toHaveBeenCalled();
     });
   });
 
@@ -368,6 +432,36 @@ describe('CompaniesService – findAll', () => {
           provide: RefreshDecisionService,
           useValue: {
             decide: jest.fn().mockResolvedValue({ serve_from: 'db', reason: 'policy_fresh', cost_flags: {}, force_refresh: false }),
+          },
+        },
+        {
+          provide: FailureStateService,
+          useValue: {
+            getRecoveryStatusForEntity: jest.fn().mockResolvedValue({
+              state: 'SUCCESS',
+              isRecoverable: true,
+              retryCount: 0,
+              lastAttempted: null,
+              nextRetryAt: null,
+              canRetry: true,
+              failureReason: null,
+              fallbackUsed: false,
+            }),
+            recordSuccess: jest.fn().mockResolvedValue(null),
+            recordFailure: jest.fn().mockResolvedValue(null),
+            classifyFailure: jest.fn().mockReturnValue({
+              failureState: 'PROVIDER_ERROR',
+              failureReason: 'provider_error',
+              isRecoverable: true,
+              isPermissionFailure: false,
+              isQuotaFailure: false,
+            }),
+          },
+        },
+        {
+          provide: BvCacheService,
+          useValue: {
+            checkFreshness: jest.fn(),
           },
         },
         {
@@ -544,6 +638,36 @@ describe('CompaniesService – findAll', () => {
             provide: RefreshDecisionService,
             useValue: {
               decide: jest.fn().mockResolvedValue({ serve_from: 'db', reason: 'policy_fresh', cost_flags: {}, force_refresh: false }),
+            },
+          },
+          {
+            provide: FailureStateService,
+            useValue: {
+              getRecoveryStatusForEntity: jest.fn().mockResolvedValue({
+                state: 'SUCCESS',
+                isRecoverable: true,
+                retryCount: 0,
+                lastAttempted: null,
+                nextRetryAt: null,
+                canRetry: true,
+                failureReason: null,
+                fallbackUsed: false,
+              }),
+              recordSuccess: jest.fn().mockResolvedValue(null),
+              recordFailure: jest.fn().mockResolvedValue(null),
+              classifyFailure: jest.fn().mockReturnValue({
+                failureState: 'PROVIDER_ERROR',
+                failureReason: 'provider_error',
+                isRecoverable: true,
+                isPermissionFailure: false,
+                isQuotaFailure: false,
+              }),
+            },
+          },
+          {
+            provide: BvCacheService,
+            useValue: {
+              checkFreshness: jest.fn(),
             },
           },
           {

@@ -106,6 +106,10 @@ export interface CompanyMetadata {
   correlation_id: string;
   /** Policy decision (cache_hit | fresh_fetch | force_refresh | stale_fallback). */
   policy_decision: string;
+  /** True when stale fallback is used and the response is degraded. */
+  degraded: boolean;
+  /** Failure-state label when degraded. */
+  failure_state: string | null;
 }
 
 export interface CompanyData {

@@ -15,6 +15,7 @@ export enum AuditEventType {
   CACHE_MISS = 'CACHE_MISS',
   STALE_SERVED = 'STALE_SERVED',
   PROVIDER_CALLED = 'PROVIDER_CALLED',
+  FAILURE_STATE = 'FAILURE_STATE',
 }
 
 @Entity({ name: 'audit_events' })

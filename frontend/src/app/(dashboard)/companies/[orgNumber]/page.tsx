@@ -103,7 +103,11 @@ export default function CompanyProfilePage() {
           {/* Metadata row */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <DataSourceBadge source={metadata.source} />
+              <DataSourceBadge
+                source={metadata.source}
+                degraded={metadata.degraded}
+                failureState={metadata.failure_state}
+              />
               <FreshnessIndicator
                 fetchedAt={metadata.fetched_at}
                 ageDays={metadata.age_days}

@@ -45,6 +45,7 @@ export default function SearchPage() {
           freshness: result.metadata.freshness,
           fetched_at: result.metadata.fetched_at,
           age_days: result.metadata.age_days,
+          degraded: result.metadata.degraded,
         });
         const foundOrgNumber = result.company?.organisationNumber ?? orgNumber;
         router.push(`/companies/${encodeURIComponent(String(foundOrgNumber))}`);
