@@ -35,6 +35,8 @@ const envSchema = z.object({
   BV_FORETAGSINFO_AUTH_HEADER: z.string().min(1).optional(),
   BV_FORETAGSINFO_AUTH_VALUE: z.string().min(1).optional(),
   BV_FORETAGSINFO_BEARER_TOKEN: z.string().min(1).optional(),
+  BV_FORETAGSINFO_AUTH_TOKEN: z.string().min(1).optional(),
+  BV_FORETAGSINFO_TOKEN: z.string().min(1).optional(),
   API_BASE_URL: z.string().url(),
   FRONTEND_URL: z.string().url().optional(),
 });

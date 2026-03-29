@@ -208,6 +208,42 @@ describe('BolagsverketClient', () => {
       expect(headers['Authorization']).toBe('Bearer org-bearer-token');
     });
 
+    it('accepts BV_FORETAGSINFO_AUTH_TOKEN as a backward-compatible bearer token alias', async () => {
+      const postMock = jest.fn((url: string) => {
+        if (url === orgUrl) return of({ data: [{ identitetsbeteckning: '5560000001' }] });
+        throw new Error(`Unexpected POST to: ${url}`);
+      });
+      const client = makeClient(postMock, jest.fn(), {
+        BV_FORETAGSINFO_AUTH_TOKEN: 'legacy-alias-token',
+      });
+
+      await client.fetchOrganisationInformation('5560000001');
+
+      const orgCall = (postMock.mock.calls as unknown as [string, unknown, { headers: Record<string, string> }][]).find(
+        ([url]) => url === orgUrl,
+      );
+      const headers = orgCall![2].headers;
+      expect(headers['Authorization']).toBe('Bearer legacy-alias-token');
+    });
+
+    it('does not double-prefix Bearer when token already contains scheme', async () => {
+      const postMock = jest.fn((url: string) => {
+        if (url === orgUrl) return of({ data: [{}] });
+        throw new Error(`Unexpected POST to: ${url}`);
+      });
+      const client = makeClient(postMock, jest.fn(), {
+        BV_FORETAGSINFO_TOKEN: 'Bearer pre-prefixed-token',
+      });
+
+      await client.fetchOrganisationInformation('5560000001');
+
+      const orgCall = (postMock.mock.calls as unknown as [string, unknown, { headers: Record<string, string> }][]).find(
+        ([url]) => url === orgUrl,
+      );
+      const headers = orgCall![2].headers;
+      expect(headers['Authorization']).toBe('Bearer pre-prefixed-token');
+    });
+
     it('uses BV_FORETAGSINFO_AUTH_VALUE verbatim as the auth header value', async () => {
       const postMock = jest.fn((url: string) => {
         if (url === orgUrl) return of({ data: [{}] });
