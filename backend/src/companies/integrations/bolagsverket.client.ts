@@ -106,19 +106,23 @@ export class BolagsverketClient {
   }
 
   private getHvdClientId(): string {
-    return (
+    const clientId =
       this.configService.get<string>('BV_HVD_CLIENT_ID') ??
-      this.configService.get<string>('BV_CLIENT_ID') ??
-      ''
-    );
+      this.configService.get<string>('BV_CLIENT_ID');
+    if (!clientId) {
+      throw new UnauthorizedException('Bolagsverket OAuth client ID is missing');
+    }
+    return clientId;
   }
 
   private getHvdClientSecret(): string {
-    return (
+    const clientSecret =
       this.configService.get<string>('BV_HVD_CLIENT_SECRET') ??
-      this.configService.get<string>('BV_CLIENT_SECRET') ??
-      ''
-    );
+      this.configService.get<string>('BV_CLIENT_SECRET');
+    if (!clientSecret) {
+      throw new UnauthorizedException('Bolagsverket OAuth client secret is missing');
+    }
+    return clientSecret;
   }
 
   private resolveForetagsinfoAuthHeader(): { name: string; value: string } | null {
@@ -218,7 +222,7 @@ export class BolagsverketClient {
         const status: number | undefined = error?.response?.status;
         const isRetryable = status !== undefined && RETRYABLE_STATUS_CODES.has(status);
 
-        if (status === 401 && options?.auth === 'hvd' && attempt < RETRY_CONFIG.maxRetries) {
+        if (status === 401 && options?.auth === 'hvd' && attempt === 0) {
           attempt++;
           this.invalidateToken();
           continue;
@@ -303,8 +307,9 @@ export class BolagsverketClient {
     this.tokenRequest = (async () => {
       try {
         const tokenResponse = await this.requestAccessToken();
-        const expiresAt =
-          Date.now() + Math.max(tokenResponse.expires_in * 1000 - TOKEN_REFRESH_SKEW_MS, 0);
+        const expiresInMs = tokenResponse.expires_in * 1000;
+        const skewMs = Math.min(TOKEN_REFRESH_SKEW_MS, Math.floor(expiresInMs * 0.1));
+        const expiresAt = Date.now() + Math.max(expiresInMs - skewMs, 0);
         this.hvdTokenCache = {
           accessToken: tokenResponse.access_token,
           expiresAt,
@@ -425,8 +430,10 @@ export class BolagsverketClient {
     const buffer = Buffer.from(responseData);
     const contentType = responseHeaders?.['content-type'] ?? 'application/zip';
     const disposition = responseHeaders?.['content-disposition'];
-    const fileNameMatch = disposition?.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
-    const rawFileName = fileNameMatch?.[1] ?? fileNameMatch?.[2];
+    const utf8Match = disposition?.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+    const quotedMatch = disposition?.match(/filename\s*=\s*"([^"]+)"/i);
+    const unquotedMatch = disposition?.match(/filename\s*=\s*([^;]+)/i);
+    const rawFileName = utf8Match?.[1] ?? quotedMatch?.[1] ?? unquotedMatch?.[1];
     const decodedFileName = rawFileName
       ? (() => {
           try {
@@ -437,7 +444,11 @@ export class BolagsverketClient {
         })()
       : undefined;
     const safeFileName = decodedFileName
-      ? basename(decodedFileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 255)
+      ? basename(decodedFileName)
+          .replace(/[\\/]/g, '_')
+          .replace(/[\u0000-\u001F\u007F]/g, '')
+          .trim()
+          .slice(0, 255)
       : undefined;
 
     return {
