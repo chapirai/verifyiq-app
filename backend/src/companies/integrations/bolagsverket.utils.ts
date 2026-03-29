@@ -14,6 +14,8 @@ export function sanitizeBolagsverketFilename(input?: string): string | undefined
     decoded = input;
   }
 
+  // Normalise Windows-style backslash separators so that basename() correctly
+  // extracts the file name component on both Unix and Windows paths.
   const normalized = decoded.replace(/\\/g, '/');
   const baseName = basename(normalized);
   const sanitized = baseName
