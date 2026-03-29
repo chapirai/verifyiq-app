@@ -9,6 +9,9 @@ import { RawPayloadStorageService } from './raw-payload-storage.service';
 import { CachePolicyEvaluationService } from './cache-policy-evaluation.service';
 import { SnapshotChainService } from './snapshot-chain.service';
 import { SnapshotComparisonService } from './snapshot-comparison.service';
+import { BvFetchSnapshotEntity } from '../entities/bv-fetch-snapshot.entity';
+import { AuditEventType } from '../../audit/audit-event.entity';
+import { AuditService } from '../../audit/audit.service';
 
 function makeNormalisedCompany(overrides: Partial<NormalisedCompany> = {}): NormalisedCompany {
   return {
@@ -40,43 +43,63 @@ function makeNormalisedCompany(overrides: Partial<NormalisedCompany> = {}): Norm
 
 describe('BolagsverketService', () => {
   let service: BolagsverketService;
+  let auditService: { emitAuditEvent: jest.Mock };
+  let cacheService: { checkFreshness: jest.Mock; createSnapshot: jest.Mock };
+  let persistenceService: { upsertOrganisation: jest.Mock };
+  let rawPayloadStorageService: { storeRawPayload: jest.Mock };
+  let snapshotChainService: { linkSnapshot: jest.Mock };
+  let snapshotComparisonService: { compareSnapshots: jest.Mock };
+  let policyService: {
+    evaluate: jest.Mock;
+    getPolicyForTenant: jest.Mock;
+    listPolicies: jest.Mock;
+    getPolicyById: jest.Mock;
+  };
 
   beforeEach(async () => {
+    cacheService = { checkFreshness: jest.fn(), createSnapshot: jest.fn() };
+    persistenceService = { upsertOrganisation: jest.fn() };
+    rawPayloadStorageService = { storeRawPayload: jest.fn() };
+    snapshotChainService = { linkSnapshot: jest.fn() };
+    snapshotComparisonService = { compareSnapshots: jest.fn() };
+    auditService = { emitAuditEvent: jest.fn().mockResolvedValue(null) };
+    policyService = {
+      evaluate: jest.fn().mockResolvedValue({
+        decision: 'fresh',
+        isFresh: true,
+        isStale: false,
+        isExpired: false,
+        shouldTriggerRefresh: false,
+        staleFallbackAllowed: true,
+        costFlags: {},
+        policyId: 'default',
+        usedSystemDefault: true,
+        dataAgeHours: 0,
+      }),
+      getPolicyForTenant: jest.fn().mockResolvedValue(null),
+      listPolicies: jest.fn().mockResolvedValue([]),
+      getPolicyById: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BolagsverketService,
         { provide: BolagsverketClient, useValue: {} },
         { provide: BolagsverketMapper, useValue: {} },
-        { provide: BvCacheService, useValue: {} },
-        { provide: BvPersistenceService, useValue: {} },
-        { provide: RawPayloadStorageService, useValue: { storeRawPayload: jest.fn() } },
-        {
-          provide: CachePolicyEvaluationService,
-          useValue: {
-            evaluate: jest.fn().mockResolvedValue({
-              decision: 'fresh',
-              isFresh: true,
-              isStale: false,
-              isExpired: false,
-              shouldTriggerRefresh: false,
-              staleFallbackAllowed: true,
-              costFlags: {},
-              policyId: 'default',
-              usedSystemDefault: true,
-              dataAgeHours: 0,
-            }),
-            getPolicyForTenant: jest.fn().mockResolvedValue(null),
-            listPolicies: jest.fn().mockResolvedValue([]),
-            getPolicyById: jest.fn().mockResolvedValue(null),
-          },
-        },
-        { provide: SnapshotChainService, useValue: { linkSnapshot: jest.fn() } },
-        { provide: SnapshotComparisonService, useValue: { compareSnapshots: jest.fn() } },
+        { provide: BvCacheService, useValue: cacheService },
+        { provide: BvPersistenceService, useValue: persistenceService },
+        { provide: RawPayloadStorageService, useValue: rawPayloadStorageService },
+        { provide: CachePolicyEvaluationService, useValue: policyService },
+        { provide: SnapshotChainService, useValue: snapshotChainService },
+        { provide: SnapshotComparisonService, useValue: snapshotComparisonService },
+        { provide: AuditService, useValue: auditService },
       ],
     }).compile();
 
     service = module.get<BolagsverketService>(BolagsverketService);
   });
+
+  afterEach(() => jest.clearAllMocks());
 
   describe('validateCompanyData', () => {
     it('returns isValid=true for a valid company', () => {
@@ -210,6 +233,7 @@ describe('BolagsverketService', () => {
           },
           { provide: SnapshotChainService, useValue: { linkSnapshot: jest.fn() } },
           { provide: SnapshotComparisonService, useValue: { compareSnapshots: jest.fn() } },
+          { provide: AuditService, useValue: { emitAuditEvent: jest.fn().mockResolvedValue(null) } },
         ],
       }).compile();
 
@@ -260,6 +284,89 @@ describe('BolagsverketService', () => {
       expect(result.normalisedData).toBe(normalisedCompany);
       expect(result.highValueDataset).toBe(hvdPayload);
       expect(result.documents).toBeNull();
+    });
+  });
+
+  describe('enrichAndSave audit events', () => {
+    it('emits cache hit event when serving cached snapshot', async () => {
+      const snapshot = new BvFetchSnapshotEntity();
+      snapshot.id = 'snap-cache';
+      snapshot.tenantId = 'tenant-1';
+      snapshot.organisationsnummer = '5560000001';
+      snapshot.fetchStatus = 'success';
+      snapshot.isFromCache = true;
+      snapshot.policyDecision = 'cache_hit';
+      snapshot.costImpactFlags = {};
+      snapshot.isStaleFallback = false;
+      snapshot.normalisedSummary = { organisationNumber: '5560000001' } as any;
+      snapshot.fetchedAt = new Date();
+
+      cacheService.checkFreshness.mockResolvedValue({
+        isFresh: true,
+        snapshot,
+        ageInDays: 1,
+      });
+
+      await service.enrichAndSave('tenant-1', '5560000001', false, 'corr-1', 'actor-1');
+
+      expect(auditService.emitAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: AuditEventType.CACHE_HIT,
+          status: 'hit',
+          resourceId: '5560000001',
+        }),
+      );
+    });
+
+    it('emits refresh events on force refresh success', async () => {
+      const resultPayload = {
+        normalisedData: makeNormalisedCompany(),
+        highValueDataset: null,
+        organisationInformation: [],
+        documents: null,
+        retrievedAt: new Date().toISOString(),
+      };
+
+      jest
+        .spyOn(service, 'getCompleteCompanyData')
+        .mockResolvedValue(resultPayload);
+
+      persistenceService.upsertOrganisation.mockResolvedValue({ id: 'org-1' });
+      rawPayloadStorageService.storeRawPayload.mockResolvedValue({
+        rawPayload: { id: 'raw-1' },
+        isDeduplicated: false,
+      });
+
+      const snapshot = new BvFetchSnapshotEntity();
+      snapshot.id = 'snap-new';
+      snapshot.tenantId = 'tenant-1';
+      snapshot.organisationsnummer = '5560000001';
+      snapshot.fetchStatus = 'success';
+      snapshot.isFromCache = false;
+      snapshot.policyDecision = 'force_refresh';
+      snapshot.costImpactFlags = { apiCallCharged: true, apiCallCount: 3 };
+      snapshot.isStaleFallback = false;
+      snapshot.apiCallCount = 3;
+      snapshot.fetchedAt = new Date();
+
+      cacheService.createSnapshot.mockResolvedValue(snapshot);
+      snapshotChainService.linkSnapshot.mockResolvedValue({ id: snapshot.id, previousSnapshotId: null });
+      snapshotComparisonService.compareSnapshots.mockResolvedValue(undefined);
+
+      await service.enrichAndSave('tenant-1', '5560000001', true, 'corr-2', 'actor-2');
+
+      const eventTypes = auditService.emitAuditEvent.mock.calls.map(
+        (call) => call[0].eventType,
+      );
+
+      expect(eventTypes).toEqual(
+        expect.arrayContaining([
+          AuditEventType.FORCE_REFRESH,
+          AuditEventType.REFRESH_INITIATED,
+          AuditEventType.PROVIDER_CALLED,
+          AuditEventType.REFRESH_COMPLETED,
+        ]),
+      );
     });
   });
 });

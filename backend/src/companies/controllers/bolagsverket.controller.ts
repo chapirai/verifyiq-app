@@ -1,5 +1,7 @@
 import { Body, Controller, ForbiddenException, Get, HttpException, InternalServerErrorException, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { AuditEventType } from '../../audit/audit-event.entity';
+import { AuditService } from '../../audit/audit.service';
 import {
   BolagsverketArendeDto,
   BolagsverketDocumentListDto,
@@ -40,7 +42,36 @@ export class BolagsverketController {
     private readonly bvDocumentStorageService: BvDocumentStorageService,
     private readonly snapshotQueryService: SnapshotQueryService,
     private readonly rawPayloadQueryService: RawPayloadQueryService,
+    private readonly auditService: AuditService,
   ) {}
+
+  private requireRawPayloadAccess(req: any, resourceId: string, accessType: string): void {
+    try {
+      assertRawPayloadAccess(req);
+    } catch (err) {
+      const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+      const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+      void this.auditService.emitAuditEvent({
+        tenantId,
+        userId: actorId ?? null,
+        eventType: AuditEventType.SENSITIVE_ACCESS,
+        action: 'raw_payload.access',
+        status: 'denied',
+        resourceId,
+        metadata: { accessType, granted: false },
+      });
+      void this.auditService.emitAuditEvent({
+        tenantId,
+        userId: actorId ?? null,
+        eventType: AuditEventType.PERMISSION_DENIED,
+        action: 'raw_payload.access',
+        status: 'denied',
+        resourceId,
+        metadata: { accessType },
+      });
+      throw err;
+    }
+  }
 
   /** GET /bolagsverket/health – check Bolagsverket API availability. */
   @Get('health')
@@ -287,7 +318,7 @@ export class BolagsverketController {
    */
   @Get('raw-payloads/:id')
   async getRawPayloadById(@Param('id') id: string, @Req() req: any) {
-    assertRawPayloadAccess(req);
+    this.requireRawPayloadAccess(req, id, 'by_id');
     const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.rawPayloadQueryService.getById(tenantId, id, actorId);
@@ -300,7 +331,7 @@ export class BolagsverketController {
    */
   @Get('raw-payloads/by-snapshot/:snapshotId')
   async getRawPayloadBySnapshot(@Param('snapshotId') snapshotId: string, @Req() req: any) {
-    assertRawPayloadAccess(req);
+    this.requireRawPayloadAccess(req, snapshotId, 'by_snapshot');
     const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.rawPayloadQueryService.getBySnapshotId(tenantId, snapshotId, actorId);
@@ -313,7 +344,7 @@ export class BolagsverketController {
    */
   @Get('raw-payloads/by-checksum')
   async getRawPayloadsByChecksum(@Query('checksum') checksum: string, @Req() req: any) {
-    assertRawPayloadAccess(req);
+    this.requireRawPayloadAccess(req, checksum, 'by_checksum');
     const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     return this.rawPayloadQueryService.getByChecksum(tenantId, checksum);
   }
@@ -329,7 +360,7 @@ export class BolagsverketController {
     @Query('limit') limit: string | undefined,
     @Req() req: any,
   ) {
-    assertRawPayloadAccess(req);
+    this.requireRawPayloadAccess(req, source, 'by_provider');
     const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const take = limit ? Math.min(parseInt(limit, 10), 100) : 50;
     return this.rawPayloadQueryService.listByProviderSource(tenantId, source, take);
@@ -346,7 +377,7 @@ export class BolagsverketController {
     @Query('limit') limit: string | undefined,
     @Req() req: any,
   ) {
-    assertRawPayloadAccess(req);
+    this.requireRawPayloadAccess(req, orgNr, 'by_org');
     const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const take = limit ? Math.min(parseInt(limit, 10), 100) : 50;
     return this.rawPayloadQueryService.listByOrganisationsnummer(tenantId, orgNr, take);

@@ -1,6 +1,7 @@
 import { GatewayTimeoutException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { AuditEventType } from '../audit/audit-event.entity';
 import { AuditService } from '../audit/audit.service';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { CompaniesService } from './companies.service';
@@ -85,7 +86,11 @@ describe('CompaniesService – orchestrateLookup', () => {
         },
         {
           provide: AuditService,
-          useValue: { log: jest.fn().mockResolvedValue(undefined) },
+          useValue: {
+            log: jest.fn().mockResolvedValue(undefined),
+            emitAuditEvent: jest.fn().mockResolvedValue(null),
+            emitUsageEvent: jest.fn().mockResolvedValue(null),
+          },
         },
         {
           provide: CachePolicyEvaluationService,
@@ -261,6 +266,27 @@ describe('CompaniesService – orchestrateLookup', () => {
           actorId: 'user-1',
           action: 'company.lookup',
           resourceType: 'company',
+          resourceId: ORG_NR,
+        }),
+      );
+      expect(auditService.emitAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: AuditEventType.LOOKUP_INITIATED,
+          status: 'initiated',
+          resourceId: ORG_NR,
+        }),
+      );
+      expect(auditService.emitAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: AuditEventType.LOOKUP_COMPLETED,
+          status: 'success',
+          resourceId: ORG_NR,
+        }),
+      );
+      expect(auditService.emitUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: AuditEventType.LOOKUP_COMPLETED,
+          status: 'success',
           resourceId: ORG_NR,
         }),
       );
