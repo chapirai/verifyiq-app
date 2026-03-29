@@ -12,6 +12,7 @@ import { firstValueFrom } from 'rxjs';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { AxiosRequestConfig } from 'axios';
+import { basename } from 'path';
 import {
   ALL_INFORMATION_CATEGORIES,
   AktiekapitalforandringResponse,
@@ -425,14 +426,26 @@ export class BolagsverketClient {
     const contentType = responseHeaders?.['content-type'] ?? 'application/zip';
     const disposition = responseHeaders?.['content-disposition'];
     const fileNameMatch = disposition?.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
-    const fileName = fileNameMatch?.[1] ?? fileNameMatch?.[2];
+    const rawFileName = fileNameMatch?.[1] ?? fileNameMatch?.[2];
+    const decodedFileName = rawFileName
+      ? (() => {
+          try {
+            return decodeURIComponent(rawFileName);
+          } catch {
+            return rawFileName;
+          }
+        })()
+      : undefined;
+    const safeFileName = decodedFileName
+      ? basename(decodedFileName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 255)
+      : undefined;
 
     return {
       requestPayload: payload,
       responsePayload: buffer,
       requestId,
       contentType,
-      fileName,
+      fileName: safeFileName,
     };
   }
 

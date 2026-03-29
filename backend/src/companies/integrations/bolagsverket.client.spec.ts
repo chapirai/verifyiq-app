@@ -54,9 +54,13 @@ describe('BolagsverketClient', () => {
     });
 
     const client = makeClient(postMock);
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValueOnce(1_000);
     const token1 = await client.getAccessToken();
-    (client as any).hvdTokenCache.expiresAt = Date.now() - 1;
+    nowSpy.mockReturnValueOnce(10_000_000);
+    nowSpy.mockReturnValueOnce(10_000_000);
     const token2 = await client.getAccessToken();
+    nowSpy.mockRestore();
 
     expect(token1).toBe('token-1');
     expect(token2).toBe('token-2');
