@@ -140,7 +140,7 @@ export class BolagsverketController {
    */
   @Post('signatory-power')
   verifySignatoryPower(@Body() dto: BolagsverketSignatoryPowerDto) {
-    return this.bolagsverketService.verifySignatoryPower(
+    return this.bolagsverketService.getSignatoryOptions(
       dto.funktionarIdentitetsbeteckning,
       dto.organisationIdentitetsbeteckning,
     );
@@ -152,7 +152,7 @@ export class BolagsverketController {
    */
   @Post('share-capital-history')
   getShareCapitalHistory(@Body() dto: BolagsverketShareCapitalHistoryDto) {
-    return this.bolagsverketService.getShareCapitalHistory(
+    return this.bolagsverketService.getShareCapitalChanges(
       dto.identitetsbeteckning,
       dto.fromdatum,
       dto.tomdatum,
@@ -165,7 +165,7 @@ export class BolagsverketController {
    */
   @Post('cases')
   getCaseInformation(@Body() dto: BolagsverketArendeDto) {
-    return this.bolagsverketService.getCaseInformation(
+    return this.bolagsverketService.getCases(
       dto.arendenummer,
       dto.organisationIdentitetsbeteckning,
       dto.fromdatum,
@@ -179,7 +179,7 @@ export class BolagsverketController {
    */
   @Post('engagements')
   getEngagements(@Body() dto: BolagsverketEngagemangDto) {
-    return this.bolagsverketService.getOrganizationEngagements(
+    return this.bolagsverketService.getOrganisationEngagements(
       dto.identitetsbeteckning,
       dto.paginering?.sida,
       dto.paginering?.antalPerSida,

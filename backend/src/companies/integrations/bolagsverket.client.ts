@@ -424,7 +424,7 @@ export class BolagsverketClient {
     const buffer = Buffer.from(responseData);
     const contentType = responseHeaders?.['content-type'] ?? 'application/zip';
     const disposition = responseHeaders?.['content-disposition'];
-    const fileNameMatch = disposition?.match(/filename\\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
+    const fileNameMatch = disposition?.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
     const fileName = fileNameMatch?.[1] ?? fileNameMatch?.[2];
 
     return {

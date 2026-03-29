@@ -43,7 +43,7 @@ describe('BolagsverketClient', () => {
 
   it('refreshes the access token when expired', async () => {
     const tokenResponses = [
-      { access_token: 'token-1', expires_in: 1 },
+      { access_token: 'token-1', expires_in: 3600 },
       { access_token: 'token-2', expires_in: 3600 },
     ];
     const postMock = jest.fn((url: string) => {
@@ -55,6 +55,7 @@ describe('BolagsverketClient', () => {
 
     const client = makeClient(postMock);
     const token1 = await client.getAccessToken();
+    (client as any).hvdTokenCache.expiresAt = Date.now() - 1;
     const token2 = await client.getAccessToken();
 
     expect(token1).toBe('token-1');

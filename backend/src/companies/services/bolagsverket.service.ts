@@ -203,38 +203,6 @@ export class BolagsverketService {
     return responsePayload;
   }
 
-  async getSignatoryOptions(
-    funktionarIdentitetsbeteckning: string,
-    organisationIdentitetsbeteckning: string,
-  ): Promise<FirmateckningsalternativResponse> {
-    return this.verifySignatoryPower(funktionarIdentitetsbeteckning, organisationIdentitetsbeteckning);
-  }
-
-  async getCases(
-    arendenummer?: string,
-    organisationIdentitetsbeteckning?: string,
-    fromdatum?: string,
-    tomdatum?: string,
-  ): Promise<ArendeResponse> {
-    return this.getCaseInformation(arendenummer, organisationIdentitetsbeteckning, fromdatum, tomdatum);
-  }
-
-  async getShareCapitalChanges(
-    identitetsbeteckning: string,
-    fromdatum?: string,
-    tomdatum?: string,
-  ): Promise<AktiekapitalforandringResponse> {
-    return this.getShareCapitalHistory(identitetsbeteckning, fromdatum, tomdatum);
-  }
-
-  async getOrganisationEngagements(
-    identitetsbeteckning: string,
-    pageNumber = 1,
-    pageSize = 20,
-  ): Promise<OrganisationsengagemangResponse> {
-    return this.getOrganizationEngagements(identitetsbeteckning, pageNumber, pageSize);
-  }
-
   // ── Officers ────────────────────────────────────────────────────────────────
 
   async getOfficerInformation(
@@ -297,7 +265,7 @@ export class BolagsverketService {
 
   // ── Signatory power ──────────────────────────────────────────────────────────
 
-  async verifySignatoryPower(
+  async getSignatoryOptions(
     funktionarIdentitetsbeteckning: string,
     organisationIdentitetsbeteckning: string,
   ): Promise<FirmateckningsalternativResponse> {
@@ -310,7 +278,7 @@ export class BolagsverketService {
 
   // ── Share capital history ────────────────────────────────────────────────────
 
-  async getShareCapitalHistory(
+  async getShareCapitalChanges(
     identitetsbeteckning: string,
     fromdatum?: string,
     tomdatum?: string,
@@ -325,7 +293,7 @@ export class BolagsverketService {
 
   // ── Cases / arenden ──────────────────────────────────────────────────────────
 
-  async getCaseInformation(
+  async getCases(
     arendenummer?: string,
     organisationIdentitetsbeteckning?: string,
     fromdatum?: string,
@@ -342,7 +310,7 @@ export class BolagsverketService {
 
   // ── Engagements ──────────────────────────────────────────────────────────────
 
-  async getOrganizationEngagements(
+  async getOrganisationEngagements(
     identitetsbeteckning: string,
     pageNumber = 1,
     pageSize = 20,
