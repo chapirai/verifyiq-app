@@ -8,6 +8,7 @@ import { ListCompaniesDto } from './dto/list-companies.dto';
 import { CACHE_TTL_DAYS } from './services/bv-cache.service';
 import { BolagsverketService } from './services/bolagsverket.service';
 import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
+import { RefreshDecisionService } from './services/refresh-decision.service';
 import {
   CompanyMetadataDto,
   FreshnessStatus,
@@ -49,6 +50,7 @@ export class CompaniesService {
     private readonly auditService: AuditService,
     private readonly bolagsverketService: BolagsverketService,
     private readonly cachePolicyEvaluationService: CachePolicyEvaluationService,
+    private readonly refreshDecisionService: RefreshDecisionService,
     @InjectRepository(CompanyEntity)
     private readonly companyRepo: Repository<CompanyEntity>,
   ) {}
@@ -88,6 +90,26 @@ export class CompaniesService {
     dto: LookupCompanyDto,
     correlationId: string,
   ): Promise<LookupCompanyResponseDto> {
+    // P02-T05: Emit a pre-enrich refresh decision for auditability and
+    // downstream billing/quota hook points.  Note: dataAgeHours=0 is passed
+    // here because the real cache age is not yet known at this stage — the
+    // BolagsverketService resolves the actual cache state and re-evaluates
+    // policy internally.  This call serves as an explicit orchestration hook
+    // for quota checks and produces an audit trail of the intent to refresh.
+    const refreshDecision = await this.refreshDecisionService.decide({
+      tenantId: ctx.tenantId,
+      dataAgeHours: 0,
+      forceRefresh: dto.force_refresh ?? false,
+      entityId: dto.orgNumber,
+      entityType: 'company',
+      correlationId,
+      actorId: ctx.actorId ?? null,
+    });
+
+    this.logger.log(
+      `[${correlationId}] [P02-T05] refresh decision: serve_from=${refreshDecision.serve_from} reason=${refreshDecision.reason}`,
+    );
+
     const enrichPromise = this.bolagsverketService.enrichAndSave(
       ctx.tenantId,
       dto.orgNumber,
@@ -159,6 +181,11 @@ export class CompaniesService {
         forceRefresh: dto.force_refresh ?? false,
         snapshotId: snapshot.id,
         policyDecision: metadata.policy_decision,
+        refreshDecision: {
+          serve_from: refreshDecision.serve_from,
+          reason: refreshDecision.reason,
+          cost_flags: refreshDecision.cost_flags,
+        },
       },
     });
 

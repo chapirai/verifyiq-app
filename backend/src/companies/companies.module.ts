@@ -29,6 +29,7 @@ import { NormalizedCompanyQueryService } from './services/normalized-company-que
 import { CachePolicyEntity } from './entities/cache-policy.entity';
 import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
 import { CachePolicyController } from './controllers/cache-policy.controller';
+import { RefreshDecisionService } from './services/refresh-decision.service';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { CachePolicyController } from './controllers/cache-policy.controller';
     NormalizationService,
     NormalizedCompanyQueryService,
     CachePolicyEvaluationService,
+    RefreshDecisionService,
   ],
   exports: [
     CompaniesService,
@@ -76,6 +78,7 @@ import { CachePolicyController } from './controllers/cache-policy.controller';
     NormalizationService,
     NormalizedCompanyQueryService,
     CachePolicyEvaluationService,
+    RefreshDecisionService,
   ],
 })
 export class CompaniesModule {}
