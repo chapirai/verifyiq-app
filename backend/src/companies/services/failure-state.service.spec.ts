@@ -69,6 +69,33 @@ describe('FailureStateService', () => {
   });
 
   describe('getRecoveryStatus', () => {
+    it('uses base delay when retryCount <= 1', () => {
+      const now = Date.now();
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+      const current = new FailureStateEntity();
+      current.failureState = 'PROVIDER_ERROR';
+      current.retryCount = 1;
+      current.isRecoverable = true;
+      current.lastAttempted = new Date(now - 10_000);
+
+      const status = service.getRecoveryStatus(current);
+
+      expect(status.nextRetryAt?.getTime()).toBe(current.lastAttempted.getTime() + 60_000);
+      nowSpy.mockRestore();
+    });
+
+    it('caps exponential backoff at the max exponent', () => {
+      const current = new FailureStateEntity();
+      current.failureState = 'PROVIDER_ERROR';
+      current.retryCount = 10;
+      current.isRecoverable = true;
+      current.lastAttempted = new Date(0);
+
+      const status = service.getRecoveryStatus(current);
+
+      expect(status.nextRetryAt?.getTime()).toBe(480_000);
+    });
+
     it('returns canRetry=false when backoff window has not elapsed', () => {
       const now = Date.now();
       const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
@@ -106,6 +133,50 @@ describe('FailureStateService', () => {
       });
 
       expect(saved.retryCount).toBe(3);
+    });
+  });
+
+  describe('getCurrentState', () => {
+    it('returns the most recent failure state for an entity', async () => {
+      const record = new FailureStateEntity();
+      record.id = 'fail-1';
+      failureRepo.findOne.mockResolvedValue(record);
+
+      const result = await service.getCurrentState('tenant-1', 'company', '5560000001');
+
+      expect(failureRepo.findOne).toHaveBeenCalledWith({
+        where: { tenantId: 'tenant-1', entityType: 'company', entityId: '5560000001' },
+        order: { createdAt: 'DESC' },
+      });
+      expect(result).toBe(record);
+    });
+
+    it('returns null when no record exists', async () => {
+      failureRepo.findOne.mockResolvedValue(null);
+      const result = await service.getCurrentState('tenant-1', 'company', 'missing');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('listHistory', () => {
+    it('returns history ordered by createdAt desc and respects limit', async () => {
+      const record = new FailureStateEntity();
+      failureRepo.find.mockResolvedValue([record]);
+
+      const result = await service.listHistory('tenant-1', 'company', '5560000001', 5);
+
+      expect(failureRepo.find).toHaveBeenCalledWith({
+        where: { tenantId: 'tenant-1', entityType: 'company', entityId: '5560000001' },
+        order: { createdAt: 'DESC' },
+        take: 5,
+      });
+      expect(result).toEqual([record]);
+    });
+
+    it('returns empty array when no history exists', async () => {
+      failureRepo.find.mockResolvedValue([]);
+      const result = await service.listHistory('tenant-1', 'company', 'missing');
+      expect(result).toEqual([]);
     });
   });
 });

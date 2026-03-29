@@ -26,6 +26,13 @@ const BACKOFF_CONFIG = {
   baseDelayMs: 60_000,
   maxDelayMs: 15 * 60_000,
 } as const;
+const MAX_BACKOFF_EXPONENT =
+  BACKOFF_CONFIG.maxDelayMs >= BACKOFF_CONFIG.baseDelayMs
+    ? Math.max(
+        0,
+        Math.floor(Math.log2(BACKOFF_CONFIG.maxDelayMs / BACKOFF_CONFIG.baseDelayMs)),
+      )
+    : 0;
 
 export interface FailureClassification {
   failureState: FailureState;
@@ -356,7 +363,11 @@ export class FailureStateService {
   // ── Internal helpers ────────────────────────────────────────────────────────
 
   private computeBackoffMs(retryCount: number): number {
-    const exponent = Math.max(retryCount - 1, 0);
-    return Math.min(BACKOFF_CONFIG.baseDelayMs * 2 ** exponent, BACKOFF_CONFIG.maxDelayMs);
+    if (retryCount <= 1) {
+      return BACKOFF_CONFIG.baseDelayMs;
+    }
+    const exponent = retryCount - 1;
+    const cappedExponent = Math.min(exponent, MAX_BACKOFF_EXPONENT);
+    return BACKOFF_CONFIG.baseDelayMs * 2 ** cappedExponent;
   }
 }

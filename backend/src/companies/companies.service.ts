@@ -26,15 +26,21 @@ import {
   LookupCompanyResponseDto,
 } from './dto/lookup-company.dto';
 import { CompanyEntity } from './entities/company.entity';
-import { SnapshotPolicyDecision } from './entities/bv-fetch-snapshot.entity';
+import { BvFetchSnapshotEntity, SnapshotPolicyDecision } from './entities/bv-fetch-snapshot.entity';
 import { FailureStateService } from './services/failure-state.service';
 import { NormalisedCompany } from './integrations/bolagsverket.mapper';
+import {
+  DocumentListResponse,
+  HighValueDatasetResponse,
+  OrganisationInformationResponse,
+} from './integrations/bolagsverket.types';
 
 /** Timeout for external Bolagsverket API calls (ms). */
 const API_TIMEOUT_MS = 10_000;
 
 /** Stale threshold: data older than TTL but within this window is 'stale'. */
 const STALE_THRESHOLD_DAYS = CACHE_TTL_DAYS * 2; // 60 days
+const MS_PER_HOUR = 1000 * 60 * 60;
 
 type EnrichResponse = Awaited<ReturnType<BolagsverketService['enrichAndSave']>>;
 
@@ -489,14 +495,13 @@ export class CompaniesService {
     const cacheCheck = await this.bvCacheService.checkFreshness(tenantId, orgNumber);
     if (!cacheCheck || !cacheCheck.snapshot) return null;
 
-    const ageInHours =
-      (Date.now() - cacheCheck.snapshot.fetchedAt.getTime()) / (1000 * 60 * 60);
+    const ageHours = (Date.now() - cacheCheck.snapshot.fetchedAt.getTime()) / MS_PER_HOUR;
 
     let staleFallbackAllowed = true;
     try {
       const policyResult = await this.cachePolicyEvaluationService.evaluate(
         tenantId,
-        ageInHours,
+        ageHours,
         {
           entityType: 'company',
           entityId: orgNumber,
@@ -520,16 +525,20 @@ export class CompaniesService {
       return null;
     }
 
-    const updatedSnapshot = Object.assign(cacheCheck.snapshot, {
+    const updatedSnapshot: BvFetchSnapshotEntity = {
+      ...cacheCheck.snapshot,
       policyDecision: 'stale_fallback',
       isStaleFallback: true,
-    });
+    };
 
+    const rawSummary = (updatedSnapshot.rawPayloadSummary ?? {}) as Record<string, unknown>;
     const fallbackResult: EnrichResponse['result'] = {
       normalisedData: updatedSnapshot.normalisedSummary as unknown as NormalisedCompany,
-      highValueDataset: null,
-      organisationInformation: [],
-      documents: null,
+      highValueDataset:
+        (rawSummary.highValueDataset as HighValueDatasetResponse | undefined) ?? null,
+      organisationInformation:
+        (rawSummary.organisationInformation as OrganisationInformationResponse[] | undefined) ?? [],
+      documents: (rawSummary.documents as DocumentListResponse | undefined) ?? null,
       retrievedAt: updatedSnapshot.fetchedAt.toISOString(),
     };
 

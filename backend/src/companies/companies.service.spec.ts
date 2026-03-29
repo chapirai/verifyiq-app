@@ -85,6 +85,7 @@ describe('CompaniesService – orchestrateLookup', () => {
   let auditService: jest.Mocked<AuditService>;
   let failureStateService: jest.Mocked<FailureStateService>;
   let bvCacheService: jest.Mocked<BvCacheService>;
+  let cachePolicyEvaluationService: jest.Mocked<CachePolicyEvaluationService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -163,6 +164,7 @@ describe('CompaniesService – orchestrateLookup', () => {
     auditService = module.get(AuditService);
     failureStateService = module.get(FailureStateService);
     bvCacheService = module.get(BvCacheService);
+    cachePolicyEvaluationService = module.get(CachePolicyEvaluationService);
   });
 
   afterEach(() => {
@@ -314,7 +316,46 @@ describe('CompaniesService – orchestrateLookup', () => {
       expect(response.metadata.degraded).toBe(true);
       expect(response.metadata.failure_state).toBe('DEGRADED');
       expect(response.metadata.freshness).toBe('stale');
+      expect(response.company.organisationNumber).toBe(ORG_NR);
       expect(failureStateService.recordFailure).toHaveBeenCalled();
+    });
+
+    it('throws when provider fails and no cached data exists', async () => {
+      bolagsverketService.enrichAndSave.mockRejectedValue(new Error('API failure'));
+      bvCacheService.checkFreshness.mockResolvedValue({
+        isFresh: false,
+        snapshot: null,
+        ageInDays: null,
+      });
+
+      await expect(
+        service.orchestrateLookup(ctx, { orgNumber: ORG_NR }),
+      ).rejects.toThrow('API failure');
+    });
+
+    it('throws when policy disallows stale fallback', async () => {
+      bolagsverketService.enrichAndSave.mockRejectedValue(new Error('API failure'));
+      bvCacheService.checkFreshness.mockResolvedValue({
+        isFresh: false,
+        snapshot: makeSnapshot(40),
+        ageInDays: 40,
+      });
+      cachePolicyEvaluationService.evaluate = jest.fn().mockResolvedValue({
+        decision: 'provider_call',
+        isFresh: false,
+        isStale: false,
+        isExpired: true,
+        shouldTriggerRefresh: false,
+        staleFallbackAllowed: false,
+        costFlags: {},
+        policyId: 'default',
+        usedSystemDefault: true,
+        dataAgeHours: 999,
+      });
+
+      await expect(
+        service.orchestrateLookup(ctx, { orgNumber: ORG_NR }),
+      ).rejects.toThrow('API failure');
     });
   });
 
