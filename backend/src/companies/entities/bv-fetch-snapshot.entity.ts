@@ -1,12 +1,35 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { createHash } from 'crypto';
 
 /** How the fetch decision was made for this snapshot. */
 export type SnapshotPolicyDecision = 'cache_hit' | 'fresh_fetch' | 'force_refresh' | 'stale_fallback';
+
+/**
+ * Generate a deterministic, immutable replay-safe identifier for a snapshot.
+ *
+ * The ID is a SHA-256 digest of `{tenantId}:{orgNr}:{snapshotId}:{payloadHash}`
+ * prefixed with "rp-" for human readability.  Two snapshots with identical
+ * inputs always produce the same replay ID — enabling content-addressable
+ * storage compatibility while remaining globally unique (P02-T07).
+ */
+export function generateReplayId(
+  tenantId: string,
+  organisationsnummer: string,
+  snapshotId: string,
+  payloadHash?: string | null,
+): string {
+  const payload = `${tenantId}:${organisationsnummer}:${snapshotId}:${payloadHash ?? ''}`;
+  const digest = createHash('sha256').update(payload, 'utf8').digest('hex');
+  return `rp-${digest.slice(0, 48)}`;
+}
 
 @Entity({ name: 'bolagsverket_fetch_snapshots' })
 @Index(['tenantId', 'organisationsnummer', 'fetchedAt'])
 @Index(['tenantId', 'organisationsnummer', 'isFromCache'])
 @Index(['tenantId', 'correlationId'])
+// P02-T07: version chain traversal indexes
+@Index(['previousSnapshotId'])
+@Index(['tenantId', 'organisationsnummer', 'sequenceNumber'])
 export class BvFetchSnapshotEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -109,4 +132,48 @@ export class BvFetchSnapshotEntity {
    */
   @Column({ name: 'raw_payload_id', type: 'uuid', nullable: true })
   rawPayloadId?: string | null;
+
+  // ── P02-T07: Version chain fields ─────────────────────────────────────────
+
+  /**
+   * ID of the preceding snapshot in the version chain for this entity.
+   * Null for the first snapshot in a chain.  Forms a linked-list structure
+   * enabling backwards traversal: snapshot → previousSnapshot → … → root.
+   */
+  @Column({ name: 'previous_snapshot_id', type: 'uuid', nullable: true })
+  previousSnapshotId?: string | null;
+
+  /**
+   * Monotonically increasing version counter per (tenant, organisationsnummer).
+   * First snapshot = 1, each subsequent snapshot increments by 1.
+   * Used for human-readable version references and sequence integrity checks.
+   */
+  @Column({ name: 'version_number', type: 'integer', default: 1 })
+  versionNumber!: number;
+
+  /**
+   * Sequence number for chain ordering within the tenant scope.
+   * Assigned at link time; equals versionNumber for per-entity chains.
+   * Reserved for cross-entity chain extensions in future phases.
+   */
+  @Column({ name: 'sequence_number', type: 'integer', default: 1 })
+  sequenceNumber!: number;
+
+  /**
+   * Replay-safe immutable identifier for this snapshot.
+   *
+   * Generated deterministically as `rp-<sha256(tenantId:orgNr:snapshotId:payloadHash)[:48]>`.
+   * Remains valid even if the underlying storage strategy changes, enabling
+   * content-addressable retrieval and safe external references (P02-T07).
+   */
+  @Column({ name: 'replay_id', type: 'varchar', length: 64, nullable: true, unique: true })
+  replayId?: string | null;
+
+  /**
+   * Set to true when the chain link to previousSnapshotId is known to be
+   * broken (predecessor is missing or invalid).  Preserved for visibility
+   * rather than silently repaired — see SnapshotChainService.reconstructChain.
+   */
+  @Column({ name: 'chain_broken', type: 'boolean', default: false })
+  chainBroken!: boolean;
 }
