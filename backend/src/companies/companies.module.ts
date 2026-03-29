@@ -18,6 +18,9 @@ import { BvCacheService } from './services/bv-cache.service';
 import { BvPersistenceService } from './services/bv-persistence.service';
 import { BvDocumentStorageService } from './services/bv-document-storage.service';
 import { SnapshotQueryService } from './services/snapshot-query.service';
+import { RawPayloadStorageService } from './services/raw-payload-storage.service';
+import { RawPayloadQueryService } from './services/raw-payload-query.service';
+import { BvRawPayloadEntity } from './entities/bv-raw-payload.entity';
 import { BolagsverketController } from './controllers/bolagsverket.controller';
 
 @Module({
@@ -29,6 +32,7 @@ import { BolagsverketController } from './controllers/bolagsverket.controller';
       BvApiCallEntity,
       BvFetchSnapshotEntity,
       BvStoredDocumentEntity,
+      BvRawPayloadEntity,
     ]),
     HttpModule,
     AuditModule,
@@ -44,6 +48,8 @@ import { BolagsverketController } from './controllers/bolagsverket.controller';
     BvPersistenceService,
     BvDocumentStorageService,
     SnapshotQueryService,
+    RawPayloadStorageService,
+    RawPayloadQueryService,
   ],
   exports: [
     CompaniesService,
@@ -52,6 +58,8 @@ import { BolagsverketController } from './controllers/bolagsverket.controller';
     BvPersistenceService,
     BvDocumentStorageService,
     SnapshotQueryService,
+    RawPayloadStorageService,
+    RawPayloadQueryService,
   ],
 })
 export class CompaniesModule {}

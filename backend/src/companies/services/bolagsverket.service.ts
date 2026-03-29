@@ -15,6 +15,7 @@ import {
 import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
 import { BvFetchSnapshotEntity } from '../entities/bv-fetch-snapshot.entity';
+import { RawPayloadStorageService } from './raw-payload-storage.service';
 
 /** Allowed tolerance when validating share-capital arithmetic (1 %). */
 const SHARE_CAPITAL_TOLERANCE = 0.01;
@@ -63,6 +64,7 @@ export class BolagsverketService {
     private readonly mapper: BolagsverketMapper,
     private readonly bvCacheService: BvCacheService,
     private readonly bvPersistenceService: BvPersistenceService,
+    private readonly rawPayloadStorageService: RawPayloadStorageService,
   ) {}
 
   // ── Health ──────────────────────────────────────────────────────────────────
@@ -412,7 +414,36 @@ export class BolagsverketService {
         organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
       });
 
-      // 4. Create snapshot record
+      // 4. Store raw payload with checksum-based deduplication (P02-T02)
+      let rawPayloadId: string | null = null;
+      try {
+        const rawContent: Record<string, unknown> = {
+          highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
+          organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
+        };
+        const { rawPayload } = await this.rawPayloadStorageService.storeRawPayload({
+          tenantId,
+          providerSource: 'bolagsverket',
+          organisationsnummer: identitetsbeteckning,
+          content: rawContent,
+          metadata: {
+            retrievedAt: result.retrievedAt,
+            apiCallCount,
+            correlationId: correlationId ?? null,
+            actorId: actorId ?? null,
+          },
+          payloadVersion: '1',
+          // snapshotId will be backfilled after snapshot creation below
+        });
+        rawPayloadId = rawPayload.id;
+      } catch (rawPayloadErr) {
+        // Storage failure is non-blocking — snapshot creation continues
+        this.logger.warn(
+          `Raw payload storage failed for ${identitetsbeteckning} (tenant ${tenantId}): ${rawPayloadErr}`,
+        );
+      }
+
+      // 5. Create snapshot record
       const snapshot = await this.bvCacheService.createSnapshot({
         tenantId,
         organisationId: org.id,
@@ -431,6 +462,7 @@ export class BolagsverketService {
         policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
         costImpactFlags: { apiCallCharged: true, apiCallCount },
         isStaleFallback: false,
+        rawPayloadId,
       });
 
       return { result, snapshot, isFromCache: false, ageInDays: null };

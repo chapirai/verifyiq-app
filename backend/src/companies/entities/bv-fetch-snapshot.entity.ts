@@ -98,4 +98,15 @@ export class BvFetchSnapshotEntity {
    */
   @Column({ name: 'is_stale_fallback', type: 'boolean', default: false })
   isStaleFallback!: boolean;
+
+  // ── P02-T02: Raw payload linkage ───────────────────────────────────────────
+
+  /**
+   * FK to the BvRawPayload record that holds the full provider response
+   * produced during this snapshot's fetch.  Null when:
+   *   • the snapshot was served from cache (no fresh fetch occurred), or
+   *   • raw-payload storage failed (graceful degradation).
+   */
+  @Column({ name: 'raw_payload_id', type: 'uuid', nullable: true })
+  rawPayloadId?: string | null;
 }

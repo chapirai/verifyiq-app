@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpException, InternalServerErrorException, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpException, InternalServerErrorException, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import {
   BolagsverketArendeDto,
@@ -15,6 +15,19 @@ import { BolagsverketService } from '../services/bolagsverket.service';
 import { BvCacheService } from '../services/bv-cache.service';
 import { BvDocumentStorageService } from '../services/bv-document-storage.service';
 import { SnapshotQueryService } from '../services/snapshot-query.service';
+import { RawPayloadQueryService } from '../services/raw-payload-query.service';
+
+/** Roles that are authorised to access raw provider payloads. */
+const RAW_PAYLOAD_ALLOWED_ROLES = ['admin', 'compliance'] as const;
+
+function assertRawPayloadAccess(req: any): void {
+  const role = (req.user?.role ?? req.user?.roles?.[0]) as string | undefined;
+  if (!role || !(RAW_PAYLOAD_ALLOWED_ROLES as readonly string[]).includes(role)) {
+    throw new ForbiddenException(
+      'Raw payload access is restricted to admin and compliance roles.',
+    );
+  }
+}
 
 @Controller('bolagsverket')
 @UseGuards(JwtAuthGuard)
@@ -24,6 +37,7 @@ export class BolagsverketController {
     private readonly bvCacheService: BvCacheService,
     private readonly bvDocumentStorageService: BvDocumentStorageService,
     private readonly snapshotQueryService: SnapshotQueryService,
+    private readonly rawPayloadQueryService: RawPayloadQueryService,
   ) {}
 
   /** GET /bolagsverket/health – check Bolagsverket API availability. */
@@ -259,5 +273,80 @@ export class BolagsverketController {
   @Get('stored-documents/:id/download')
   async downloadStoredDocument(@Param('id') id: string) {
     return this.bvDocumentStorageService.getDownloadUrl(id);
+  }
+
+  // ── Raw Payload endpoints (P02-T02) ────────────────────────────────────────
+  // All raw-payload routes are permission-gated: admin and compliance only.
+
+  /**
+   * GET /bolagsverket/raw-payloads/:id
+   * Retrieve a raw payload by ID.
+   * Restricted to admin / compliance roles.
+   */
+  @Get('raw-payloads/:id')
+  async getRawPayloadById(@Param('id') id: string, @Req() req: any) {
+    assertRawPayloadAccess(req);
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.rawPayloadQueryService.getById(tenantId, id, actorId);
+  }
+
+  /**
+   * GET /bolagsverket/raw-payloads/by-snapshot/:snapshotId
+   * Retrieve the raw payload linked to a specific snapshot.
+   * Restricted to admin / compliance roles.
+   */
+  @Get('raw-payloads/by-snapshot/:snapshotId')
+  async getRawPayloadBySnapshot(@Param('snapshotId') snapshotId: string, @Req() req: any) {
+    assertRawPayloadAccess(req);
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.rawPayloadQueryService.getBySnapshotId(tenantId, snapshotId, actorId);
+  }
+
+  /**
+   * GET /bolagsverket/raw-payloads/by-checksum?checksum=…
+   * Find all raw payloads with a specific checksum (deduplication audit).
+   * Restricted to admin / compliance roles.
+   */
+  @Get('raw-payloads/by-checksum')
+  async getRawPayloadsByChecksum(@Query('checksum') checksum: string, @Req() req: any) {
+    assertRawPayloadAccess(req);
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    return this.rawPayloadQueryService.getByChecksum(tenantId, checksum);
+  }
+
+  /**
+   * GET /bolagsverket/raw-payloads/by-provider?source=…&limit=…
+   * List raw payloads from a specific provider source.
+   * Restricted to admin / compliance roles.
+   */
+  @Get('raw-payloads/by-provider')
+  async getRawPayloadsByProvider(
+    @Query('source') source: string,
+    @Query('limit') limit: string | undefined,
+    @Req() req: any,
+  ) {
+    assertRawPayloadAccess(req);
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const take = limit ? Math.min(parseInt(limit, 10), 100) : 50;
+    return this.rawPayloadQueryService.listByProviderSource(tenantId, source, take);
+  }
+
+  /**
+   * GET /bolagsverket/raw-payloads/by-org?orgNr=…&limit=…
+   * List raw payloads for a specific organisation.
+   * Restricted to admin / compliance roles.
+   */
+  @Get('raw-payloads/by-org')
+  async getRawPayloadsByOrg(
+    @Query('orgNr') orgNr: string,
+    @Query('limit') limit: string | undefined,
+    @Req() req: any,
+  ) {
+    assertRawPayloadAccess(req);
+    const tenantId = (req.user?.tenantId as string | undefined) ?? 'demo-tenant';
+    const take = limit ? Math.min(parseInt(limit, 10), 100) : 50;
+    return this.rawPayloadQueryService.listByOrganisationsnummer(tenantId, orgNr, take);
   }
 }
