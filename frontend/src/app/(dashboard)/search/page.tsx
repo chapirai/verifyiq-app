@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { useRecentSearches } from '@/hooks/use-recent-searches';
 
 interface ApiError {
-  response?: { status?: number; data?: { message?: string } };
+  response?: { status?: number; data?: { message?: string | string[] } };
   message?: string;
 }
 
@@ -18,12 +18,20 @@ function isApiError(err: unknown): err is ApiError {
 function getErrorMessage(err: unknown): string {
   const apiErr = isApiError(err) ? err : null;
   const status = apiErr?.response?.status;
-  if (status != null && status >= 500) return 'Service is temporarily unavailable. Please try again.';
+  const apiMessage = apiErr?.response?.data?.message;
+  const resolvedApiMessage = Array.isArray(apiMessage)
+    ? apiMessage.filter(Boolean).join(' ')
+    : apiMessage;
+  if (status != null && status >= 500) {
+    return typeof resolvedApiMessage === 'string' && resolvedApiMessage.trim().length > 0
+      ? resolvedApiMessage
+      : 'Service is temporarily unavailable. Please try again.';
+  }
   if (err instanceof Error && err.message.toLowerCase().includes('timeout'))
     return 'Request timed out. Please try again.';
   if (err instanceof Error && err.message.toLowerCase().includes('network'))
     return 'Network error. Please check your connection and try again.';
-  const msg = apiErr?.response?.data?.message ?? (err instanceof Error ? err.message : null);
+  const msg = resolvedApiMessage ?? (err instanceof Error ? err.message : null);
   return typeof msg === 'string' ? msg : 'An unexpected error occurred.';
 }
 
