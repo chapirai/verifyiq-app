@@ -21,7 +21,7 @@ export class JwtAuthGuard implements CanActivate {
     const tenantId = Array.isArray(headerTenantId) ? headerTenantId[0] : headerTenantId;
 
     request.user = request.user ?? {
-      sub: 'system-user',
+      sub: null,
       tenantId: tenantId ?? DEFAULT_TENANT_ID,
       roles: ['admin'],
     };

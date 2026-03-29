@@ -17,6 +17,7 @@ describe('JwtAuthGuard', () => {
 
     expect(guard.canActivate(makeContext(request))).toBe(true);
     expect(request.user?.tenantId).toBe(DEFAULT_TENANT_ID);
+    expect(request.user?.sub).toBeNull();
   });
 
   it('uses tenantId from header when provided', () => {
@@ -28,5 +29,6 @@ describe('JwtAuthGuard', () => {
 
     expect(guard.canActivate(makeContext(request))).toBe(true);
     expect(request.user?.tenantId).toBe(customTenantId);
+    expect(request.user?.sub).toBeNull();
   });
 });
