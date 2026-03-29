@@ -55,7 +55,7 @@ export function SourcePanel({ data, loading, error, onRetry }: SourcePanelProps)
         <dl className="space-y-3 text-sm text-slate-300">
           <div className="flex items-center justify-between gap-4">
             <dt className="text-slate-500">Provider</dt>
-            <dd className="text-right text-white capitalize">{data.provider_name ?? '—'}</dd>
+            <dd className="text-right text-white">{data.provider_name ?? '—'}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="text-slate-500">Endpoint used</dt>

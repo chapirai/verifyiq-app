@@ -44,9 +44,10 @@ function resolveBaseFreshness(
   freshnessWindowHours: number,
   maxAgeHours: number,
 ): 'fresh' | 'stale' {
-  if (Number.isNaN(ageHours) || ageHours < 0) return 'stale';
-  if (ageHours < freshnessWindowHours) return 'fresh';
-  if (ageHours < maxAgeHours) return 'stale';
+  if (!Number.isFinite(ageHours)) return 'stale';
+  const normalizedAge = Math.max(0, ageHours);
+  if (normalizedAge < freshnessWindowHours) return 'fresh';
+  if (normalizedAge < maxAgeHours) return 'stale';
   return 'stale';
 }
 

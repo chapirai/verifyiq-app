@@ -53,7 +53,8 @@ export class CompaniesController {
     @Param('orgNumber') orgNumber: string,
     @Query('limit') limit?: string,
   ) {
-    const take = limit ? Math.min(parseInt(limit, 10), 100) : 20;
+    const parsedLimit = Number.parseInt(limit ?? '', 10);
+    const take = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 20;
     return this.companyMetadataService.getSnapshotHistory(tenantId, orgNumber, take);
   }
 }
