@@ -19,6 +19,8 @@ import { RawPayloadStorageService } from './raw-payload-storage.service';
 import { CachePolicyEvaluationService } from './cache-policy-evaluation.service';
 import { SnapshotChainService } from './snapshot-chain.service';
 import { SnapshotComparisonService } from './snapshot-comparison.service';
+import { AuditEventType } from '../../audit/audit-event.entity';
+import { AuditService } from '../../audit/audit.service';
 
 /** Allowed tolerance when validating share-capital arithmetic (1 %). */
 const SHARE_CAPITAL_TOLERANCE = 0.01;
@@ -71,6 +73,7 @@ export class BolagsverketService {
     private readonly cachePolicyEvaluationService: CachePolicyEvaluationService,
     private readonly snapshotChainService: SnapshotChainService,
     private readonly snapshotComparisonService: SnapshotComparisonService,
+    private readonly auditService: AuditService,
   ) {}
 
   // ── Health ──────────────────────────────────────────────────────────────────
@@ -354,17 +357,41 @@ export class BolagsverketService {
     isFromCache: boolean;
     ageInDays: number | null;
   }> {
+    const actor = actorId ?? null;
+    const correlation = correlationId ?? null;
+    const eventContext = {
+      orgNumber: identitetsbeteckning,
+      forceRefresh,
+    };
+    let cacheCheck: Awaited<ReturnType<BvCacheService['checkFreshness']>> | null = null;
+    let policyDecisionLabel: SnapshotPolicyDecision | null = null;
+    let isStaleFallback = false;
+    let shouldServeCache = false;
+
+    if (forceRefresh) {
+      void this.auditService.emitAuditEvent({
+        tenantId,
+        userId: actor,
+        eventType: AuditEventType.FORCE_REFRESH,
+        action: 'company.refresh',
+        status: 'requested',
+        resourceId: identitetsbeteckning,
+        correlationId: correlation,
+        metadata: eventContext,
+      });
+    }
+
     // 1. Check cache — then evaluate against the configured policy
     if (!forceRefresh) {
-      const cacheCheck = await this.bvCacheService.checkFreshness(tenantId, identitetsbeteckning);
+      cacheCheck = await this.bvCacheService.checkFreshness(tenantId, identitetsbeteckning);
       if (cacheCheck.snapshot) {
         // Compute age in fractional hours for precise policy evaluation
         const ageInHours =
           (Date.now() - cacheCheck.snapshot.fetchedAt.getTime()) / (1000 * 60 * 60);
 
-        let policyDecisionLabel: SnapshotPolicyDecision = 'cache_hit';
-        let isStaleFallback = false;
-        let shouldServeCache = false;
+        policyDecisionLabel = 'cache_hit';
+        isStaleFallback = false;
+        shouldServeCache = false;
 
         try {
           const policyResult = await this.cachePolicyEvaluationService.evaluate(
@@ -401,6 +428,24 @@ export class BolagsverketService {
           this.logger.log(
             `Cache hit for ${identitetsbeteckning} (age: ${cacheCheck.ageInDays} days, policy: ${policyDecisionLabel})`,
           );
+          const cacheEventType = isStaleFallback
+            ? AuditEventType.STALE_SERVED
+            : AuditEventType.CACHE_HIT;
+          const cacheStatus = isStaleFallback ? 'stale_served' : 'hit';
+          void this.auditService.emitAuditEvent({
+            tenantId,
+            userId: actor,
+            eventType: cacheEventType,
+            action: 'company.cache',
+            status: cacheStatus,
+            resourceId: identitetsbeteckning,
+            correlationId: correlation,
+            metadata: {
+              ...eventContext,
+              cacheDecision: policyDecisionLabel,
+              ageInDays: cacheCheck.ageInDays,
+            },
+          });
           // Update the snapshot record to reflect the current policy decision
           const updatedSnapshot = Object.assign(cacheCheck.snapshot, {
             policyDecision: policyDecisionLabel,
@@ -420,6 +465,31 @@ export class BolagsverketService {
             ageInDays: cacheCheck.ageInDays,
           };
         }
+        void this.auditService.emitAuditEvent({
+          tenantId,
+          userId: actor,
+          eventType: AuditEventType.CACHE_MISS,
+          action: 'company.cache',
+          status: 'refresh_required',
+          resourceId: identitetsbeteckning,
+          correlationId: correlation,
+          metadata: {
+            ...eventContext,
+            cacheDecision: policyDecisionLabel,
+            ageInDays: cacheCheck.ageInDays,
+          },
+        });
+      } else {
+        void this.auditService.emitAuditEvent({
+          tenantId,
+          userId: actor,
+          eventType: AuditEventType.CACHE_MISS,
+          action: 'company.cache',
+          status: 'no_snapshot',
+          resourceId: identitetsbeteckning,
+          correlationId: correlation,
+          metadata: eventContext,
+        });
       }
     }
 
@@ -428,6 +498,41 @@ export class BolagsverketService {
     let errorMessage: string | undefined;
     let result!: CompleteCompanyProfile;
     let apiCallCount = 0;
+    const triggerType = forceRefresh
+      ? 'force_refresh'
+      : cacheCheck?.snapshot
+        ? 'stale_refresh'
+        : 'cache_miss';
+
+    void this.auditService.emitAuditEvent({
+      tenantId,
+      userId: actor,
+      eventType: AuditEventType.REFRESH_INITIATED,
+      action: 'company.refresh',
+      status: 'initiated',
+      resourceId: identitetsbeteckning,
+      correlationId: correlation,
+      metadata: {
+        ...eventContext,
+        triggerType,
+        cacheDecision: policyDecisionLabel,
+        providerCall: true,
+      },
+    });
+    void this.auditService.emitAuditEvent({
+      tenantId,
+      userId: actor,
+      eventType: AuditEventType.PROVIDER_CALLED,
+      action: 'company.provider_call',
+      status: 'started',
+      resourceId: identitetsbeteckning,
+      correlationId: correlation,
+      costImpact: { apiCallCount: ENRICH_API_CALL_COUNT },
+      metadata: {
+        ...eventContext,
+        triggerType,
+      },
+    });
 
     try {
       result = await this.getCompleteCompanyData(identitetsbeteckning);
@@ -456,6 +561,22 @@ export class BolagsverketService {
       } catch (snapshotErr) {
         this.logger.error(`Failed to create error snapshot for ${identitetsbeteckning}: ${snapshotErr}`);
       }
+      void this.auditService.emitAuditEvent({
+        tenantId,
+        userId: actor,
+        eventType: AuditEventType.REFRESH_COMPLETED,
+        action: 'company.refresh',
+        status: 'error',
+        resourceId: identitetsbeteckning,
+        correlationId: correlation,
+        costImpact: { apiCallCount: 0 },
+        metadata: {
+          ...eventContext,
+          triggerType,
+          resultStatus: 'error',
+          error: errorMessage,
+        },
+      });
       throw err;
     }
 
@@ -525,6 +646,24 @@ export class BolagsverketService {
         ),
       );
 
+      void this.auditService.emitAuditEvent({
+        tenantId,
+        userId: actor,
+        eventType: AuditEventType.REFRESH_COMPLETED,
+        action: 'company.refresh',
+        status: fetchStatus,
+        resourceId: identitetsbeteckning,
+        correlationId: correlation,
+        costImpact: { apiCallCount },
+        metadata: {
+          ...eventContext,
+          triggerType,
+          resultStatus: fetchStatus,
+          snapshotId: snapshot.id,
+          apiCallCount,
+        },
+      });
+
       return { result, snapshot, isFromCache: false, ageInDays: null };
     } catch (persistErr) {
       const snapshot = await this.bvCacheService.createSnapshot({
@@ -544,6 +683,24 @@ export class BolagsverketService {
         policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
         costImpactFlags: { apiCallCharged: true, apiCallCount },
         isStaleFallback: false,
+      });
+      void this.auditService.emitAuditEvent({
+        tenantId,
+        userId: actor,
+        eventType: AuditEventType.REFRESH_COMPLETED,
+        action: 'company.refresh',
+        status: 'partial',
+        resourceId: identitetsbeteckning,
+        correlationId: correlation,
+        costImpact: { apiCallCount },
+        metadata: {
+          ...eventContext,
+          triggerType,
+          resultStatus: 'partial',
+          snapshotId: snapshot.id,
+          apiCallCount,
+          error: String(persistErr),
+        },
       });
       return { result, snapshot, isFromCache: false, ageInDays: null };
     }

@@ -2,6 +2,7 @@ import { GatewayTimeoutException, Injectable, Logger, NotFoundException } from '
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
+import { AuditEventType } from '../audit/audit-event.entity';
 import { AuditService } from '../audit/audit.service';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { ListCompaniesDto } from './dto/list-companies.dto';
@@ -94,10 +95,27 @@ export class CompaniesService {
     dto: LookupCompanyDto,
     correlationId: string,
   ): Promise<LookupCompanyResponseDto> {
+    const actorId = ctx.actorId ?? null;
+    const lookupMetadata = {
+      orgNumber: dto.orgNumber,
+      forceRefresh: dto.force_refresh ?? false,
+    };
+
+    void this.auditService.emitAuditEvent({
+      tenantId: ctx.tenantId,
+      userId: actorId,
+      eventType: AuditEventType.LOOKUP_INITIATED,
+      action: 'company.lookup',
+      status: 'initiated',
+      resourceId: dto.orgNumber,
+      correlationId,
+      metadata: lookupMetadata,
+    });
+
     // P02-T06: Capture lineage metadata (best-effort; never throws).
     this.lineageCapture.capture({
       tenantId: ctx.tenantId,
-      userId: ctx.actorId ?? null,
+      userId: actorId,
       correlationId,
       triggerType: LineageMetadataCaptureService.resolveTriggerType({
         forceRefresh: dto.force_refresh ?? false,
@@ -115,100 +133,188 @@ export class CompaniesService {
     // BolagsverketService resolves the actual cache state and re-evaluates
     // policy internally.  This call serves as an explicit orchestration hook
     // for quota checks and produces an audit trail of the intent to refresh.
-    const refreshDecision = await this.refreshDecisionService.decide({
-      tenantId: ctx.tenantId,
-      dataAgeHours: 0,
-      forceRefresh: dto.force_refresh ?? false,
-      entityId: dto.orgNumber,
-      entityType: 'company',
-      correlationId,
-      actorId: ctx.actorId ?? null,
-    });
+    let refreshDecision: Awaited<ReturnType<RefreshDecisionService['decide']>> | null = null;
 
-    this.logger.log(
-      `[${correlationId}] [P02-T05] refresh decision: serve_from=${refreshDecision.serve_from} reason=${refreshDecision.reason}`,
-    );
-
-    const enrichPromise = this.bolagsverketService.enrichAndSave(
-      ctx.tenantId,
-      dto.orgNumber,
-      dto.force_refresh ?? false,
-      correlationId,
-      ctx.actorId ?? null,
-    );
-
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new GatewayTimeoutException('Bolagsverket API request timed out')),
-        API_TIMEOUT_MS,
-      ),
-    );
-
-    const { result, snapshot, isFromCache, ageInDays } = await Promise.race([
-      enrichPromise,
-      timeoutPromise,
-    ]);
-
-    const source = isFromCache ? 'DB' : 'API';
-    const ageDays = ageInDays ?? 0;
-    const fetchedAt = isFromCache
-      ? snapshot.fetchedAt.toISOString()
-      : result.retrievedAt;
-
-    // Resolve the effective policy for freshness metadata (best-effort; fallback to defaults)
-    let freshnessWindowHours = CACHE_TTL_DAYS * 24;
-    let maxAgeHours = STALE_THRESHOLD_DAYS * 24;
     try {
-      const policy = await this.cachePolicyEvaluationService.getPolicyForTenant(ctx.tenantId);
-      if (policy) {
-        freshnessWindowHours = policy.freshnessWindowHours;
-        maxAgeHours = policy.maxAgeHours;
-      }
-    } catch {
-      // Non-blocking: safe to ignore — defaults are used
-    }
-
-    const metadata: CompanyMetadataDto = {
-      source,
-      fetched_at: fetchedAt,
-      age_days: ageDays,
-      freshness: computeFreshness(ageDays, freshnessWindowHours, maxAgeHours),
-      cache_ttl_days: CACHE_TTL_DAYS,
-      snapshot_id: snapshot.id,
-      correlation_id: correlationId,
-      policy_decision: snapshot.policyDecision ?? (isFromCache ? 'cache_hit' : 'fresh_fetch'),
-    };
-
-    const company = result.normalisedData as unknown as Record<string, unknown>;
-
-    this.logger.log(
-      `[${correlationId}] Lookup complete source=${source} age=${ageDays}d freshness=${metadata.freshness} snapshotId=${snapshot.id}`,
-    );
-
-    await this.auditService.log({
-      tenantId: ctx.tenantId,
-      actorId: ctx.actorId ?? null,
-      action: 'company.lookup',
-      resourceType: 'company',
-      resourceId: dto.orgNumber,
-      metadata: {
-        correlationId,
-        source,
-        orgNumber: dto.orgNumber,
-        ageDays,
-        freshness: metadata.freshness,
+      refreshDecision = await this.refreshDecisionService.decide({
+        tenantId: ctx.tenantId,
+        dataAgeHours: 0,
         forceRefresh: dto.force_refresh ?? false,
-        snapshotId: snapshot.id,
-        policyDecision: metadata.policy_decision,
-        refreshDecision: {
-          serve_from: refreshDecision.serve_from,
-          reason: refreshDecision.reason,
-          cost_flags: refreshDecision.cost_flags,
-        },
-      },
-    });
+        entityId: dto.orgNumber,
+        entityType: 'company',
+        correlationId,
+        actorId,
+      });
 
-    return { company, metadata };
+      this.logger.log(
+        `[${correlationId}] [P02-T05] refresh decision: serve_from=${refreshDecision.serve_from} reason=${refreshDecision.reason}`,
+      );
+
+      const enrichPromise = this.bolagsverketService.enrichAndSave(
+        ctx.tenantId,
+        dto.orgNumber,
+        dto.force_refresh ?? false,
+        correlationId,
+        actorId,
+      );
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new GatewayTimeoutException('Bolagsverket API request timed out')),
+          API_TIMEOUT_MS,
+        ),
+      );
+
+      const { result, snapshot, isFromCache, ageInDays } = await Promise.race([
+        enrichPromise,
+        timeoutPromise,
+      ]);
+
+      const source = isFromCache ? 'DB' : 'API';
+      const ageDays = ageInDays ?? 0;
+      const fetchedAt = isFromCache
+        ? snapshot.fetchedAt.toISOString()
+        : result.retrievedAt;
+
+      // Resolve the effective policy for freshness metadata (best-effort; fallback to defaults)
+      let freshnessWindowHours = CACHE_TTL_DAYS * 24;
+      let maxAgeHours = STALE_THRESHOLD_DAYS * 24;
+      try {
+        const policy = await this.cachePolicyEvaluationService.getPolicyForTenant(ctx.tenantId);
+        if (policy) {
+          freshnessWindowHours = policy.freshnessWindowHours;
+          maxAgeHours = policy.maxAgeHours;
+        }
+      } catch {
+        // Non-blocking: safe to ignore — defaults are used
+      }
+
+      const metadata: CompanyMetadataDto = {
+        source,
+        fetched_at: fetchedAt,
+        age_days: ageDays,
+        freshness: computeFreshness(ageDays, freshnessWindowHours, maxAgeHours),
+        cache_ttl_days: CACHE_TTL_DAYS,
+        snapshot_id: snapshot.id,
+        correlation_id: correlationId,
+        policy_decision: snapshot.policyDecision ?? (isFromCache ? 'cache_hit' : 'fresh_fetch'),
+      };
+
+      const company = result.normalisedData as unknown as Record<string, unknown>;
+
+      this.logger.log(
+        `[${correlationId}] Lookup complete source=${source} age=${ageDays}d freshness=${metadata.freshness} snapshotId=${snapshot.id}`,
+      );
+
+      await this.auditService.log({
+        tenantId: ctx.tenantId,
+        actorId,
+        action: 'company.lookup',
+        resourceType: 'company',
+        resourceId: dto.orgNumber,
+        metadata: {
+          correlationId,
+          source,
+          orgNumber: dto.orgNumber,
+          ageDays,
+          freshness: metadata.freshness,
+          forceRefresh: dto.force_refresh ?? false,
+          snapshotId: snapshot.id,
+          policyDecision: metadata.policy_decision,
+          refreshDecision: refreshDecision
+            ? {
+                serve_from: refreshDecision.serve_from,
+                reason: refreshDecision.reason,
+                cost_flags: refreshDecision.cost_flags,
+              }
+            : null,
+        },
+      });
+
+      const costImpact = {
+        source,
+        provider_call: !isFromCache,
+        api_call_count: snapshot.apiCallCount ?? 0,
+        force_refresh: dto.force_refresh ?? false,
+        policy_decision: metadata.policy_decision,
+        refresh_cost_flags: refreshDecision?.cost_flags ?? {},
+        snapshot_cost_flags: snapshot.costImpactFlags ?? {},
+      };
+
+      void this.auditService.emitAuditEvent({
+        tenantId: ctx.tenantId,
+        userId: actorId,
+        eventType: AuditEventType.LOOKUP_COMPLETED,
+        action: 'company.lookup',
+        status: 'success',
+        resourceId: dto.orgNumber,
+        correlationId,
+        costImpact,
+        metadata: {
+          ...lookupMetadata,
+          source,
+          cacheDecision: metadata.policy_decision,
+          providerCall: !isFromCache,
+          resultStatus: snapshot.fetchStatus,
+          snapshotId: snapshot.id,
+        },
+      });
+
+      void this.auditService.emitUsageEvent({
+        tenantId: ctx.tenantId,
+        userId: actorId,
+        eventType: AuditEventType.LOOKUP_COMPLETED,
+        action: 'company.lookup',
+        status: 'success',
+        resourceId: dto.orgNumber,
+        correlationId,
+        costImpact,
+        metadata: {
+          source,
+          snapshotId: snapshot.id,
+        },
+      });
+
+      return { company, metadata };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      void this.auditService.emitAuditEvent({
+        tenantId: ctx.tenantId,
+        userId: actorId,
+        eventType: AuditEventType.LOOKUP_COMPLETED,
+        action: 'company.lookup',
+        status: 'error',
+        resourceId: dto.orgNumber,
+        correlationId,
+        costImpact: {
+          force_refresh: dto.force_refresh ?? false,
+          refresh_cost_flags: refreshDecision?.cost_flags ?? {},
+        },
+        metadata: {
+          ...lookupMetadata,
+          resultStatus: 'error',
+          error: errorMessage,
+        },
+      });
+
+      void this.auditService.emitUsageEvent({
+        tenantId: ctx.tenantId,
+        userId: actorId,
+        eventType: AuditEventType.LOOKUP_COMPLETED,
+        action: 'company.lookup',
+        status: 'error',
+        resourceId: dto.orgNumber,
+        correlationId,
+        costImpact: {
+          force_refresh: dto.force_refresh ?? false,
+        },
+        metadata: {
+          error: errorMessage,
+        },
+      });
+
+      throw err;
+    }
   }
 
   /** @deprecated Use orchestrateLookup instead. Kept for backward compatibility. */

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BvRawPayloadEntity } from '../entities/bv-raw-payload.entity';
+import { AuditEventType } from '../../audit/audit-event.entity';
 import { AuditService } from '../../audit/audit.service';
 
 @Injectable()
@@ -26,6 +27,18 @@ export class RawPayloadQueryService {
     actorId?: string | null,
   ): Promise<BvRawPayloadEntity | null> {
     const record = await this.rawPayloadRepo.findOne({ where: { id, tenantId } });
+    void this.auditService.emitAuditEvent({
+      tenantId,
+      userId: actorId ?? null,
+      eventType: AuditEventType.SENSITIVE_ACCESS,
+      action: 'raw_payload.access',
+      status: 'granted',
+      resourceId: id,
+      metadata: {
+        accessType: 'by_id',
+        recordFound: Boolean(record),
+      },
+    });
     if (record) {
       await this.auditService.log({
         tenantId,
@@ -49,6 +62,19 @@ export class RawPayloadQueryService {
     actorId?: string | null,
   ): Promise<BvRawPayloadEntity | null> {
     const record = await this.rawPayloadRepo.findOne({ where: { snapshotId, tenantId } });
+    void this.auditService.emitAuditEvent({
+      tenantId,
+      userId: actorId ?? null,
+      eventType: AuditEventType.SENSITIVE_ACCESS,
+      action: 'raw_payload.access',
+      status: 'granted',
+      resourceId: snapshotId,
+      metadata: {
+        accessType: 'by_snapshot',
+        recordFound: Boolean(record),
+        snapshotId,
+      },
+    });
     if (record) {
       await this.auditService.log({
         tenantId,

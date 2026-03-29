@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BvRawPayloadEntity } from '../entities/bv-raw-payload.entity';
 import { RawPayloadQueryService } from './raw-payload-query.service';
+import { AuditEventType } from '../../audit/audit-event.entity';
 import { AuditService } from '../../audit/audit.service';
 
 const TENANT_ID = 'tenant-abc';
@@ -26,11 +27,14 @@ function makeRawPayload(overrides: Partial<BvRawPayloadEntity> = {}): BvRawPaylo
 describe('RawPayloadQueryService', () => {
   let service: RawPayloadQueryService;
   let rawPayloadRepo: { findOne: jest.Mock; find: jest.Mock };
-  let auditService: { log: jest.Mock };
+  let auditService: { log: jest.Mock; emitAuditEvent: jest.Mock };
 
   beforeEach(async () => {
     rawPayloadRepo = { findOne: jest.fn(), find: jest.fn() };
-    auditService = { log: jest.fn().mockResolvedValue(undefined) };
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+      emitAuditEvent: jest.fn().mockResolvedValue(null),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,6 +72,13 @@ describe('RawPayloadQueryService', () => {
       rawPayloadRepo.findOne.mockResolvedValue(rp);
 
       await service.getById(TENANT_ID, 'rp-abc', 'actor-1');
+      expect(auditService.emitAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: AuditEventType.SENSITIVE_ACCESS,
+          status: 'granted',
+          resourceId: 'rp-abc',
+        }),
+      );
       expect(auditService.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'raw_payload.retrieved',
@@ -77,9 +88,16 @@ describe('RawPayloadQueryService', () => {
       );
     });
 
-    it('does not emit audit event when not found', async () => {
+    it('emits sensitive access event even when not found', async () => {
       rawPayloadRepo.findOne.mockResolvedValue(null);
       await service.getById(TENANT_ID, 'nonexistent');
+      expect(auditService.emitAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: AuditEventType.SENSITIVE_ACCESS,
+          status: 'granted',
+          resourceId: 'nonexistent',
+        }),
+      );
       expect(auditService.log).not.toHaveBeenCalled();
     });
   });
@@ -108,6 +126,13 @@ describe('RawPayloadQueryService', () => {
       rawPayloadRepo.findOne.mockResolvedValue(rp);
 
       await service.getBySnapshotId(TENANT_ID, 'snap-99', 'actor-2');
+      expect(auditService.emitAuditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: AuditEventType.SENSITIVE_ACCESS,
+          status: 'granted',
+          resourceId: 'snap-99',
+        }),
+      );
       expect(auditService.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'raw_payload.retrieved',
