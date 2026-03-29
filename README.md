@@ -277,8 +277,10 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 | `BV_FORETAGSINFO_CLIENT_ID` | Optional Företagsinformation-specific OAuth client ID |
 | `BV_FORETAGSINFO_CLIENT_SECRET` | Optional Företagsinformation-specific OAuth client secret |
 | `BV_FORETAGSINFO_BEARER_TOKEN` | Bearer token for Företagsinformation API |
+| `BV_FORETAGSINFO_AUTH_TOKEN` / `BV_FORETAGSINFO_TOKEN` | Backward-compatible aliases for `BV_FORETAGSINFO_BEARER_TOKEN` |
 | `BV_FORETAGSINFO_AUTH_HEADER` | Custom header name (default: `Authorization`) |
 | `BV_FORETAGSINFO_AUTH_VALUE` | Full auth header value override (use instead of bearer token) |
+| `BULLMQ_SKIP_REDIS_VERSION_CHECK` | Set `true` only in local/dev if Redis is older than 5.0 |
 | `MINIO_ENDPOINT` | MinIO hostname (default: `localhost`) |
 | `MINIO_PORT` | MinIO port (default: `9000`) |
 | `MINIO_USE_SSL` | `true` in production |

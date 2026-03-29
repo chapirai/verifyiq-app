@@ -54,6 +54,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
+        skipVersionCheck: config.get<string>('BULLMQ_SKIP_REDIS_VERSION_CHECK') === 'true',
         connection: {
           host: config.getOrThrow<string>('REDIS_HOST'),
           port: config.getOrThrow<number>('REDIS_PORT'),

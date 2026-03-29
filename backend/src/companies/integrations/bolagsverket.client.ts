@@ -149,9 +149,14 @@ export class BolagsverketClient {
     if (authValue) {
       return { name: headerName, value: authValue };
     }
-    const bearerToken = this.configService.get<string>('BV_FORETAGSINFO_BEARER_TOKEN');
+    const bearerToken = (
+      this.configService.get<string>('BV_FORETAGSINFO_BEARER_TOKEN')
+      ?? this.configService.get<string>('BV_FORETAGSINFO_AUTH_TOKEN')
+      ?? this.configService.get<string>('BV_FORETAGSINFO_TOKEN')
+    )?.trim();
     if (bearerToken) {
-      return { name: headerName, value: `Bearer ${bearerToken}` };
+      const normalizedValue = /^Bearer\s+/i.test(bearerToken) ? bearerToken : `Bearer ${bearerToken}`;
+      return { name: headerName, value: normalizedValue };
     }
     return null;
   }
