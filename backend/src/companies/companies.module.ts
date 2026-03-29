@@ -18,6 +18,7 @@ import { BvCacheService } from './services/bv-cache.service';
 import { BvPersistenceService } from './services/bv-persistence.service';
 import { BvDocumentStorageService } from './services/bv-document-storage.service';
 import { SnapshotQueryService } from './services/snapshot-query.service';
+import { SnapshotChainService } from './services/snapshot-chain.service';
 import { RawPayloadStorageService } from './services/raw-payload-storage.service';
 import { RawPayloadQueryService } from './services/raw-payload-query.service';
 import { BvRawPayloadEntity } from './entities/bv-raw-payload.entity';
@@ -64,6 +65,7 @@ import { LineageController } from './controllers/lineage.controller';
     BvPersistenceService,
     BvDocumentStorageService,
     SnapshotQueryService,
+    SnapshotChainService,
     RawPayloadStorageService,
     RawPayloadQueryService,
     NormalizationService,
@@ -80,6 +82,7 @@ import { LineageController } from './controllers/lineage.controller';
     BvPersistenceService,
     BvDocumentStorageService,
     SnapshotQueryService,
+    SnapshotChainService,
     RawPayloadStorageService,
     RawPayloadQueryService,
     NormalizationService,
