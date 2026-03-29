@@ -290,11 +290,13 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 
 ### Token management, troubleshooting, and credential rotation
 
-- The backend caches OAuth tokens per auth target and scope and refreshes them before expiry.
+- The backend stores tenant-scoped integration tokens in `integration_tokens` and retrieves the latest valid token at runtime using tenant context from JWT/session.
+- Tokens are encrypted at rest and refreshed before expiry; a background refresh loop pre-warms expiring tenant tokens every minute.
 - Token endpoint calls use Basic auth (`client_id:client_secret`) and include `X-Request-Id`.
-- Inspect token cache diagnostics at `GET /api/v1/bolagsverket/token-cache` (authenticated).
-- To rotate credentials, update `.env` (`BV_HVD_*` and optionally `BV_FORETAGSINFO_*`), restart backend, and verify a fresh token is issued via the token-cache endpoint. Existing cached tokens remain usable until expiry unless revoked.
-- For immediate cutover during rotation, revoke active tokens by running a short Nest shell/script that calls `BolagsverketService.revokeAccessToken()` (requires `BV_HVD_REVOKE_URL`), then restart the backend with new credentials.
+- Backend modules now pass tenant context through Bolagsverket service/client calls so each request transparently uses the correct tenant token.
+- Audit events are emitted for token refresh lifecycle operations (`REFRESH_INITIATED`, `REFRESH_COMPLETED`, `FAILURE_STATE`) under `integration.token.refresh`.
+- Inspect in-memory fallback token cache diagnostics at `GET /api/v1/bolagsverket/token-cache` (authenticated).
+- For first-time tenant bootstrap, set integration client credentials (`BV_HVD_*` / `BV_FORETAGSINFO_*`), then invoke any Bolagsverket endpoint once for that tenant; the token is issued and persisted automatically with no token copy/paste into `.env`.
 - If token requests fail, verify token URL, scopes, and credentials first; logs include request IDs and normalized upstream error details (`status`, `title`, `detail`, `code`, `requestId`).
 
 ### Manual Bolagsverket checks (curl)

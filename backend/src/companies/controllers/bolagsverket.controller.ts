@@ -91,8 +91,13 @@ export class BolagsverketController {
    * Retrieve complete company profile (HVD + organisation information + documents).
    */
   @Post('company')
-  getCompleteCompanyData(@Body() dto: BolagsverketLookupDto) {
-    return this.bolagsverketService.getCompleteCompanyData(dto.identitetsbeteckning);
+  getCompleteCompanyData(@Body() dto: BolagsverketLookupDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.getCompleteCompanyData(dto.identitetsbeteckning, {
+      tenantId,
+      actorId: actorId ?? null,
+    });
   }
 
   /**
@@ -100,11 +105,14 @@ export class BolagsverketController {
    * Retrieve company information from Företagsinformation API.
    */
   @Post('company-information')
-  getCompanyInformation(@Body() dto: BolagsverketLookupDto) {
+  getCompanyInformation(@Body() dto: BolagsverketLookupDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.bolagsverketService.getCompanyInformation(
       dto.identitetsbeteckning,
       dto.informationCategories,
       dto.tidpunkt,
+      { tenantId, actorId: actorId ?? null },
     );
   }
 
@@ -113,8 +121,13 @@ export class BolagsverketController {
    * List available annual reports and financial documents for an organisation.
    */
   @Post('documents')
-  getDocumentList(@Body() dto: BolagsverketDocumentListDto) {
-    return this.bolagsverketService.getDocumentList(dto.identitetsbeteckning);
+  getDocumentList(@Body() dto: BolagsverketDocumentListDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.getDocumentList(dto.identitetsbeteckning, {
+      tenantId,
+      actorId: actorId ?? null,
+    });
   }
 
   /**
@@ -122,8 +135,13 @@ export class BolagsverketController {
    * Download a document ZIP from Bolagsverket (Värdefulla Datamängder).
    */
   @Get('documents/:dokumentId/download')
-  async downloadDocument(@Param('dokumentId') dokumentId: string, @Res({ passthrough: true }) res: Response) {
-    const document = await this.bolagsverketService.getDocument(dokumentId);
+  async downloadDocument(@Param('dokumentId') dokumentId: string, @Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    const document = await this.bolagsverketService.getDocument(dokumentId, {
+      tenantId,
+      actorId: actorId ?? null,
+    });
     res.set({
       'Content-Type': document.contentType,
       'Content-Disposition': `attachment; filename="${document.fileName}"`,
@@ -136,8 +154,13 @@ export class BolagsverketController {
    * Get officer information (board, signatories, all).
    */
   @Post('officers')
-  getOfficers(@Body() dto: BolagsverketLookupDto, @Query('type') type?: 'all' | 'signatories' | 'board') {
-    return this.bolagsverketService.getOfficerInformation(dto.identitetsbeteckning, type ?? 'all');
+  getOfficers(@Body() dto: BolagsverketLookupDto, @Req() req: any, @Query('type') type?: 'all' | 'signatories' | 'board') {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.getOfficerInformation(dto.identitetsbeteckning, type ?? 'all', {
+      tenantId,
+      actorId: actorId ?? null,
+    });
   }
 
   /**
@@ -145,10 +168,13 @@ export class BolagsverketController {
    * Verify if a person/organisation has signatory authority.
    */
   @Post('signatory-power')
-  verifySignatoryPower(@Body() dto: BolagsverketSignatoryPowerDto) {
+  verifySignatoryPower(@Body() dto: BolagsverketSignatoryPowerDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.bolagsverketService.getSignatoryOptions(
       dto.funktionarIdentitetsbeteckning,
       dto.organisationIdentitetsbeteckning,
+      { tenantId, actorId: actorId ?? null },
     );
   }
 
@@ -157,11 +183,14 @@ export class BolagsverketController {
    * Retrieve historical share capital changes.
    */
   @Post('share-capital-history')
-  getShareCapitalHistory(@Body() dto: BolagsverketShareCapitalHistoryDto) {
+  getShareCapitalHistory(@Body() dto: BolagsverketShareCapitalHistoryDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.bolagsverketService.getShareCapitalChanges(
       dto.identitetsbeteckning,
       dto.fromdatum,
       dto.tomdatum,
+      { tenantId, actorId: actorId ?? null },
     );
   }
 
@@ -170,12 +199,15 @@ export class BolagsverketController {
    * Retrieve case/arende information.
    */
   @Post('cases')
-  getCaseInformation(@Body() dto: BolagsverketArendeDto) {
+  getCaseInformation(@Body() dto: BolagsverketArendeDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.bolagsverketService.getCases(
       dto.arendenummer,
       dto.organisationIdentitetsbeteckning,
       dto.fromdatum,
       dto.tomdatum,
+      { tenantId, actorId: actorId ?? null },
     );
   }
 
@@ -184,11 +216,14 @@ export class BolagsverketController {
    * Find all organisations where a person/organisation holds officer positions.
    */
   @Post('engagements')
-  getEngagements(@Body() dto: BolagsverketEngagemangDto) {
+  getEngagements(@Body() dto: BolagsverketEngagemangDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.bolagsverketService.getOrganisationEngagements(
       dto.identitetsbeteckning,
       dto.paginering?.sida,
       dto.paginering?.antalPerSida,
+      { tenantId, actorId: actorId ?? null },
     );
   }
 
@@ -197,11 +232,14 @@ export class BolagsverketController {
    * Retrieve financial reports for an organisation.
    */
   @Post('financial-reports')
-  getFinancialReports(@Body() dto: BolagsverketFinancialReportsDto) {
+  getFinancialReports(@Body() dto: BolagsverketFinancialReportsDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
     return this.bolagsverketService.getFinancialReports(
       dto.identitetsbeteckning,
       dto.fromdatum,
       dto.tomdatum,
+      { tenantId, actorId: actorId ?? null },
     );
   }
 
@@ -210,8 +248,13 @@ export class BolagsverketController {
    * Get a snapshot of share capital, financial year, and available reports.
    */
   @Post('financial-snapshot')
-  getFinancialSnapshot(@Body() dto: BolagsverketDocumentListDto) {
-    return this.bolagsverketService.getFinancialSnapshot(dto.identitetsbeteckning);
+  getFinancialSnapshot(@Body() dto: BolagsverketDocumentListDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.getFinancialSnapshot(dto.identitetsbeteckning, {
+      tenantId,
+      actorId: actorId ?? null,
+    });
   }
 
   /**

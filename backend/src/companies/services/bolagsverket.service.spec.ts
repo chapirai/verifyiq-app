@@ -285,6 +285,48 @@ describe('BolagsverketService', () => {
       expect(result.highValueDataset).toBe(hvdPayload);
       expect(result.documents).toBeNull();
     });
+
+    it('passes tenant context through API client calls', async () => {
+      const hvdPayload = { organisation: { identitetsbeteckning: '5560210261', namn: 'Test AB' } };
+      const richPayload = [{ identitetsbeteckning: '5560210261' }];
+      clientMock.fetchHighValueDataset.mockResolvedValue({
+        requestPayload: { identitetsbeteckning: '5560210261' },
+        responsePayload: hvdPayload as any,
+        requestId: 'req-1',
+      });
+      clientMock.fetchOrganisationInformation.mockResolvedValue({
+        requestPayload: {},
+        responsePayload: richPayload as any,
+        requestId: 'req-2',
+      });
+      clientMock.fetchDocumentList.mockResolvedValue({
+        requestPayload: { identitetsbeteckning: '5560210261' },
+        responsePayload: null as any,
+        requestId: 'req-3',
+      });
+      mapperMock.map.mockReturnValue(makeNormalisedCompany({ organisationNumber: '5560210261' }));
+
+      await service.getCompleteCompanyData('5560210261', {
+        tenantId: 'tenant-ctx',
+        actorId: 'actor-ctx',
+        correlationId: 'corr-ctx',
+      });
+
+      expect(clientMock.fetchHighValueDataset).toHaveBeenCalledWith(
+        '5560210261',
+        expect.objectContaining({ tenantId: 'tenant-ctx' }),
+      );
+      expect(clientMock.fetchOrganisationInformation).toHaveBeenCalledWith(
+        '5560210261',
+        undefined,
+        undefined,
+        expect.objectContaining({ tenantId: 'tenant-ctx' }),
+      );
+      expect(clientMock.fetchDocumentList).toHaveBeenCalledWith(
+        '5560210261',
+        expect.objectContaining({ tenantId: 'tenant-ctx' }),
+      );
+    });
   });
 
   describe('enrichAndSave audit events', () => {
