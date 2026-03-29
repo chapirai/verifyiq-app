@@ -70,6 +70,80 @@ describe('BolagsverketClient', () => {
       expect(token2).toBe('token-2');
       expect(postMock).toHaveBeenCalledTimes(2);
     });
+
+    it('sends credentials via HTTP Basic Auth (not in the request body)', async () => {
+      const postMock = makeTokenMock();
+      const client = makeClient(postMock);
+      await client.getAccessToken();
+
+      const tokenCall = (postMock.mock.calls as unknown as [string, unknown, { headers: Record<string, string> }][]).find(
+        ([url]) => url === tokenUrl,
+      );
+      expect(tokenCall).toBeDefined();
+      const requestHeaders = tokenCall![2].headers;
+      // Must carry Basic Auth header built from client_id:client_secret
+      const expectedBasic = 'Basic ' + Buffer.from('client-id:client-secret').toString('base64');
+      expect(requestHeaders['Authorization']).toBe(expectedBasic);
+      // Credentials must NOT appear in the request body
+      const body = tokenCall![1] as string;
+      expect(body).not.toContain('client_id');
+      expect(body).not.toContain('client_secret');
+    });
+  });
+
+  // ── Företagsinformation OAuth2 token ──────────────────────────────────────
+
+  describe('getAccessTokenForForetagsinfo', () => {
+    const foretagsinfoTokenUrl = 'https://portal.api.bolagsverket.se/oauth2/token';
+
+    it('fetches and caches a token with foretagsinformation:read scope', async () => {
+      const postMock = jest.fn((url: string) => {
+        if (url === foretagsinfoTokenUrl)
+          return of({ data: { access_token: 'fi-token-1', expires_in: 3600 } });
+        throw new Error(`Unexpected POST to: ${url}`);
+      });
+      const client = makeClient(postMock, jest.fn(), {
+        BV_FORETAGSINFO_TOKEN_URL: foretagsinfoTokenUrl,
+        BV_FORETAGSINFO_SCOPE: 'foretagsinformation:read',
+        BV_FORETAGSINFO_CLIENT_ID: 'fi-client-id',
+        BV_FORETAGSINFO_CLIENT_SECRET: 'fi-client-secret',
+      });
+
+      const token1 = await client.getAccessTokenForForetagsinfo();
+      const token2 = await client.getAccessTokenForForetagsinfo();
+
+      expect(token1).toBe('fi-token-1');
+      expect(token2).toBe('fi-token-1');
+      expect(postMock).toHaveBeenCalledTimes(1);
+
+      // Verify Basic Auth header and scope in body
+      const tokenCall = (postMock.mock.calls as unknown as [string, unknown, { headers: Record<string, string> }][]).find(
+        ([url]) => url === foretagsinfoTokenUrl,
+      );
+      const expectedBasic = 'Basic ' + Buffer.from('fi-client-id:fi-client-secret').toString('base64');
+      expect(tokenCall![2].headers['Authorization']).toBe(expectedBasic);
+      const body = tokenCall![1] as string;
+      expect(body).toContain('scope=foretagsinformation%3Aread');
+    });
+
+    it('falls back to HVD credentials when no Företagsinformation-specific credentials are set', async () => {
+      const postMock = jest.fn((url: string) => {
+        if (url === tokenUrl)
+          return of({ data: { access_token: 'shared-token', expires_in: 3600 } });
+        throw new Error(`Unexpected POST to: ${url}`);
+      });
+      // No BV_FORETAGSINFO_* creds; falls back to BV_HVD_CLIENT_ID
+      const client = makeClient(postMock);
+
+      const token = await client.getAccessTokenForForetagsinfo();
+      expect(token).toBe('shared-token');
+
+      const tokenCall = (postMock.mock.calls as unknown as [string, unknown, { headers: Record<string, string> }][]).find(
+        ([url]) => url === tokenUrl,
+      );
+      const expectedBasic = 'Basic ' + Buffer.from('client-id:client-secret').toString('base64');
+      expect(tokenCall![2].headers['Authorization']).toBe(expectedBasic);
+    });
   });
 
   // ── Token revocation ───────────────────────────────────────────────────────
@@ -188,16 +262,21 @@ describe('BolagsverketClient', () => {
       expect(headers['Authorization']).toBeUndefined();
     });
 
-    it('falls back to legacy x-client-id/x-client-secret when no token is configured', async () => {
+    it('falls back to legacy x-client-id/x-client-secret when no OAuth credentials are configured', async () => {
       const postMock = jest.fn((url: string) => {
-        if (url === tokenUrl) return of({ data: { access_token: 'hvd-token', expires_in: 3600 } });
         if (url === orgUrl) return of({ data: [{}] });
         throw new Error(`Unexpected POST to: ${url}`);
       });
-      const client = makeClient(postMock, jest.fn(), {
+      // Create a client with NO HVD/Foretagsinfo OAuth credentials – only legacy BV_CLIENT_ID/SECRET
+      const httpService = { post: postMock, get: jest.fn() };
+      const legacyConfig: Record<string, string> = {
         BV_CLIENT_ID: 'legacy-client-id',
         BV_CLIENT_SECRET: 'legacy-client-secret',
-      });
+      };
+      const configService = {
+        get: jest.fn((key: string) => legacyConfig[key]),
+      };
+      const client = new BolagsverketClient(httpService as any, configService as any);
 
       await client.fetchOrganisationInformation('5560000001');
 
@@ -207,6 +286,26 @@ describe('BolagsverketClient', () => {
       const headers = orgCall![2].headers;
       expect(headers['x-client-id']).toBe('legacy-client-id');
       expect(headers['x-client-secret']).toBe('legacy-client-secret');
+    });
+
+    it('uses OAuth2 Bearer token when BV_HVD_CLIENT_ID is set and no static token is configured', async () => {
+      const postMock = jest.fn((url: string) => {
+        if (url === tokenUrl) return of({ data: { access_token: 'fi-oauth-token', expires_in: 3600 } });
+        if (url === orgUrl) return of({ data: [{}] });
+        throw new Error(`Unexpected POST to: ${url}`);
+      });
+      // No BV_FORETAGSINFO_BEARER_TOKEN / BV_FORETAGSINFO_AUTH_VALUE
+      // but BV_HVD_CLIENT_ID is present → should use OAuth2
+      const client = makeClient(postMock, jest.fn());
+
+      await client.fetchOrganisationInformation('5560000001');
+
+      const orgCall = (postMock.mock.calls as unknown as [string, unknown, { headers: Record<string, string> }][]).find(
+        ([url]) => url === orgUrl,
+      );
+      expect(orgCall).toBeDefined();
+      const headers = orgCall![2].headers;
+      expect(headers['Authorization']).toBe('Bearer fi-oauth-token');
     });
   });
 

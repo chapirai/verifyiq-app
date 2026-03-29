@@ -50,20 +50,32 @@ const RETRY_CONFIG = {
 const HVD_BASE_URL = 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1';
 const ORG_BASE_URL = 'https://gw.api.bolagsverket.se/foretagsinformation/v4';
 const DEFAULT_HVD_SCOPES = 'vardefulla-datamangder:read vardefulla-datamangder:ping';
-const DEFAULT_HVD_TOKEN_PATH = '/oauth2/token';
+const DEFAULT_FORETAGSINFO_SCOPE = 'foretagsinformation:read';
+/**
+ * Bolagsverket's OAuth2 token endpoint lives on portal.api.bolagsverket.se,
+ * which is separate from the data-gateway host (gw.api.bolagsverket.se).
+ */
+const DEFAULT_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token';
 const DEFAULT_HVD_DOCUMENT_PATH = '/dokument';
 const TOKEN_REFRESH_SKEW_MS = 60_000;
+
+/** Shape of a cached access token entry. */
+interface TokenCacheEntry {
+  accessToken: string;
+  expiresAt: number;
+  scope?: string;
+  tokenType?: string;
+}
 
 @Injectable()
 export class BolagsverketClient {
   private readonly logger = new Logger(BolagsverketClient.name);
-  private hvdTokenCache: {
-    accessToken: string;
-    expiresAt: number;
-    scope?: string;
-    tokenType?: string;
-  } | null = null;
+  /** Token cache for Värdefulla Datamängder (HVD) API. */
+  private hvdTokenCache: TokenCacheEntry | null = null;
   private tokenRequest: Promise<string> | null = null;
+  /** Token cache for Företagsinformation API when OAuth2 is used. */
+  private foretagsinfoTokenCache: TokenCacheEntry | null = null;
+  private foretagsinfoTokenRequest: Promise<string> | null = null;
   private warnedLegacyAuth = false;
 
   constructor(
@@ -94,7 +106,11 @@ export class BolagsverketClient {
   private getHvdTokenUrl(): string {
     const configured = this.configService.get<string>('BV_HVD_TOKEN_URL');
     if (configured) return configured;
-    return this.buildUrl(this.getHvdBaseUrl(), DEFAULT_HVD_TOKEN_PATH);
+    // Fall back to the shared Bolagsverket token endpoint on the portal subdomain.
+    // NOTE: The token endpoint is on portal.api.bolagsverket.se, NOT on the data
+    // gateway host (gw.api.bolagsverket.se). Using BV_HVD_BASE_URL would produce
+    // the wrong URL, so we always default to DEFAULT_TOKEN_URL here.
+    return DEFAULT_TOKEN_URL;
   }
 
   private getHvdRevokeUrl(): string | null {
@@ -125,6 +141,44 @@ export class BolagsverketClient {
     return clientSecret;
   }
 
+  /**
+   * Returns the OAuth2 token URL to use for Företagsinformation.
+   * Defaults to the shared Bolagsverket portal token endpoint.
+   */
+  private getForetagsinfoTokenUrl(): string {
+    return (
+      this.configService.get<string>('BV_FORETAGSINFO_TOKEN_URL') ??
+      this.configService.get<string>('BV_HVD_TOKEN_URL') ??
+      DEFAULT_TOKEN_URL
+    );
+  }
+
+  private getForetagsinfoScope(): string {
+    return this.configService.get<string>('BV_FORETAGSINFO_SCOPE') ?? DEFAULT_FORETAGSINFO_SCOPE;
+  }
+
+  private getForetagsinfoClientId(): string {
+    const clientId =
+      this.configService.get<string>('BV_FORETAGSINFO_CLIENT_ID') ??
+      this.configService.get<string>('BV_HVD_CLIENT_ID') ??
+      this.configService.get<string>('BV_CLIENT_ID');
+    if (!clientId) {
+      throw new UnauthorizedException('Bolagsverket Företagsinformation OAuth client ID is missing');
+    }
+    return clientId;
+  }
+
+  private getForetagsinfoClientSecret(): string {
+    const clientSecret =
+      this.configService.get<string>('BV_FORETAGSINFO_CLIENT_SECRET') ??
+      this.configService.get<string>('BV_HVD_CLIENT_SECRET') ??
+      this.configService.get<string>('BV_CLIENT_SECRET');
+    if (!clientSecret) {
+      throw new UnauthorizedException('Bolagsverket Företagsinformation OAuth client secret is missing');
+    }
+    return clientSecret;
+  }
+
   private resolveForetagsinfoAuthHeader(): { name: string; value: string } | null {
     const headerName = this.configService.get<string>('BV_FORETAGSINFO_AUTH_HEADER') ?? 'Authorization';
     const authValue = this.configService.get<string>('BV_FORETAGSINFO_AUTH_VALUE');
@@ -148,19 +202,43 @@ export class BolagsverketClient {
     };
   }
 
-  private buildForetagsinfoHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+  /**
+   * Build headers for Företagsinformation requests.
+   *
+   * Priority order:
+   *  1. BV_FORETAGSINFO_AUTH_VALUE (or BV_FORETAGSINFO_BEARER_TOKEN) – static token
+   *  2. OAuth2 client credentials when BV_FORETAGSINFO_CLIENT_ID or BV_HVD_CLIENT_ID
+   *     is configured (dynamic token fetch with foretagsinformation:read scope)
+   *  3. Legacy x-client-id / x-client-secret headers (deprecated; only when BV_CLIENT_ID
+   *     is set without any HVD/Foretagsinfo OAuth credentials)
+   */
+  private async buildForetagsinfoHeaders(extraHeaders: Record<string, string> = {}): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       'x-request-id': randomUUID(),
       ...extraHeaders,
     };
 
+    // 1. Static bearer / custom auth header takes priority.
     const authHeader = this.resolveForetagsinfoAuthHeader();
     if (authHeader) {
       headers[authHeader.name] = authHeader.value;
       return headers;
     }
 
+    // 2. OAuth2 dynamic token when explicit HVD or Foretagsinfo OAuth credentials exist.
+    //    BV_CLIENT_ID is intentionally excluded here so that legacy deployments that
+    //    only set BV_CLIENT_ID/BV_CLIENT_SECRET continue to use the legacy path.
+    const hasOAuthCreds =
+      this.configService.get<string>('BV_FORETAGSINFO_CLIENT_ID') ??
+      this.configService.get<string>('BV_HVD_CLIENT_ID');
+    if (hasOAuthCreds) {
+      const token = await this.getAccessTokenForForetagsinfo();
+      headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
+
+    // 3. Legacy fallback.
     const clientId = this.configService.get<string>('BV_CLIENT_ID') ?? '';
     const clientSecret = this.configService.get<string>('BV_CLIENT_SECRET') ?? '';
     if (clientId && clientSecret) {
@@ -203,7 +281,7 @@ export class BolagsverketClient {
     while (true) {
       const headers =
         options?.auth === 'org'
-          ? this.buildForetagsinfoHeaders(options?.extraHeaders)
+          ? await this.buildForetagsinfoHeaders(options?.extraHeaders)
           : await this.buildHvdHeaders(options?.extraHeaders);
       const requestId = headers['x-request-id'];
       try {
@@ -227,6 +305,11 @@ export class BolagsverketClient {
           this.invalidateToken();
           continue;
         }
+        if (status === 401 && options?.auth === 'org' && attempt === 0) {
+          attempt++;
+          this.invalidateForetagsinfoToken();
+          continue;
+        }
         if (isRetryable && attempt < RETRY_CONFIG.maxRetries) {
           attempt++;
           this.logger.warn(
@@ -247,29 +330,49 @@ export class BolagsverketClient {
     this.tokenRequest = null;
   }
 
+  private invalidateForetagsinfoToken(): void {
+    this.foretagsinfoTokenCache = null;
+    this.foretagsinfoTokenRequest = null;
+  }
+
   private isTokenValid(): boolean {
     if (!this.hvdTokenCache) return false;
     return Date.now() < this.hvdTokenCache.expiresAt;
   }
 
-  private async requestAccessToken(): Promise<OAuthTokenResponse> {
-    const clientId = this.getHvdClientId();
-    const clientSecret = this.getHvdClientSecret();
-    if (!clientId || !clientSecret) {
-      throw new UnauthorizedException('Bolagsverket OAuth client credentials are missing');
-    }
+  private isForetagsinfoTokenValid(): boolean {
+    if (!this.foretagsinfoTokenCache) return false;
+    return Date.now() < this.foretagsinfoTokenCache.expiresAt;
+  }
 
+  /**
+   * Builds a Basic Auth header value from client credentials.
+   * Bolagsverket's token endpoint uses HTTP Basic Auth (RFC 6749 §2.3.1).
+   */
+  private buildBasicAuthHeader(clientId: string, clientSecret: string): string {
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    return `Basic ${credentials}`;
+  }
+
+  /**
+   * Helper to fetch an OAuth2 token with client_credentials grant.
+   * Uses HTTP Basic Auth for credentials (confirmed working with Bolagsverket production).
+   */
+  private async fetchOAuthToken(
+    tokenUrl: string,
+    clientId: string,
+    clientSecret: string,
+    scope: string,
+  ): Promise<OAuthTokenResponse> {
     const params = new URLSearchParams();
     params.append('grant_type', 'client_credentials');
-    params.append('client_id', clientId);
-    params.append('client_secret', clientSecret);
-    params.append('scope', this.getHvdScopes());
+    params.append('scope', scope);
 
-    const tokenUrl = this.getHvdTokenUrl();
     const response = await firstValueFrom(
       this.httpService.post(tokenUrl, params.toString(), {
         headers: {
           'content-type': 'application/x-www-form-urlencoded',
+          Authorization: this.buildBasicAuthHeader(clientId, clientSecret),
           'x-request-id': randomUUID(),
         },
       }),
@@ -295,6 +398,12 @@ export class BolagsverketClient {
       expires_in: expiresIn,
       scope: parsed.scope,
     };
+  }
+
+  private async requestAccessToken(): Promise<OAuthTokenResponse> {
+    const clientId = this.getHvdClientId();
+    const clientSecret = this.getHvdClientSecret();
+    return this.fetchOAuthToken(this.getHvdTokenUrl(), clientId, clientSecret, this.getHvdScopes());
   }
 
   async getAccessToken(): Promise<string> {
@@ -325,6 +434,45 @@ export class BolagsverketClient {
     })();
 
     return this.tokenRequest;
+  }
+
+  /**
+   * Fetch (and cache) an OAuth2 token for the Företagsinformation API.
+   * Uses the foretagsinformation:read scope by default.
+   */
+  async getAccessTokenForForetagsinfo(): Promise<string> {
+    if (this.isForetagsinfoTokenValid()) {
+      return this.foretagsinfoTokenCache!.accessToken;
+    }
+
+    if (this.foretagsinfoTokenRequest) {
+      return this.foretagsinfoTokenRequest;
+    }
+
+    this.foretagsinfoTokenRequest = (async () => {
+      try {
+        const tokenResponse = await this.fetchOAuthToken(
+          this.getForetagsinfoTokenUrl(),
+          this.getForetagsinfoClientId(),
+          this.getForetagsinfoClientSecret(),
+          this.getForetagsinfoScope(),
+        );
+        const expiresInMs = tokenResponse.expires_in * 1000;
+        const skewMs = Math.min(TOKEN_REFRESH_SKEW_MS, Math.floor(expiresInMs * 0.1));
+        const expiresAt = Date.now() + Math.max(expiresInMs - skewMs, 0);
+        this.foretagsinfoTokenCache = {
+          accessToken: tokenResponse.access_token,
+          expiresAt,
+          scope: tokenResponse.scope,
+          tokenType: tokenResponse.token_type,
+        };
+        return tokenResponse.access_token;
+      } finally {
+        this.foretagsinfoTokenRequest = null;
+      }
+    })();
+
+    return this.foretagsinfoTokenRequest;
   }
 
   async revokeAccessToken(): Promise<{ revoked: boolean; error?: string }> {
