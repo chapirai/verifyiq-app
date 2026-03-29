@@ -5,10 +5,11 @@ import { useAuthStore } from '@/lib/stores/auth.store';
 
 export function useAuth() {
   const store = useAuthStore();
+  const hydrate = useAuthStore((state) => state.hydrate);
 
   useEffect(() => {
-    store.hydrate();
-  }, [store]);
+    hydrate();
+  }, [hydrate]);
 
   return store;
 }

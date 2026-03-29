@@ -93,6 +93,12 @@ export interface CompanyLookupByOrgNumberPayload {
 
 export type FreshnessStatus = 'fresh' | 'stale' | 'expired';
 export type LookupSource = 'DB' | 'API';
+export type CompanyFreshnessStatus = 'fresh' | 'stale' | 'degraded';
+export type CompanyCacheDecision =
+  | 'served_from_cache'
+  | 'served_stale'
+  | 'fetched_from_provider'
+  | 'unknown';
 
 export interface CompanyMetadata {
   source: LookupSource;
@@ -126,6 +132,46 @@ export interface CompanyData {
 export interface CompanyLookupResponse {
   company: CompanyData;
   metadata: CompanyMetadata;
+}
+
+export interface CompanyFreshnessMetadata {
+  org_number: string;
+  has_data: boolean;
+  last_fetched_timestamp: string | null;
+  freshness_status: CompanyFreshnessStatus;
+  next_refresh_time: string | null;
+  provider_name: string | null;
+  endpoint_used: string | null;
+  cache_decision: CompanyCacheDecision;
+  policy_decision: string | null;
+  snapshot_id: string | null;
+}
+
+export interface CompanySnapshotHistoryItem {
+  id: string;
+  fetched_at: string;
+  fetch_status: string;
+  policy_decision: string;
+  trigger_type: string;
+  is_from_cache: boolean;
+  is_stale_fallback: boolean;
+  api_call_count: number;
+  source_name: string;
+  version_number: number;
+  correlation_id: string | null;
+}
+
+export interface CompanyChangeEvent {
+  id: string;
+  orgNumber: string;
+  attributeName: string;
+  oldValue: string | null;
+  newValue: string | null;
+  changeType: string;
+  createdAt: string;
+  snapshotIdAfter?: string | null;
+  snapshotIdBefore?: string | null;
+  correlationId?: string | null;
 }
 
 const defaultTenantSlug = process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG || 'demo-bank';
@@ -172,6 +218,29 @@ export const api = {
     payload: CompanyLookupByOrgNumberPayload,
   ): Promise<CompanyLookupResponse> {
     const response = await httpClient.post<CompanyLookupResponse>('/companies/lookup', payload);
+    return response.data;
+  },
+
+  async getCompanyFreshness(orgNumber: string): Promise<CompanyFreshnessMetadata> {
+    const response = await httpClient.get<CompanyFreshnessMetadata>(
+      `/companies/${encodeURIComponent(orgNumber)}/freshness`,
+    );
+    return response.data;
+  },
+
+  async getCompanySnapshots(orgNumber: string, limit = 20): Promise<CompanySnapshotHistoryItem[]> {
+    const response = await httpClient.get<CompanySnapshotHistoryItem[]>(
+      `/companies/${encodeURIComponent(orgNumber)}/snapshots`,
+      { params: { limit } },
+    );
+    return response.data;
+  },
+
+  async getChangeEventsByOrgNumber(orgNumber: string, limit = 10): Promise<CompanyChangeEvent[]> {
+    const response = await httpClient.get<CompanyChangeEvent[]>(
+      `/change-events/by-org/${encodeURIComponent(orgNumber)}`,
+      { params: { limit } },
+    );
     return response.data;
   },
 

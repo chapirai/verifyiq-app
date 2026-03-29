@@ -41,6 +41,7 @@ import { ChangeEventQueryService } from './services/change-event-query.service';
 import { ChangeEventController } from './controllers/change-event.controller';
 import { FailureStateEntity } from './entities/failure-state.entity';
 import { FailureStateService } from './services/failure-state.service';
+import { CompanyMetadataService } from './services/company-metadata.service';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { FailureStateService } from './services/failure-state.service';
     SnapshotComparisonService,
     ChangeEventQueryService,
     FailureStateService,
+    CompanyMetadataService,
   ],
   exports: [
     CompaniesService,
@@ -105,6 +107,7 @@ import { FailureStateService } from './services/failure-state.service';
     SnapshotComparisonService,
     ChangeEventQueryService,
     FailureStateService,
+    CompanyMetadataService,
   ],
 })
 export class CompaniesModule {}
