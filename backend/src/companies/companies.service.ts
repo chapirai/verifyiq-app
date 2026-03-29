@@ -7,6 +7,7 @@ import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { ListCompaniesDto } from './dto/list-companies.dto';
 import { CACHE_TTL_DAYS } from './services/bv-cache.service';
 import { BolagsverketService } from './services/bolagsverket.service';
+import { CachePolicyEvaluationService } from './services/cache-policy-evaluation.service';
 import {
   CompanyMetadataDto,
   FreshnessStatus,
@@ -21,9 +22,19 @@ const API_TIMEOUT_MS = 10_000;
 /** Stale threshold: data older than TTL but within this window is 'stale'. */
 const STALE_THRESHOLD_DAYS = CACHE_TTL_DAYS * 2; // 60 days
 
-function computeFreshness(ageDays: number): FreshnessStatus {
-  if (ageDays < CACHE_TTL_DAYS) return 'fresh';
-  if (ageDays < STALE_THRESHOLD_DAYS) return 'stale';
+/**
+ * Compute FreshnessStatus using policy-derived thresholds (hours → days).
+ * Falls back to hardcoded defaults when policy is unavailable.
+ */
+function computeFreshness(
+  ageDays: number,
+  freshnessWindowHours = CACHE_TTL_DAYS * 24,
+  maxAgeHours = STALE_THRESHOLD_DAYS * 24,
+): FreshnessStatus {
+  const freshnessWindowDays = freshnessWindowHours / 24;
+  const maxAgeDays = maxAgeHours / 24;
+  if (ageDays < freshnessWindowDays) return 'fresh';
+  if (ageDays < maxAgeDays) return 'stale';
   return 'expired';
 }
 
@@ -37,6 +48,7 @@ export class CompaniesService {
   constructor(
     private readonly auditService: AuditService,
     private readonly bolagsverketService: BolagsverketService,
+    private readonly cachePolicyEvaluationService: CachePolicyEvaluationService,
     @InjectRepository(CompanyEntity)
     private readonly companyRepo: Repository<CompanyEntity>,
   ) {}
@@ -102,11 +114,24 @@ export class CompaniesService {
       ? snapshot.fetchedAt.toISOString()
       : result.retrievedAt;
 
+    // Resolve the effective policy for freshness metadata (best-effort; fallback to defaults)
+    let freshnessWindowHours = CACHE_TTL_DAYS * 24;
+    let maxAgeHours = STALE_THRESHOLD_DAYS * 24;
+    try {
+      const policy = await this.cachePolicyEvaluationService.getPolicyForTenant(ctx.tenantId);
+      if (policy) {
+        freshnessWindowHours = policy.freshnessWindowHours;
+        maxAgeHours = policy.maxAgeHours;
+      }
+    } catch {
+      // Non-blocking: safe to ignore — defaults are used
+    }
+
     const metadata: CompanyMetadataDto = {
       source,
       fetched_at: fetchedAt,
       age_days: ageDays,
-      freshness: computeFreshness(ageDays),
+      freshness: computeFreshness(ageDays, freshnessWindowHours, maxAgeHours),
       cache_ttl_days: CACHE_TTL_DAYS,
       snapshot_id: snapshot.id,
       correlation_id: correlationId,

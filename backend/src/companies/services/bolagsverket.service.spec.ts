@@ -6,6 +6,7 @@ import { BolagsverketMapper, DEFAULT_COMPANY_NAME, NormalisedCompany } from '../
 import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
 import { RawPayloadStorageService } from './raw-payload-storage.service';
+import { CachePolicyEvaluationService } from './cache-policy-evaluation.service';
 
 function makeNormalisedCompany(overrides: Partial<NormalisedCompany> = {}): NormalisedCompany {
   return {
@@ -47,6 +48,26 @@ describe('BolagsverketService', () => {
         { provide: BvCacheService, useValue: {} },
         { provide: BvPersistenceService, useValue: {} },
         { provide: RawPayloadStorageService, useValue: { storeRawPayload: jest.fn() } },
+        {
+          provide: CachePolicyEvaluationService,
+          useValue: {
+            evaluate: jest.fn().mockResolvedValue({
+              decision: 'fresh',
+              isFresh: true,
+              isStale: false,
+              isExpired: false,
+              shouldTriggerRefresh: false,
+              staleFallbackAllowed: true,
+              costFlags: {},
+              policyId: 'default',
+              usedSystemDefault: true,
+              dataAgeHours: 0,
+            }),
+            getPolicyForTenant: jest.fn().mockResolvedValue(null),
+            listPolicies: jest.fn().mockResolvedValue([]),
+            getPolicyById: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     }).compile();
 
@@ -165,6 +186,24 @@ describe('BolagsverketService', () => {
           { provide: BvCacheService, useValue: {} },
           { provide: BvPersistenceService, useValue: {} },
           { provide: RawPayloadStorageService, useValue: { storeRawPayload: jest.fn() } },
+          {
+            provide: CachePolicyEvaluationService,
+            useValue: {
+              evaluate: jest.fn().mockResolvedValue({
+                decision: 'fresh',
+                isFresh: true,
+                isStale: false,
+                isExpired: false,
+                shouldTriggerRefresh: false,
+                staleFallbackAllowed: true,
+                costFlags: {},
+                policyId: 'default',
+                usedSystemDefault: true,
+                dataAgeHours: 0,
+              }),
+              getPolicyForTenant: jest.fn().mockResolvedValue(null),
+            },
+          },
         ],
       }).compile();
 
