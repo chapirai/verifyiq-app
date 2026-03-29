@@ -266,7 +266,7 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 | `BV_HVD_CLIENT_ID` | Optional override for Värdefulla Datamängder client ID |
 | `BV_HVD_CLIENT_SECRET` | Optional override for Värdefulla Datamängder client secret |
 | `BV_HVD_BASE_URL` | Override base URL for Värdefulla Datamängder |
-| `BV_HVD_TOKEN_URL` | OAuth token endpoint for Värdefulla Datamängder |
+| `BV_HVD_TOKEN_URL` | Optional OAuth token endpoint override for Värdefulla Datamängder (defaults to `<BV_HVD_BASE_URL>/oauth2/token`) |
 | `BV_HVD_REVOKE_URL` | OAuth token revocation endpoint (optional) |
 | `BV_HVD_SCOPES` | OAuth scopes (default: `vardefulla-datamangder:read vardefulla-datamangder:ping`) |
 | `BV_HVD_DOCUMENT_PATH` | Document download path (default: `/dokument`) |
