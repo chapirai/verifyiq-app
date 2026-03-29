@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, CompanyLookupResponse } from '@/lib/api';
+import { formatApiMessage } from '@/lib/api-errors';
 import { useToast } from '@/components/ui/ToastProvider';
 
 const RECENTLY_VIEWED_KEY = 'verifyiq:recently-viewed-companies';
@@ -11,7 +12,7 @@ const REFRESH_COOLDOWN_MS = 5000;
 interface ApiError {
   response?: {
     status?: number;
-    data?: { message?: string };
+    data?: { message?: string | string[] };
   };
   message?: string;
 }
@@ -121,6 +122,7 @@ export function useCompanyLookup(orgNumber: string): CompanyLookupState {
       } catch (err: unknown) {
         const apiErr = isApiError(err) ? err : null;
         const status = apiErr?.response?.status;
+        const resolvedApiMessage = formatApiMessage(apiErr?.response?.data?.message);
 
         let userMessage: string;
         if (status === 404) {
@@ -128,15 +130,16 @@ export function useCompanyLookup(orgNumber: string): CompanyLookupState {
         } else if (status === 400) {
           userMessage = 'Invalid organisation number format. Please use a 10-digit or 12-digit number.';
         } else if (status != null && status >= 500) {
-          userMessage = isRefresh
+          const fallback = isRefresh
             ? 'Service error. Please try again later.'
             : 'Service is temporarily unavailable. Please try again later.';
+          userMessage = resolvedApiMessage ?? fallback;
         } else if (err instanceof Error && err.message.toLowerCase().includes('timeout')) {
           userMessage = isRefresh ? 'Refresh timed out. Please try again.' : 'Request timed out. Please try again.';
         } else if (err instanceof Error && err.message.toLowerCase().includes('network')) {
           userMessage = 'Network error. Check your connection.';
         } else {
-          const msg = apiErr?.response?.data?.message ?? (err instanceof Error ? err.message : null);
+          const msg = resolvedApiMessage ?? (err instanceof Error ? err.message : null);
           userMessage = typeof msg === 'string' ? msg : isRefresh ? 'Refresh failed. Please try again.' : 'An unexpected error occurred.';
         }
 

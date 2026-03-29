@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import SearchForm from '@/components/SearchForm';
 import { api } from '@/lib/api';
 import { useRecentSearches } from '@/hooks/use-recent-searches';
+import { formatApiMessage } from '@/lib/api-errors';
 
 interface ApiError {
-  response?: { status?: number; data?: { message?: string } };
+  response?: { status?: number; data?: { message?: string | string[] } };
   message?: string;
 }
 
@@ -18,12 +19,15 @@ function isApiError(err: unknown): err is ApiError {
 function getErrorMessage(err: unknown): string {
   const apiErr = isApiError(err) ? err : null;
   const status = apiErr?.response?.status;
-  if (status != null && status >= 500) return 'Service is temporarily unavailable. Please try again.';
+  const resolvedApiMessage = formatApiMessage(apiErr?.response?.data?.message);
+  if (status != null && status >= 500) {
+    return resolvedApiMessage ?? 'Service is temporarily unavailable. Please try again.';
+  }
   if (err instanceof Error && err.message.toLowerCase().includes('timeout'))
     return 'Request timed out. Please try again.';
   if (err instanceof Error && err.message.toLowerCase().includes('network'))
     return 'Network error. Please check your connection and try again.';
-  const msg = apiErr?.response?.data?.message ?? (err instanceof Error ? err.message : null);
+  const msg = resolvedApiMessage ?? (err instanceof Error ? err.message : null);
   return typeof msg === 'string' ? msg : 'An unexpected error occurred.';
 }
 
