@@ -57,13 +57,19 @@ const TOKEN_REFRESH_SKEW_MS = 60_000;
 @Injectable()
 export class BolagsverketClient {
   private readonly logger = new Logger(BolagsverketClient.name);
-  private hvdTokenCache: {
+  private tokenCaches = new Map<string, {
     accessToken: string;
     expiresAt: number;
     scope?: string;
     tokenType?: string;
-  } | null = null;
-  private tokenRequest: Promise<string> | null = null;
+  }>();
+  private tokenRequests = new Map<string, Promise<string>>();
+  private tokenMetrics = {
+    cacheHits: 0,
+    cacheMisses: 0,
+    refreshes: 0,
+    requestFailures: 0,
+  };
   private warnedLegacyAuth = false;
 
   constructor(
@@ -105,24 +111,36 @@ export class BolagsverketClient {
     return this.configService.get<string>('BV_HVD_SCOPES') ?? DEFAULT_HVD_SCOPES;
   }
 
-  private getHvdClientId(): string {
-    const clientId =
-      this.configService.get<string>('BV_HVD_CLIENT_ID') ??
-      this.configService.get<string>('BV_CLIENT_ID');
+  private getTokenClientId(auth: 'hvd' | 'org'): string {
+    const authSpecificKey = auth === 'hvd' ? 'BV_HVD_CLIENT_ID' : 'BV_FORETAGSINFO_CLIENT_ID';
+    const clientId = this.configService.get<string>(authSpecificKey) ?? this.configService.get<string>('BV_CLIENT_ID');
     if (!clientId) {
       throw new UnauthorizedException('Bolagsverket OAuth client ID is missing');
     }
     return clientId;
   }
 
-  private getHvdClientSecret(): string {
-    const clientSecret =
-      this.configService.get<string>('BV_HVD_CLIENT_SECRET') ??
-      this.configService.get<string>('BV_CLIENT_SECRET');
+  private getTokenClientSecret(auth: 'hvd' | 'org'): string {
+    const authSpecificKey = auth === 'hvd' ? 'BV_HVD_CLIENT_SECRET' : 'BV_FORETAGSINFO_CLIENT_SECRET';
+    const clientSecret = this.configService.get<string>(authSpecificKey) ?? this.configService.get<string>('BV_CLIENT_SECRET');
     if (!clientSecret) {
       throw new UnauthorizedException('Bolagsverket OAuth client secret is missing');
     }
     return clientSecret;
+  }
+
+  private getTokenScopes(auth: 'hvd' | 'org'): string {
+    if (auth === 'hvd') return this.getHvdScopes();
+    return this.configService.get<string>('BV_FORETAGSINFO_SCOPES') ?? '';
+  }
+
+  private getTokenUrl(auth: 'hvd' | 'org'): string {
+    if (auth === 'hvd') return this.getHvdTokenUrl();
+    return this.configService.get<string>('BV_FORETAGSINFO_TOKEN_URL') ?? this.getHvdTokenUrl();
+  }
+
+  private getTokenCacheKey(auth: 'hvd' | 'org'): string {
+    return `${auth}:${this.getTokenScopes(auth)}`;
   }
 
   private resolveForetagsinfoAuthHeader(): { name: string; value: string } | null {
@@ -138,8 +156,13 @@ export class BolagsverketClient {
     return null;
   }
 
+  private isForetagsinfoOAuthEnabled(): boolean {
+    const raw = this.configService.get<string>('BV_FORETAGSINFO_USE_OAUTH');
+    return typeof raw === 'string' && raw.toLowerCase() === 'true';
+  }
+
   private async buildHvdHeaders(extraHeaders: Record<string, string> = {}): Promise<Record<string, string>> {
-    const token = await this.getAccessToken();
+    const token = await this.getAccessToken('hvd');
     return {
       'content-type': 'application/json',
       Authorization: `Bearer ${token}`,
@@ -148,12 +171,18 @@ export class BolagsverketClient {
     };
   }
 
-  private buildForetagsinfoHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+  private async buildForetagsinfoHeaders(extraHeaders: Record<string, string> = {}): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       'x-request-id': randomUUID(),
       ...extraHeaders,
     };
+
+    if (this.isForetagsinfoOAuthEnabled()) {
+      const token = await this.getAccessToken('org');
+      headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
 
     const authHeader = this.resolveForetagsinfoAuthHeader();
     if (authHeader) {
@@ -178,13 +207,38 @@ export class BolagsverketClient {
   }
 
   private mapError(status?: number, requestId?: string, details?: BvApiError | string): never {
-    const detailMessage = typeof details === 'string' ? details : details?.detail || details?.title || details?.code;
+    const normalized = this.normalizeApiErrorDetails(status, requestId, details);
+    const detailMessage = normalized.detail || normalized.title || normalized.code;
     const detailSuffix = detailMessage ? `: ${detailMessage}` : '';
-    const base = requestId ? ` (requestId: ${requestId})` : '';
-    if (status === 400) throw new BadRequestException(`Bolagsverket rejected the request${base}${detailSuffix}`);
-    if (status === 401) throw new UnauthorizedException(`Bolagsverket authentication failed${base}${detailSuffix}`);
-    if (status === 403) throw new ForbiddenException(`Bolagsverket access forbidden${base}${detailSuffix}`);
+    const base = normalized.requestId ? ` (requestId: ${normalized.requestId})` : '';
+    this.logger.error(
+      `Bolagsverket upstream error${base}`,
+      JSON.stringify({
+        status: normalized.status,
+        title: normalized.title,
+        detail: normalized.detail,
+        code: normalized.code,
+        requestId: normalized.requestId,
+      }),
+    );
+    const mappedStatus = normalized.status ?? status;
+    if (mappedStatus === 400) throw new BadRequestException(`Bolagsverket rejected the request${base}${detailSuffix}`);
+    if (mappedStatus === 401) throw new UnauthorizedException(`Bolagsverket authentication failed${base}${detailSuffix}`);
+    if (mappedStatus === 403) throw new ForbiddenException(`Bolagsverket access forbidden${base}${detailSuffix}`);
     throw new InternalServerErrorException(`Bolagsverket request failed${base}${detailSuffix}`);
+  }
+
+  private normalizeApiErrorDetails(status?: number, requestId?: string, details?: BvApiError | string) {
+    if (typeof details === 'string') {
+      return { status, detail: details, requestId };
+    }
+    return {
+      status: details?.status ?? status,
+      title: details?.title,
+      detail: details?.detail,
+      code: details?.code,
+      requestId: details?.requestId ?? requestId,
+    };
   }
 
   private async requestWithRetry<T>(
@@ -201,10 +255,9 @@ export class BolagsverketClient {
     let retryDelayMs: number = RETRY_CONFIG.initialDelayMs;
 
     while (true) {
-      const headers =
-        options?.auth === 'org'
-          ? this.buildForetagsinfoHeaders(options?.extraHeaders)
-          : await this.buildHvdHeaders(options?.extraHeaders);
+      const headers = options?.auth === 'org'
+        ? await this.buildForetagsinfoHeaders(options?.extraHeaders)
+        : await this.buildHvdHeaders(options?.extraHeaders);
       const requestId = headers['x-request-id'];
       try {
         const config: AxiosRequestConfig = {
@@ -243,88 +296,145 @@ export class BolagsverketClient {
   }
 
   private invalidateToken(): void {
-    this.hvdTokenCache = null;
-    this.tokenRequest = null;
+    this.tokenCaches.clear();
+    this.tokenRequests.clear();
   }
 
-  private isTokenValid(): boolean {
-    if (!this.hvdTokenCache) return false;
-    return Date.now() < this.hvdTokenCache.expiresAt;
+  private isTokenValid(cacheKey: string): boolean {
+    const tokenCache = this.tokenCaches.get(cacheKey);
+    if (!tokenCache) return false;
+    return Date.now() < tokenCache.expiresAt;
   }
 
-  private async requestAccessToken(): Promise<OAuthTokenResponse> {
-    const clientId = this.getHvdClientId();
-    const clientSecret = this.getHvdClientSecret();
+  private async requestAccessToken(auth: 'hvd' | 'org'): Promise<OAuthTokenResponse> {
+    const clientId = this.getTokenClientId(auth);
+    const clientSecret = this.getTokenClientSecret(auth);
     if (!clientId || !clientSecret) {
       throw new UnauthorizedException('Bolagsverket OAuth client credentials are missing');
     }
 
     const params = new URLSearchParams();
     params.append('grant_type', 'client_credentials');
-    params.append('client_id', clientId);
-    params.append('client_secret', clientSecret);
-    params.append('scope', this.getHvdScopes());
+    const scope = this.getTokenScopes(auth);
+    if (scope) params.append('scope', scope);
+    const tokenUrl = this.getTokenUrl(auth);
+    const requestId = randomUUID();
+    const authHeader = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
 
-    const tokenUrl = this.getHvdTokenUrl();
-    const response = await firstValueFrom(
-      this.httpService.post(tokenUrl, params.toString(), {
-        headers: {
-          'content-type': 'application/x-www-form-urlencoded',
-          'x-request-id': randomUUID(),
-        },
-      }),
-    );
+    let attempt = 0;
+    const maxAttempts = RETRY_CONFIG.maxRetries + 1;
+    let retryDelayMs: number = RETRY_CONFIG.initialDelayMs;
+    let lastError: unknown;
 
-    const tokenSchema = z.object({
-      access_token: z.string().min(1),
-      token_type: z.string().optional(),
-      expires_in: z.union([z.number(), z.string()]),
-      scope: z.string().optional(),
-    });
-    const parsed = tokenSchema.parse(response.data);
-    const expiresIn = Number(parsed.expires_in);
-    if (!Number.isFinite(expiresIn) || expiresIn <= 0) {
-      throw new InternalServerErrorException(
-        `Bolagsverket token response contains invalid expires_in: ${String(parsed.expires_in)}`,
-      );
+    while (attempt < maxAttempts) {
+      try {
+        const response = await firstValueFrom(
+          this.httpService.get(tokenUrl, {
+            params: Object.fromEntries(params.entries()),
+            headers: {
+              Authorization: authHeader,
+              Accept: 'application/json',
+              'x-request-id': requestId,
+            },
+          }),
+        );
+        const tokenSchema = z.object({
+          access_token: z.string().min(1),
+          token_type: z.string().optional(),
+          expires_in: z.union([z.number(), z.string()]),
+          scope: z.string().optional(),
+        });
+        const parsed = tokenSchema.parse(response.data);
+        const expiresIn = Number(parsed.expires_in);
+        if (!Number.isFinite(expiresIn) || expiresIn <= 0) {
+          throw new InternalServerErrorException(
+            `Bolagsverket token response contains invalid expires_in: ${String(parsed.expires_in)}`,
+          );
+        }
+
+        return {
+          access_token: parsed.access_token,
+          token_type: parsed.token_type,
+          expires_in: expiresIn,
+          scope: parsed.scope,
+        };
+      } catch (error: any) {
+        const status = error?.response?.status as number | undefined;
+        const isRetryable = status === undefined || RETRYABLE_STATUS_CODES.has(status);
+        lastError = error;
+        if (isRetryable && attempt < maxAttempts - 1) {
+          attempt++;
+          this.logger.warn(
+            `Bolagsverket token request failed for ${auth} with ${status ?? 'network error'} – retry ${attempt}/${RETRY_CONFIG.maxRetries} in ${retryDelayMs}ms (requestId: ${requestId})`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+          retryDelayMs = Math.min(retryDelayMs * RETRY_CONFIG.backoffMultiplier, RETRY_CONFIG.maxDelayMs);
+          continue;
+        }
+        this.tokenMetrics.requestFailures++;
+        this.mapError(status, requestId, error?.response?.data);
+      }
     }
-
-    return {
-      access_token: parsed.access_token,
-      token_type: parsed.token_type,
-      expires_in: expiresIn,
-      scope: parsed.scope,
-    };
+    throw new InternalServerErrorException(`Bolagsverket token request failed: ${String(lastError)}`);
   }
 
-  async getAccessToken(): Promise<string> {
-    if (this.isTokenValid()) {
-      return this.hvdTokenCache!.accessToken;
+  /**
+   * Returns a cached OAuth token for the selected integration target.
+   * - `hvd`: Värdefulla Datamängder token settings (`BV_HVD_*`).
+   * - `org`: Företagsinformation OAuth mode settings (`BV_FORETAGSINFO_*`).
+   */
+  async getAccessToken(auth: 'hvd' | 'org' = 'hvd'): Promise<string> {
+    const cacheKey = this.getTokenCacheKey(auth);
+    if (this.isTokenValid(cacheKey)) {
+      this.tokenMetrics.cacheHits++;
+      return this.tokenCaches.get(cacheKey)!.accessToken;
+    }
+    this.tokenMetrics.cacheMisses++;
+
+    const ongoingRequest = this.tokenRequests.get(cacheKey);
+    if (ongoingRequest) {
+      return ongoingRequest;
     }
 
-    if (this.tokenRequest) {
-      return this.tokenRequest;
-    }
-
-    this.tokenRequest = (async () => {
+    const tokenRequest = (async () => {
       try {
-        const tokenResponse = await this.requestAccessToken();
+        const tokenResponse = await this.requestAccessToken(auth);
         const expiresInMs = tokenResponse.expires_in * 1000;
         const skewMs = Math.min(TOKEN_REFRESH_SKEW_MS, Math.floor(expiresInMs * 0.1));
         const expiresAt = Date.now() + Math.max(expiresInMs - skewMs, 0);
-        this.hvdTokenCache = {
+        this.tokenMetrics.refreshes++;
+        this.tokenCaches.set(cacheKey, {
           accessToken: tokenResponse.access_token,
           expiresAt,
           scope: tokenResponse.scope,
           tokenType: tokenResponse.token_type,
-        };
+        });
         return tokenResponse.access_token;
       } finally {
-        this.tokenRequest = null;
+        this.tokenRequests.delete(cacheKey);
       }
     })();
 
-    return this.tokenRequest;
+    this.tokenRequests.set(cacheKey, tokenRequest);
+    return tokenRequest;
+  }
+
+  getTokenCacheStatus(): {
+    entries: Array<{ cacheKey: string; expiresAt: number; expiresInMs: number; scope?: string; tokenType?: string }>;
+    metrics: { cacheHits: number; cacheMisses: number; refreshes: number; requestFailures: number };
+  } {
+    const now = Date.now();
+    const entries = [...this.tokenCaches.entries()].map(([cacheKey, token]) => ({
+      cacheKey,
+      expiresAt: token.expiresAt,
+      expiresInMs: Math.max(token.expiresAt - now, 0),
+      scope: token.scope,
+      tokenType: token.tokenType,
+    }));
+    return {
+      entries,
+      metrics: { ...this.tokenMetrics },
+    };
   }
 
   async revokeAccessToken(): Promise<{ revoked: boolean; error?: string }> {
@@ -332,12 +442,14 @@ export class BolagsverketClient {
     if (!revokeUrl) {
       return { revoked: false, error: 'Revocation endpoint is not configured' };
     }
-    if (!this.hvdTokenCache) {
+    const hvdCacheKey = this.getTokenCacheKey('hvd');
+    const hvdToken = this.tokenCaches.get(hvdCacheKey);
+    if (!hvdToken) {
       return { revoked: false, error: 'No access token available to revoke' };
     }
 
     const params = new URLSearchParams();
-    params.append('token', this.hvdTokenCache.accessToken);
+    params.append('token', hvdToken.accessToken);
     params.append('token_type_hint', 'access_token');
     try {
       await firstValueFrom(

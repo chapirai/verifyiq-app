@@ -80,6 +80,12 @@ export class BolagsverketController {
     return this.bolagsverketService.healthCheck();
   }
 
+  /** GET /bolagsverket/token-cache – expose OAuth token cache diagnostics. */
+  @Get('token-cache')
+  tokenCacheStatus() {
+    return this.bolagsverketService.getTokenCacheStatus();
+  }
+
   /**
    * POST /bolagsverket/company
    * Retrieve complete company profile (HVD + organisation information + documents).
