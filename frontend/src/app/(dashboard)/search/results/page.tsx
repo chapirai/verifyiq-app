@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import type { Route } from 'next';
 import { useSearchResults } from '@/hooks/use-search-results';
 import type { CompanySearchResult } from '@/lib/api';
 
@@ -177,9 +178,11 @@ interface PaginationControlsProps {
 }
 
 function PaginationControls({ page, totalPages, query, limit }: PaginationControlsProps) {
-  function buildUrl(p: number) {
-    const params = new URLSearchParams({ q: query, page: String(p), limit: String(limit) });
-    return `/search/results?${params.toString()}`;
+  function buildHref(p: number) {
+    return {
+      pathname: '/search/results' as Route,
+      query: { q: query, page: String(p), limit: String(limit) },
+    };
   }
 
   if (totalPages <= 1) return null;
@@ -188,7 +191,7 @@ function PaginationControls({ page, totalPages, query, limit }: PaginationContro
     <div className="flex items-center justify-between text-sm">
       {page > 1 ? (
         <Link
-          href={buildUrl(page - 1)}
+          href={buildHref(page - 1)}
           className="rounded-xl bg-slate-700 px-4 py-2 text-white transition hover:bg-slate-600"
         >
           ← Previous
@@ -210,7 +213,7 @@ function PaginationControls({ page, totalPages, query, limit }: PaginationContro
 
       {page < totalPages ? (
         <Link
-          href={buildUrl(page + 1)}
+          href={buildHref(page + 1)}
           className="rounded-xl bg-slate-700 px-4 py-2 text-white transition hover:bg-slate-600"
         >
           Next →
