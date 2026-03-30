@@ -88,7 +88,8 @@ services:
       BV_CLIENT_ID: ${BV_CLIENT_ID:-placeholder-bv-client-id}
       BV_CLIENT_SECRET: ${BV_CLIENT_SECRET:-placeholder-bv-client-secret}
       API_BASE_URL: http://localhost:${PORT:-4000}/api/v1
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URLS: ${FRONTEND_URLS:-}
     depends_on:
       postgres:
         condition: service_healthy

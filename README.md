@@ -210,6 +210,8 @@ cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | yes | Same as MinIO credentials for local dev |
 | `BV_CLIENT_ID` / `BV_CLIENT_SECRET` | yes | Default Bolagsverket OAuth credentials (used for HVD if specific HVD creds not supplied) |
 | `BV_FORETAGSINFO_BEARER_TOKEN` | optional | Bearer token for Företagsinformation API |
+| `FRONTEND_URL` | yes | Primary frontend origin for backend CORS (example: `https://casablac.com`) |
+| `FRONTEND_URLS` | optional | Comma-separated extra frontend origins for CORS (example: `https://www.casablac.com`) |
 | `NEXT_PUBLIC_API_BASE_URL` | yes | Frontend → backend URL |
 
 ## Local URLs
@@ -220,6 +222,68 @@ cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 | Backend API | <http://localhost:4000/api/v1> |
 | MinIO API | <http://localhost:9000> |
 | MinIO Console | <http://localhost:9001> |
+
+## Deploying to `casablac.com` (Wix DNS) with backend + local database
+
+This setup keeps PostgreSQL local while exposing frontend/backend publicly from a host at `83.250.39.207`.
+
+### 1) Wix DNS records (TTL: 1 hour)
+
+Create/update these DNS records in Wix:
+
+- `A` record: `@` (root, `casablac.com`) → `83.250.39.207` (TTL 1 hour)
+- `A` record: `www` (`www.casablac.com`) → `83.250.39.207` (TTL 1 hour)
+- `A` record: `api` (`api.casablac.com`) → `83.250.39.207` (TTL 1 hour)
+
+### 2) Frontend hosting approach (recommended)
+
+Do **not** embed the full Next.js app inside Wix pages. Use Wix only for DNS and host the frontend from your own server/container:
+
+- Frontend public URL: `https://casablac.com` (and/or `https://www.casablac.com`)
+- Backend public URL: `https://api.casablac.com/api/v1`
+
+Use a reverse proxy (for example Nginx/Caddy/Traefik) on `83.250.39.207` to:
+- route `casablac.com` + `www.casablac.com` to the frontend container (`:3000`)
+- route `api.casablac.com` to the backend container (`:4000`)
+- terminate HTTPS certificates for all three hostnames
+
+### 3) Required environment values
+
+Set production environment variables before starting containers:
+
+```bash
+# Frontend
+NEXT_PUBLIC_API_BASE_URL=https://api.casablac.com/api/v1
+
+# Backend CORS allowlist
+FRONTEND_URL=https://casablac.com
+FRONTEND_URLS=https://www.casablac.com
+```
+
+`FRONTEND_URLS` supports comma-separated values if needed (for example preview domains).
+
+### 4) Keep database local but reachable by backend
+
+If backend runs on `83.250.39.207` and PostgreSQL stays on another local computer:
+
+- set backend `PG_HOST` to that local machine's reachable IP/DNS (not `localhost`)
+- in PostgreSQL, set `listen_addresses` to allow that interface
+- in `pg_hba.conf`, allow only the backend host/IP and only required users/databases
+- open firewall **only** for PostgreSQL from backend host (TCP 5432), deny all other sources
+- prefer VPN/private tunnel between backend host and local DB network
+
+Keep Redis/MinIO either local to backend host or similarly restricted.
+
+### 5) CORS and firewall checklist
+
+- Backend CORS must include:
+  - `https://casablac.com`
+  - `https://www.casablac.com`
+- Frontend must call only `https://api.casablac.com/api/v1`
+- Open inbound ports:
+  - `80/443` to reverse proxy
+  - backend port (`4000`) should be internal-only if proxy is on same host
+  - PostgreSQL (`5432`) should never be public on internet
 
 ## Bolagsverket Enrichment Module
 
