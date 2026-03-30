@@ -225,15 +225,15 @@ cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 
 ## Deploying to `casablac.com` (Wix DNS) with backend + local database
 
-This setup keeps PostgreSQL local while exposing frontend/backend publicly from a host at `83.250.39.207`.
+This setup keeps PostgreSQL local while exposing frontend/backend publicly from your server host.
 
 ### 1) Wix DNS records (TTL: 1 hour)
 
 Create/update these DNS records in Wix:
 
-- `A` record: `@` (root, `casablac.com`) → `83.250.39.207` (TTL 1 hour)
-- `A` record: `www` (`www.casablac.com`) → `83.250.39.207` (TTL 1 hour)
-- `A` record: `api` (`api.casablac.com`) → `83.250.39.207` (TTL 1 hour)
+- `A` record: `@` (root, `casablac.com`) → `<YOUR_SERVER_IP>` (TTL 1 hour)
+- `A` record: `www` (`www.casablac.com`) → `<YOUR_SERVER_IP>` (TTL 1 hour)
+- `A` record: `api` (`api.casablac.com`) → `<YOUR_SERVER_IP>` (TTL 1 hour)
 
 ### 2) Frontend hosting approach (recommended)
 
@@ -242,7 +242,7 @@ Do **not** embed the full Next.js app inside Wix pages. Use Wix only for DNS and
 - Frontend public URL: `https://casablac.com` (and/or `https://www.casablac.com`)
 - Backend public URL: `https://api.casablac.com/api/v1`
 
-Use a reverse proxy (for example Nginx/Caddy/Traefik) on `83.250.39.207` to:
+Use a reverse proxy (for example Nginx/Caddy/Traefik) on your server to:
 - route `casablac.com` + `www.casablac.com` to the frontend container (`:3000`)
 - route `api.casablac.com` to the backend container (`:4000`)
 - terminate HTTPS certificates for all three hostnames
@@ -264,7 +264,7 @@ FRONTEND_URLS=https://www.casablac.com
 
 ### 4) Keep database local but reachable by backend
 
-If backend runs on `83.250.39.207` and PostgreSQL stays on another local computer:
+If backend runs on your server and PostgreSQL stays on another local computer:
 
 - set backend `PG_HOST` to that local machine's reachable IP/DNS (not `localhost`)
 - in PostgreSQL, set `listen_addresses` to allow that interface
