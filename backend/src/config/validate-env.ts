@@ -40,6 +40,26 @@ const envSchema = z.object({
   BV_FORETAGSINFO_TOKEN: z.string().min(1).optional(),
   API_BASE_URL: z.string().url(),
   FRONTEND_URL: z.string().url().optional(),
+  FRONTEND_URLS: z
+    .string()
+    .optional()
+    .refine(
+      value =>
+        !value ||
+        value
+          .split(',')
+          .map(origin => origin.trim())
+          .filter(Boolean)
+          .every(origin => {
+            try {
+              new URL(origin);
+              return true;
+            } catch {
+              return false;
+            }
+          }),
+      { message: 'FRONTEND_URLS must be a comma-separated list of valid URLs' },
+    ),
 });
 
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
