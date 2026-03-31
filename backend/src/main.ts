@@ -8,7 +8,12 @@ import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
   const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
-  const allowedOrigins = new Set([frontendUrl, 'http://localhost:3000']);
+  const frontendUrls = process.env.FRONTEND_URLS
+    ? process.env.FRONTEND_URLS.split(',')
+        .map((url) => url.trim())
+        .filter(Boolean)
+    : [];
+  const allowedOrigins = new Set([frontendUrl, ...frontendUrls, 'http://localhost:3000']);
 
   const app = await NestFactory.create(AppModule, {
     cors: {
