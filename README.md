@@ -210,8 +210,8 @@ cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | yes | Same as MinIO credentials for local dev |
 | `BV_CLIENT_ID` / `BV_CLIENT_SECRET` | yes | Default Bolagsverket OAuth credentials (used for HVD if specific HVD creds not supplied) |
 | `BV_FORETAGSINFO_BEARER_TOKEN` | optional | Bearer token for Företagsinformation API |
-| `FRONTEND_URL` | yes | Primary frontend origin for backend CORS (example: `https://casablac.com`) |
-| `FRONTEND_URLS` | optional | Comma-separated extra frontend origins for CORS (example: `https://www.casablac.com`) |
+| `FRONTEND_URL` | yes | Primary frontend origin for backend CORS (example: `https://nordiccompanydata.com`) |
+| `FRONTEND_URLS` | optional | Comma-separated extra frontend origins for CORS (example: `https://www.nordiccompanydata.com`) |
 | `NEXT_PUBLIC_API_BASE_URL` | yes | Frontend → backend URL |
 
 ## Local URLs
@@ -223,29 +223,26 @@ cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 | MinIO API | <http://localhost:9000> |
 | MinIO Console | <http://localhost:9001> |
 
-## Deploying to `casablac.com` (Wix DNS) with backend + local database
+## Deploying to `nordiccompanydata.com` (Vercel + Render)
 
-This setup keeps PostgreSQL local while exposing frontend/backend publicly from your server host.
+This setup uses Vercel for the frontend and Render for the backend API.
 
-### 1) Wix DNS records (TTL: 1 hour)
+### 1) DNS records (TTL: 1 hour)
 
-Create/update these DNS records in Wix:
+Create/update DNS records with your domain provider:
 
-- `A` record: `@` (root, `casablac.com`) → `<YOUR_SERVER_IP>` (TTL 1 hour)
-- `A` record: `www` (`www.casablac.com`) → `<YOUR_SERVER_IP>` (TTL 1 hour)
-- `A` record: `api` (`api.casablac.com`) → `<YOUR_SERVER_IP>` (TTL 1 hour)
+- `A`/`ALIAS` record: `@` (`nordiccompanydata.com`) → Vercel target
+- `CNAME` record: `www` (`www.nordiccompanydata.com`) → `cname.vercel-dns.com`
+- Verify Render service DNS remains `verifyiq.onrender.com`
 
-### 2) Frontend hosting approach (recommended)
+### 2) Hosting approach
 
-Do **not** embed the full Next.js app inside Wix pages. Use Wix only for DNS and host the frontend from your own server/container:
+Deploy the Next.js frontend on Vercel and keep the NestJS API on Render:
 
-- Frontend public URL: `https://casablac.com` (and/or `https://www.casablac.com`)
-- Backend public URL: `https://api.casablac.com/api/v1`
+- Frontend public URL: `https://nordiccompanydata.com` (and optionally `https://www.nordiccompanydata.com`)
+- Backend public URL: `https://verifyiq.onrender.com/api/v1`
 
-Use a reverse proxy (for example Nginx/Caddy/Traefik) on your server to:
-- route `casablac.com` + `www.casablac.com` to the frontend container (`:3000`)
-- route `api.casablac.com` to the backend container (`:4000`)
-- terminate HTTPS certificates for all three hostnames
+Ensure both services have valid SSL certificates and custom domains configured.
 
 ### 3) Required environment values
 
@@ -253,37 +250,24 @@ Set production environment variables before starting containers:
 
 ```bash
 # Frontend
-NEXT_PUBLIC_API_BASE_URL=https://api.casablac.com/api/v1
+NEXT_PUBLIC_API_BASE_URL=https://verifyiq.onrender.com/api/v1
 
 # Backend CORS allowlist
-FRONTEND_URL=https://casablac.com
-FRONTEND_URLS=https://www.casablac.com
+FRONTEND_URL=https://nordiccompanydata.com
+FRONTEND_URLS=https://www.nordiccompanydata.com
 ```
 
 `FRONTEND_URLS` supports comma-separated values if needed (for example preview domains).
 
-### 4) Keep database local but reachable by backend
-
-If backend runs on your server and PostgreSQL stays on another local computer:
-
-- set backend `PG_HOST` to that local machine's reachable IP/DNS (not `localhost`)
-- in PostgreSQL, set `listen_addresses` to allow that interface
-- in `pg_hba.conf`, allow only the backend host/IP and only required users/databases
-- open firewall **only** for PostgreSQL from backend host (TCP 5432), deny all other sources
-- prefer VPN/private tunnel between backend host and local DB network
-
-Keep Redis/MinIO either local to backend host or similarly restricted.
-
-### 5) CORS and firewall checklist
+### 4) CORS and hosting checklist
 
 - Backend CORS must include:
-  - `https://casablac.com`
-  - `https://www.casablac.com`
-- Frontend must call only `https://api.casablac.com/api/v1`
-- Open inbound ports:
-  - `80/443` to reverse proxy
-  - backend port (`4000`) should be internal-only if proxy is on same host
-  - PostgreSQL (`5432`) should never be public on internet
+  - `https://nordiccompanydata.com`
+  - `https://www.nordiccompanydata.com` (if used)
+- Frontend must call only `https://verifyiq.onrender.com/api/v1`
+- In Vercel, set `NEXT_PUBLIC_API_BASE_URL=https://verifyiq.onrender.com/api/v1`
+- In Render, set `FRONTEND_URL=https://nordiccompanydata.com` and optional `FRONTEND_URLS=https://www.nordiccompanydata.com`
+- Confirm DNS and SSL are valid for both frontend and backend domains
 
 ## Bolagsverket Enrichment Module
 

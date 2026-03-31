@@ -39,6 +39,7 @@ BV_FORETAGSINFO_BASE_URL=https://gw.api.bolagsverket.se/foretagsinformation/v4
 BV_FORETAGSINFO_USE_OAUTH=false
 BV_FORETAGSINFO_BEARER_TOKEN=<if-using-bearer-auth>
 
-API_BASE_URL=https://your-production-domain.com/api/v1
-FRONTEND_URL=https://your-production-domain.com
-NEXT_PUBLIC_API_BASE_URL=https://your-production-domain.com/api/v1
+API_BASE_URL=https://verifyiq.onrender.com/api/v1
+FRONTEND_URL=https://nordiccompanydata.com
+FRONTEND_URLS=https://www.nordiccompanydata.com
+NEXT_PUBLIC_API_BASE_URL=https://verifyiq.onrender.com/api/v1
