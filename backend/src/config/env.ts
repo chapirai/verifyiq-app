@@ -39,4 +39,5 @@ export default () => ({
   BV_FORETAGSINFO_TOKEN: process.env.BV_FORETAGSINFO_TOKEN,
   API_BASE_URL: process.env.API_BASE_URL ?? 'http://localhost:4000/api/v1',
   FRONTEND_URL: process.env.FRONTEND_URL,
+  FRONTEND_URLS: process.env.FRONTEND_URLS,
 });
