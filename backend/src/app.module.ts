@@ -49,6 +49,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
         database: config.getOrThrow<string>('PG_DBNAME'),
         autoLoadEntities: true,
         synchronize: false,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
       }),
     }),
     BullModule.forRootAsync({
