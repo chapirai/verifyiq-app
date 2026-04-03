@@ -212,6 +212,31 @@ cp .env.example .env        # PowerShell: Copy-Item .env.example .env
 | `BV_FORETAGSINFO_BEARER_TOKEN` | optional | Bearer token for Företagsinformation API |
 | `NEXT_PUBLIC_API_BASE_URL` | yes | Frontend → backend URL |
 
+### Production deployment checklist (Render + Vercel)
+
+Use `.env.example` as your source of truth and set the values in each hosting dashboard.
+
+1. **Render PostgreSQL (database service)**
+   - Copy the database **Internal** connection values into:
+     - `PG_HOST`, `PG_PORT`, `PG_DBNAME`, `PG_USER`, `PG_PASSWORD`
+     - `DATABASE_URL` (internal URL)
+
+2. **Render backend (web service)**
+   - Set all required backend env vars from `.env.example` (`PG_*`, Redis, storage, JWT, Bolagsverket).
+   - Set:
+     - `API_BASE_URL=https://<your-render-backend>.onrender.com/api/v1`
+     - `FRONTEND_URL=https://<your-vercel-project>.vercel.app`
+     - `FRONTEND_URLS` (optional, comma-separated extra domains like custom domain + preview URL)
+
+3. **Vercel frontend project**
+   - Set:
+     - `NEXT_PUBLIC_API_BASE_URL=https://<your-render-backend>.onrender.com/api/v1`
+     - `NEXT_PUBLIC_DEFAULT_TENANT_SLUG` (optional, e.g. `demo-bank`)
+
+4. **Important**
+   - Updating local `.env` is **not enough** for production.
+   - You must also set env vars in the **Render** and **Vercel** dashboards, then redeploy services.
+
 ## Local URLs
 
 | Service | URL |
