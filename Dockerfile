@@ -1,3 +1,5 @@
+# Render defaults to ./Dockerfile, while local compose builds with backend/Dockerfile.
+# Keep both files aligned so either build path produces the same backend image.
 FROM node:20-alpine AS base
 WORKDIR /app
 
