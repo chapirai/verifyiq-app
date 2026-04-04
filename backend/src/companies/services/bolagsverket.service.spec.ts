@@ -37,6 +37,7 @@ function makeNormalisedCompany(overrides: Partial<NormalisedCompany> = {}): Norm
       hasRichOrganisationInformation: false,
       partialDataFields: [],
     },
+    fieldErrors: [],
     ...overrides,
   };
 }

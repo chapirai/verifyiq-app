@@ -33,6 +33,11 @@ const envSchema = z.object({
   BV_HVD_SCOPES: z.string().min(1).optional(),
   BV_HVD_DOCUMENT_PATH: z.string().min(1).optional(),
   BV_FORETAGSINFO_BASE_URL: z.string().url().optional(),
+  BV_FORETAGSINFO_CLIENT_ID: z.string().min(1).optional(),
+  BV_FORETAGSINFO_CLIENT_SECRET: z.string().min(1).optional(),
+  BV_FORETAGSINFO_TOKEN_URL: z.string().url().optional(),
+  BV_FORETAGSINFO_SCOPES: z.string().min(1).optional(),
+  BV_FORETAGSINFO_USE_OAUTH: z.enum(['true', 'false']).optional(),
   BV_FORETAGSINFO_AUTH_HEADER: z.string().min(1).optional(),
   BV_FORETAGSINFO_AUTH_VALUE: z.string().min(1).optional(),
   BV_FORETAGSINFO_BEARER_TOKEN: z.string().min(1).optional(),
@@ -74,5 +79,21 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
     throw new Error(`Invalid environment configuration: ${errors}`);
   }
 
-  return parsed.data;
+  const data = parsed.data;
+
+  // Warn at startup if Företagsinformation OAuth is enabled without a dedicated
+  // token URL — it will fall back to the HVD token URL, which may be a
+  // different OAuth server and cause silent authentication failures.
+  if (
+    data.BV_FORETAGSINFO_USE_OAUTH === 'true' &&
+    !data.BV_FORETAGSINFO_TOKEN_URL
+  ) {
+    console.warn(
+      '[config] BV_FORETAGSINFO_USE_OAUTH is enabled but BV_FORETAGSINFO_TOKEN_URL is not set. ' +
+        'Token requests for Företagsinformation will fall back to the HVD token URL ' +
+        '(BV_HVD_TOKEN_URL). Set BV_FORETAGSINFO_TOKEN_URL if the services use different OAuth servers.',
+    );
+  }
+
+  return data;
 }

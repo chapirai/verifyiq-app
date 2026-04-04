@@ -37,6 +37,13 @@ export class BvOrganisationEntity {
   @Column({ name: 'raw_payload', type: 'jsonb', default: () => "'{}'::jsonb" })
   rawPayload!: Record<string, unknown>;
 
+  /**
+   * Stores data quality metadata derived from the latest enrichment:
+   * { completenessScore, missingFields, errorSources, fieldErrors }
+   */
+  @Column({ name: 'data_quality', type: 'jsonb', nullable: true })
+  dataQuality?: Record<string, unknown> | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

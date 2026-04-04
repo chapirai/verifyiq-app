@@ -21,9 +21,8 @@ const RETRY_CONFIG = {
   backoffMultiplier: 2,
   maxDelayMs: 30_000,
 } as const;
-const HVD_BASE_URL = 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1';
 const DEFAULT_HVD_SCOPES = 'vardefulla-datamangder:read vardefulla-datamangder:ping';
-const DEFAULT_HVD_TOKEN_PATH = '/oauth2/token';
+const DEFAULT_HVD_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token';
 
 @Injectable()
 export class IntegrationTokenService {
@@ -168,24 +167,10 @@ export class IntegrationTokenService {
     return `bolagsverket:org:${this.getTokenScopes('org')}`;
   }
 
-  private normalizeBaseUrl(url: string): string {
-    return url.endsWith('/') ? url.slice(0, -1) : url;
-  }
-
-  private buildUrl(baseUrl: string, path: string): string {
-    const normalizedBase = this.normalizeBaseUrl(baseUrl);
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    return `${normalizedBase}${normalizedPath}`;
-  }
-
-  private getHvdBaseUrl(): string {
-    return this.configService.get<string>('BV_HVD_BASE_URL') ?? HVD_BASE_URL;
-  }
-
   private getHvdTokenUrl(): string {
     const configured = this.configService.get<string>('BV_HVD_TOKEN_URL');
     if (configured) return configured;
-    return this.buildUrl(this.getHvdBaseUrl(), DEFAULT_HVD_TOKEN_PATH);
+    return DEFAULT_HVD_TOKEN_URL;
   }
 
   private getTokenClientId(auth: 'hvd' | 'org'): string {

@@ -9,6 +9,7 @@ const nav: { href: Route; label: string }[] = [
   { href: '/onboarding', label: 'Onboarding' },
   { href: '/screening', label: 'Screening' },
   { href: '/monitoring', label: 'Monitoring' },
+  { href: '/integration-status', label: 'Integration Status' },
   { href: '/ownership', label: 'Ownership' },
   { href: '/financial', label: 'Financial & Ratings' },
   { href: '/risk-indicators', label: 'Risk Indicators' },

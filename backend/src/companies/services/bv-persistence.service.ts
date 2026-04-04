@@ -35,6 +35,24 @@ export class BvPersistenceService {
     entity.senastUppdaterad = new Date();
     entity.rawPayload = rawPayload;
 
+    // Derive a lightweight data quality snapshot from field-level errors.
+    // The constant mirrors TRACKED_FIELDS in HvdAggregatorService (7 canonical fields).
+    const QUALITY_TRACKED_FIELD_COUNT = 7;
+    const fieldErrors = normalised.fieldErrors ?? [];
+    const errorSources = [...new Set(fieldErrors.map((e) => e.field))];
+    const completenessScore = Math.round(
+      ((QUALITY_TRACKED_FIELD_COUNT - Math.min(errorSources.length, QUALITY_TRACKED_FIELD_COUNT)) /
+        QUALITY_TRACKED_FIELD_COUNT) *
+        100,
+    );
+    entity.dataQuality = {
+      completenessScore,
+      missingFields: errorSources,
+      errorSources: [...new Set(fieldErrors.map((e) => e.errorType))],
+      fieldErrors,
+      lastUpdated: new Date().toISOString(),
+    };
+
     const saved = await this.orgRepo.save(entity);
     this.logger.log(
       `Upserted organisation ${normalised.organisationNumber} for tenant ${tenantId}`,
