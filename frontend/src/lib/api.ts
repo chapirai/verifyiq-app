@@ -72,6 +72,22 @@ export interface CompanySearchResult {
   fetchedAt: string | null;
 }
 
+export interface CompanyListItem {
+  organisationNumber: string;
+  legalName: string | null;
+  status: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompanyListResponse {
+  data: CompanyListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  has_next: boolean;
+}
+
 export interface CompanySearchResponse {
   results: CompanySearchResult[];
   metadata: {
@@ -244,8 +260,8 @@ export const api = {
     return response.data;
   },
 
-  async listCompanies() {
-    const response = await httpClient.get('/companies');
+  async listCompanies(): Promise<CompanyListResponse> {
+    const response = await httpClient.get<CompanyListResponse>('/companies');
     return response.data;
   },
 
