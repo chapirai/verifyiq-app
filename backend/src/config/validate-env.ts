@@ -36,7 +36,7 @@ const envSchema = z.object({
   BV_FORETAGSINFO_CLIENT_ID: z.string().min(1).optional(),
   BV_FORETAGSINFO_CLIENT_SECRET: z.string().min(1).optional(),
   BV_FORETAGSINFO_TOKEN_URL: z.string().url().optional(),
-  BV_FORETAGSINFO_SCOPES: z.string().optional(),
+  BV_FORETAGSINFO_SCOPES: z.string().min(1).optional(),
   BV_FORETAGSINFO_USE_OAUTH: z.enum(['true', 'false']).optional(),
   BV_FORETAGSINFO_AUTH_HEADER: z.string().min(1).optional(),
   BV_FORETAGSINFO_AUTH_VALUE: z.string().min(1).optional(),
