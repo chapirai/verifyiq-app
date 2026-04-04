@@ -89,11 +89,12 @@ export class CompaniesService {
     dto: LookupCompanyDto,
   ): Promise<LookupCompanyResponseDto> {
     const correlationId = randomUUID();
+    const orgId = dto.identitetsbeteckning ?? dto.orgNumber ?? '';
     this.logger.log(
-      `[${correlationId}] orchestrateLookup tenant=${ctx.tenantId} orgNumber=${dto.orgNumber} forceRefresh=${dto.force_refresh ?? false}`,
+      `[${correlationId}] orchestrateLookup tenant=${ctx.tenantId} identitetsbeteckning=${orgId} forceRefresh=${dto.force_refresh ?? false}`,
     );
 
-    const dedupeKey = `${ctx.tenantId}:${dto.orgNumber}`;
+    const dedupeKey = `${ctx.tenantId}:${orgId}`;
 
     // Deduplication: reuse an in-flight API call for the same org within this request window
     if (!dto.force_refresh && this.inFlight.has(dedupeKey)) {
@@ -115,8 +116,9 @@ export class CompaniesService {
     correlationId: string,
   ): Promise<LookupCompanyResponseDto> {
     const actorId = ctx.actorId ?? null;
+    const orgId = dto.identitetsbeteckning ?? dto.orgNumber ?? '';
     const lookupMetadata = {
-      orgNumber: dto.orgNumber,
+      identitetsbeteckning: orgId,
       forceRefresh: dto.force_refresh ?? false,
     };
 
@@ -126,7 +128,7 @@ export class CompaniesService {
       eventType: AuditEventType.LOOKUP_INITIATED,
       action: 'company.lookup',
       status: 'initiated',
-      resourceId: dto.orgNumber,
+      resourceId: orgId,
       correlationId,
       metadata: lookupMetadata,
     });
@@ -141,7 +143,7 @@ export class CompaniesService {
       }),
       httpMethod: 'POST',
       sourceEndpoint: '/companies/lookup',
-      requestParameters: { orgNumber: dto.orgNumber, force_refresh: dto.force_refresh ?? false },
+      requestParameters: { identitetsbeteckning: orgId, force_refresh: dto.force_refresh ?? false },
     }).catch((err) =>
       this.logger.warn(`[P02-T06] Lineage capture error: ${err}`),
     );
@@ -158,7 +160,7 @@ export class CompaniesService {
     const recoveryStatus = await this.failureStateService.getRecoveryStatusForEntity(
       ctx.tenantId,
       'company',
-      dto.orgNumber,
+      orgId,
     );
     const isApiAvailable = recoveryStatus.canRetry;
 
@@ -167,7 +169,7 @@ export class CompaniesService {
         tenantId: ctx.tenantId,
         dataAgeHours: 0,
         forceRefresh: dto.force_refresh ?? false,
-        entityId: dto.orgNumber,
+        entityId: orgId,
         entityType: 'company',
         correlationId,
         actorId,
@@ -187,7 +189,7 @@ export class CompaniesService {
       if (!isApiAvailable) {
         const fallback = await this._attemptStaleFallback(
           ctx.tenantId,
-          dto.orgNumber,
+          orgId,
           correlationId,
           actorId,
           recoveryStatus.failureReason ?? 'provider_unavailable_backoff',
@@ -200,7 +202,7 @@ export class CompaniesService {
           await this.failureStateService.recordFailure({
             tenantId: ctx.tenantId,
             entityType: 'company',
-            entityId: dto.orgNumber,
+            entityId: orgId,
             failureState: recoveryStatus.state,
             failureReason: recoveryStatus.failureReason ?? 'provider_unavailable_backoff',
             isRecoverable: recoveryStatus.isRecoverable,
@@ -216,7 +218,7 @@ export class CompaniesService {
             eventType: AuditEventType.STALE_SERVED,
             action: 'company.cache',
             status: 'provider_unavailable_backoff',
-            resourceId: dto.orgNumber,
+            resourceId: orgId,
             correlationId,
             metadata: {
               ...lookupMetadata,
@@ -228,7 +230,7 @@ export class CompaniesService {
           await this.failureStateService.recordFailure({
             tenantId: ctx.tenantId,
             entityType: 'company',
-            entityId: dto.orgNumber,
+            entityId: orgId,
             failureState: 'NO_DATA_AVAILABLE',
             failureReason: recoveryStatus.failureReason ?? 'provider_unavailable_backoff',
             isRecoverable: recoveryStatus.isRecoverable,
@@ -243,7 +245,7 @@ export class CompaniesService {
       } else {
         const enrichPromise = this.bolagsverketService.enrichAndSave(
           ctx.tenantId,
-          dto.orgNumber,
+          orgId,
           dto.force_refresh ?? false,
           correlationId,
           actorId,
@@ -266,7 +268,7 @@ export class CompaniesService {
             await this.failureStateService.recordSuccess({
               tenantId: ctx.tenantId,
               entityType: 'company',
-              entityId: dto.orgNumber,
+              entityId: orgId,
               correlationId,
               actorId,
             });
@@ -275,7 +277,7 @@ export class CompaniesService {
           const classification = this.failureStateService.classifyFailure(err);
           const fallback = await this._attemptStaleFallback(
             ctx.tenantId,
-            dto.orgNumber,
+            orgId,
             correlationId,
             actorId,
             classification.failureReason,
@@ -284,7 +286,7 @@ export class CompaniesService {
             await this.failureStateService.recordFailure({
               tenantId: ctx.tenantId,
               entityType: 'company',
-              entityId: dto.orgNumber,
+              entityId: orgId,
               failureState: 'NO_DATA_AVAILABLE',
               failureReason: classification.failureReason,
               isRecoverable: classification.isRecoverable,
@@ -304,7 +306,7 @@ export class CompaniesService {
           await this.failureStateService.recordFailure({
             tenantId: ctx.tenantId,
             entityType: 'company',
-            entityId: dto.orgNumber,
+            entityId: orgId,
             failureState: classification.failureState,
             failureReason: classification.failureReason,
             isRecoverable: classification.isRecoverable,
@@ -319,7 +321,7 @@ export class CompaniesService {
             eventType: AuditEventType.STALE_SERVED,
             action: 'company.cache',
             status: 'provider_failure_fallback',
-            resourceId: dto.orgNumber,
+            resourceId: orgId,
             correlationId,
             metadata: {
               ...lookupMetadata,
@@ -379,11 +381,11 @@ export class CompaniesService {
         actorId,
         action: 'company.lookup',
         resourceType: 'company',
-        resourceId: dto.orgNumber,
+        resourceId: orgId,
         metadata: {
           correlationId,
           source,
-          orgNumber: dto.orgNumber,
+          identitetsbeteckning: orgId,
           ageDays,
           freshness: metadata.freshness,
           forceRefresh: dto.force_refresh ?? false,
@@ -415,7 +417,7 @@ export class CompaniesService {
         eventType: AuditEventType.LOOKUP_COMPLETED,
         action: 'company.lookup',
         status: 'success',
-        resourceId: dto.orgNumber,
+        resourceId: orgId,
         correlationId,
         costImpact,
         metadata: {
@@ -434,7 +436,7 @@ export class CompaniesService {
         eventType: AuditEventType.LOOKUP_COMPLETED,
         action: 'company.lookup',
         status: 'success',
-        resourceId: dto.orgNumber,
+        resourceId: orgId,
         correlationId,
         costImpact,
         metadata: {
@@ -452,7 +454,7 @@ export class CompaniesService {
         eventType: AuditEventType.LOOKUP_COMPLETED,
         action: 'company.lookup',
         status: 'error',
-        resourceId: dto.orgNumber,
+        resourceId: orgId,
         correlationId,
         costImpact: {
           force_refresh: dto.force_refresh ?? false,
@@ -471,7 +473,7 @@ export class CompaniesService {
         eventType: AuditEventType.LOOKUP_COMPLETED,
         action: 'company.lookup',
         status: 'error',
-        resourceId: dto.orgNumber,
+        resourceId: orgId,
         correlationId,
         costImpact: {
           force_refresh: dto.force_refresh ?? false,

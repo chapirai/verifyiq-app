@@ -241,7 +241,10 @@ export const api = {
   async lookupCompanyByOrgNumber(
     payload: CompanyLookupByOrgNumberPayload,
   ): Promise<CompanyLookupResponse> {
-    const response = await httpClient.post<CompanyLookupResponse>('/companies/lookup', payload);
+    const response = await httpClient.post<CompanyLookupResponse>('/companies/lookup', {
+      identitetsbeteckning: payload.orgNumber,
+      force_refresh: payload.force_refresh,
+    });
     return response.data;
   },
 
@@ -274,10 +277,25 @@ export const api = {
   },
 
   async searchCompanies(q: string, page = 1, limit = 10): Promise<CompanySearchResponse> {
-    const response = await httpClient.get<CompanySearchResponse>('/companies', {
+    const response = await httpClient.get<CompanyListResponse>('/companies', {
       params: { q, page, limit },
     });
-    return response.data;
+    // Map the backend CompanyListResponse shape to the CompanySearchResponse shape
+    // that the search results page expects.
+    return {
+      results: response.data.data.map((item) => ({
+        orgNumber: item.organisationNumber,
+        legalName: item.legalName,
+        status: item.status,
+        countryCode: null,
+        fetchedAt: item.updatedAt,
+      })),
+      metadata: {
+        total: response.data.total,
+        page: response.data.page,
+        limit: response.data.limit,
+      },
+    };
   },
 
   async listOnboardingCases() {
