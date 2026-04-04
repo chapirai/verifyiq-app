@@ -5,15 +5,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
-import { Interval } from '@nestjs/schedule';
 import { z } from 'zod';
 import { IntegrationTokenEntity } from '../entities/integration-token.entity';
 import { AuditService } from '../../audit/audit.service';
 import { AuditEventType } from '../../audit/audit-event.entity';
 import { OAuthTokenResponse } from '../integrations/bolagsverket.types';
 
-const TOKEN_REFRESH_SKEW_MS = 60_000;
-const BACKGROUND_REFRESH_THRESHOLD_MS = 5 * 60_000;
 const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 const RETRY_CONFIG = {
   maxRetries: 3,
@@ -27,7 +24,6 @@ const DEFAULT_HVD_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token';
 @Injectable()
 export class IntegrationTokenService {
   private readonly logger = new Logger(IntegrationTokenService.name);
-  private readonly refreshRequests = new Map<string, Promise<string>>();
   private readonly encryptionKey: Buffer;
 
   constructor(
@@ -37,11 +33,17 @@ export class IntegrationTokenService {
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
   ) {
-    const encryptionSecret = this.configService.get<string>('INTEGRATION_TOKEN_ENCRYPTION_KEY')
-      ?? this.configService.getOrThrow<string>('JWT_SECRET');
+    const encryptionSecret =
+      this.configService.get<string>('INTEGRATION_TOKEN_ENCRYPTION_KEY') ??
+      this.configService.getOrThrow<string>('JWT_SECRET');
     this.encryptionKey = createHash('sha256').update(encryptionSecret).digest();
   }
 
+  /**
+   * Always fetches a fresh token from Bolagsverket OAuth endpoint.
+   * Saves each token fetch as a new row in integration_tokens.
+   * No caching — every lookup gets a fresh token for both hvd and org APIs.
+   */
   async getTenantAccessToken(
     tenantId: string,
     auth: 'hvd' | 'org' = 'hvd',
@@ -49,45 +51,35 @@ export class IntegrationTokenService {
     actorId?: string | null,
   ): Promise<string> {
     const providerKey = this.getProviderKey(auth);
-    const cacheKey = `${tenantId}:${providerKey}`;
+    const tokenUrl = this.getTokenUrl(auth);
+    const scope = this.getTokenScopes(auth);
 
-    const ongoing = this.refreshRequests.get(cacheKey);
-    if (ongoing) {
-      return ongoing;
-    }
+    void this.auditService.emitAuditEvent({
+      tenantId,
+      userId: actorId ?? null,
+      eventType: AuditEventType.REFRESH_INITIATED,
+      action: 'integration.token.refresh',
+      status: 'initiated',
+      resourceId: providerKey,
+      correlationId: correlationId ?? null,
+      metadata: { providerKey, tokenUrl, scope },
+    });
 
-    const refreshPromise = (async () => {
-      const tokenUrl = this.getTokenUrl(auth);
-      const scope = this.getTokenScopes(auth);
-      const existing = await this.integrationTokenRepo.findOne({
-        where: { tenantId, providerKey },
-      });
-      if (existing && this.isEntityTokenValid(existing)) {
-        return this.decrypt(existing.encryptedAccessToken);
-      }
-
-      void this.auditService.emitAuditEvent({
-        tenantId,
-        userId: actorId ?? null,
-        eventType: AuditEventType.REFRESH_INITIATED,
-        action: 'integration.token.refresh',
-        status: 'initiated',
-        resourceId: providerKey,
-        correlationId: correlationId ?? null,
-        metadata: { providerKey, tokenUrl, scope },
-      });
-
+    try {
       const tokenResponse = await this.requestAccessToken(auth);
       const expiresAt = this.calculateExpiry(tokenResponse.expires_in);
 
-      const entity = existing ?? this.integrationTokenRepo.create({ tenantId, providerKey });
-      entity.encryptedAccessToken = this.encrypt(tokenResponse.access_token);
-      // Client-credentials token responses do not include refresh_token.
-      entity.encryptedRefreshToken = null;
-      entity.expiresAt = new Date(expiresAt);
-      entity.tokenType = tokenResponse.token_type ?? null;
-      entity.scope = tokenResponse.scope ?? null;
-      entity.lastRefreshedAt = new Date();
+      // Always insert a new row — each lookup is a separate instance
+      const entity = this.integrationTokenRepo.create({
+        tenantId,
+        providerKey,
+        encryptedAccessToken: this.encrypt(tokenResponse.access_token),
+        encryptedRefreshToken: null,
+        expiresAt: new Date(expiresAt),
+        tokenType: tokenResponse.token_type ?? null,
+        scope: tokenResponse.scope ?? null,
+        lastRefreshedAt: new Date(),
+      });
       await this.integrationTokenRepo.save(entity);
 
       void this.auditService.emitAuditEvent({
@@ -107,7 +99,7 @@ export class IntegrationTokenService {
       });
 
       return tokenResponse.access_token;
-    })().catch((error) => {
+    } catch (error) {
       void this.auditService.emitAuditEvent({
         tenantId,
         userId: actorId ?? null,
@@ -122,42 +114,11 @@ export class IntegrationTokenService {
         },
       });
       throw error;
-    }).finally(() => {
-      this.refreshRequests.delete(cacheKey);
-    });
-
-    this.refreshRequests.set(cacheKey, refreshPromise);
-    return refreshPromise;
-  }
-
-  @Interval(60_000)
-  async refreshExpiringTenantTokens(): Promise<void> {
-    const refreshBefore = new Date(Date.now() + BACKGROUND_REFRESH_THRESHOLD_MS);
-    const expiringTokens = await this.integrationTokenRepo
-      .createQueryBuilder('token')
-      .where('token.expires_at <= :refreshBefore', { refreshBefore })
-      .getMany();
-
-    for (const token of expiringTokens) {
-      const auth = token.providerKey.startsWith('bolagsverket:org:') ? 'org' : 'hvd';
-      try {
-        await this.getTenantAccessToken(token.tenantId, auth);
-      } catch (error) {
-        this.logger.warn(
-          `Background token refresh failed for tenant=${token.tenantId} provider=${token.providerKey}: ${String(error)}`,
-        );
-      }
     }
   }
 
-  private isEntityTokenValid(entity: IntegrationTokenEntity): boolean {
-    return Date.now() + TOKEN_REFRESH_SKEW_MS <= entity.expiresAt.getTime();
-  }
-
   private calculateExpiry(expiresInSeconds: number): number {
-    const expiresInMs = expiresInSeconds * 1000;
-    const skewMs = Math.min(TOKEN_REFRESH_SKEW_MS, Math.floor(expiresInMs * 0.1));
-    return Date.now() + Math.max(expiresInMs - skewMs, 0);
+    return Date.now() + expiresInSeconds * 1000;
   }
 
   private getProviderKey(auth: 'hvd' | 'org'): string {
@@ -168,26 +129,22 @@ export class IntegrationTokenService {
   }
 
   private getHvdTokenUrl(): string {
-    const configured = this.configService.get<string>('BV_HVD_TOKEN_URL');
-    if (configured) return configured;
-    return DEFAULT_HVD_TOKEN_URL;
+    return this.configService.get<string>('BV_HVD_TOKEN_URL') ?? DEFAULT_HVD_TOKEN_URL;
   }
 
   private getTokenClientId(auth: 'hvd' | 'org'): string {
-    const authSpecificKey = auth === 'hvd' ? 'BV_HVD_CLIENT_ID' : 'BV_FORETAGSINFO_CLIENT_ID';
-    const clientId = this.configService.get<string>(authSpecificKey) ?? this.configService.get<string>('BV_CLIENT_ID');
-    if (!clientId) {
-      throw new UnauthorizedException('Bolagsverket OAuth client ID is missing');
-    }
+    const key = auth === 'hvd' ? 'BV_HVD_CLIENT_ID' : 'BV_FORETAGSINFO_CLIENT_ID';
+    const clientId =
+      this.configService.get<string>(key) ?? this.configService.get<string>('BV_CLIENT_ID');
+    if (!clientId) throw new UnauthorizedException('Bolagsverket OAuth client ID is missing');
     return clientId;
   }
 
   private getTokenClientSecret(auth: 'hvd' | 'org'): string {
-    const authSpecificKey = auth === 'hvd' ? 'BV_HVD_CLIENT_SECRET' : 'BV_FORETAGSINFO_CLIENT_SECRET';
-    const clientSecret = this.configService.get<string>(authSpecificKey) ?? this.configService.get<string>('BV_CLIENT_SECRET');
-    if (!clientSecret) {
-      throw new UnauthorizedException('Bolagsverket OAuth client secret is missing');
-    }
+    const key = auth === 'hvd' ? 'BV_HVD_CLIENT_SECRET' : 'BV_FORETAGSINFO_CLIENT_SECRET';
+    const clientSecret =
+      this.configService.get<string>(key) ?? this.configService.get<string>('BV_CLIENT_SECRET');
+    if (!clientSecret) throw new UnauthorizedException('Bolagsverket OAuth client secret is missing');
     return clientSecret;
   }
 
@@ -244,7 +201,6 @@ export class IntegrationTokenService {
             `Bolagsverket token response contains invalid expires_in: ${String(parsed.expires_in)}`,
           );
         }
-
         return {
           access_token: parsed.access_token,
           token_type: parsed.token_type,
