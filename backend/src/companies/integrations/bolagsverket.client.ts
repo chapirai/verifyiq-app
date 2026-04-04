@@ -361,7 +361,7 @@ export class BolagsverketClient {
             headers: {
               Authorization: authHeader,
               Accept: 'application/json',
-              'content-type': 'application/x-www-form-urlencoded',
+              'Content-Type': 'application/x-www-form-urlencoded',
               'x-request-id': requestId,
             },
           }),

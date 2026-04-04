@@ -130,9 +130,12 @@ export class HvdAggregatorService {
 
     const registeredAt = this.safeField(primary.registreringsdatum, 'registreringsdatum', errorSources);
 
-    const deregisteredAt = primary.avregistreringsinformation?.fel
-      ? (errorSources.push('avregistreringsinformation'), null)
-      : (primary.avregistreringsinformation?.avregistreringsdatum ?? null);
+    let deregisteredAt: string | null = null;
+    if (primary.avregistreringsinformation?.fel) {
+      errorSources.push('avregistreringsinformation');
+    } else {
+      deregisteredAt = primary.avregistreringsinformation?.avregistreringsdatum ?? null;
+    }
 
     const address = this.extractAddress(primary.adresser, errorSources);
 
