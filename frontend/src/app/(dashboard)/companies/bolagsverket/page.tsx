@@ -120,6 +120,7 @@ interface EnrichResult {
     normalisedData?: NormalisedData;
     highValueDataset?: HighValueDatasetResponse | null;
     organisationInformation?: OrganisationInformationResponse[];
+    documents?: { dokument?: BvDokument[] } | null;
     retrievedAt?: string;
   };
   snapshot?: SnapshotRow;
@@ -674,6 +675,13 @@ export default function BolagsverketPage() {
         result = await api.bolagsverket.enrich({ identitetsbeteckning: stripped, forceRefresh });
       }
       setEnrichResult(result);
+
+      // Seed hvdDocs immediately from the enrich response (works for both live and cached hits).
+      // The separate documentList call below supplements with the latest data from the API.
+      const enrichedDocs = result.result?.documents?.dokument;
+      if (enrichedDocs && enrichedDocs.length > 0) {
+        setHvdDocs(enrichedDocs);
+      }
 
       // Snapshots + HVD document list in parallel (org only)
       const tasks: Promise<void>[] = [

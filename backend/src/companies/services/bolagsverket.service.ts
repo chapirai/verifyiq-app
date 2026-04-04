@@ -564,6 +564,7 @@ export class BolagsverketService {
           // can render both API sections even when data is served from cache.
           let cachedHvd: HighValueDatasetResponse | null = null;
           let cachedOrgInfo: OrganisationInformationResponse[] = [];
+          let cachedDocuments: DocumentListResponse | null = null;
           try {
             const org = await this.bvPersistenceService.findByOrgNr(tenantId, identitetsbeteckning);
             if (org?.rawPayload) {
@@ -572,6 +573,7 @@ export class BolagsverketService {
               cachedOrgInfo = Array.isArray(rawOrgInfo)
                 ? (rawOrgInfo as OrganisationInformationResponse[])
                 : [];
+              cachedDocuments = (org.rawPayload['documents'] as DocumentListResponse) ?? null;
             }
           } catch (lookupErr) {
             const detail = lookupErr instanceof Error ? lookupErr.message : String(lookupErr);
@@ -583,7 +585,7 @@ export class BolagsverketService {
             normalisedData: cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany,
             highValueDataset: cachedHvd,
             organisationInformation: cachedOrgInfo,
-            documents: null,
+            documents: cachedDocuments,
             retrievedAt: cacheCheck.snapshot.fetchedAt.toISOString(),
           };
           return {
@@ -717,6 +719,7 @@ export class BolagsverketService {
       const org = await this.bvPersistenceService.upsertOrganisation(tenantId, result.normalisedData, {
         highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
         organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
+        documents: result.documents as unknown as Record<string, unknown>,
       });
 
       // 4. Store raw payload with checksum-based deduplication (P02-T02)
