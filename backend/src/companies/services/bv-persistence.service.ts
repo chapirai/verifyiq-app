@@ -36,11 +36,14 @@ export class BvPersistenceService {
     entity.rawPayload = rawPayload;
 
     // Derive a lightweight data quality snapshot from field-level errors.
+    // The constant mirrors TRACKED_FIELDS in HvdAggregatorService (7 canonical fields).
+    const QUALITY_TRACKED_FIELD_COUNT = 7;
     const fieldErrors = normalised.fieldErrors ?? [];
     const errorSources = [...new Set(fieldErrors.map((e) => e.field))];
-    const totalFields = 7; // tracked canonical fields
     const completenessScore = Math.round(
-      ((totalFields - Math.min(errorSources.length, totalFields)) / totalFields) * 100,
+      ((QUALITY_TRACKED_FIELD_COUNT - Math.min(errorSources.length, QUALITY_TRACKED_FIELD_COUNT)) /
+        QUALITY_TRACKED_FIELD_COUNT) *
+        100,
     );
     entity.dataQuality = {
       completenessScore,

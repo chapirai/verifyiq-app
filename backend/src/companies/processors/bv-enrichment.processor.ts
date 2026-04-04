@@ -170,6 +170,24 @@ export class BvEnrichmentProcessor extends WorkerHost {
   }
 
   private classifyError(err: unknown): string {
+    // Prefer structured HTTP status codes from Axios-style error objects.
+    const status =
+      typeof err === 'object' &&
+      err !== null &&
+      'response' in err &&
+      typeof (err as { response?: { status?: unknown } }).response?.status === 'number'
+        ? (err as { response: { status: number } }).response.status
+        : undefined;
+
+    if (status !== undefined) {
+      if (status === 401) return 'HTTP_401';
+      if (status === 403) return 'HTTP_403';
+      if (status === 429) return 'HTTP_429_RATE_LIMIT';
+      if (status >= 500) return `HTTP_${status}`;
+      return `HTTP_${status}`;
+    }
+
+    // Fallback: inspect message string for status codes.
     if (err instanceof Error) {
       const msg = err.message;
       if (msg.includes('401')) return 'HTTP_401';
