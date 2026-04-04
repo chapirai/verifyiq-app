@@ -22,7 +22,6 @@ export class CompanyNormalizer {
           : null;
 
     // Safely extract businessDescription — API may return { klartext: '...', kod: '...', fel: ..., dataproducent: ... }
-    // or { text: '...' } or a plain string. Never pass the raw object to the frontend.
     const rawDesc =
       richOrganisation?.verksamhetsbeskrivning ??
       hvOrganisation?.verksamhetsbeskrivning ??
@@ -36,6 +35,34 @@ export class CompanyNormalizer {
             ? rawDesc.klartext
             : null;
 
+    // Safely extract companyForm — API may return { klartext: 'Aktiebolag', kod: 'AB', fel: null, dataproducent: '...' }
+    const rawCompanyForm =
+      hvOrganisation?.organisationsform ??
+      richOrganisation?.organisationsform ??
+      null;
+    const companyForm =
+      typeof rawCompanyForm === 'string'
+        ? rawCompanyForm
+        : typeof rawCompanyForm?.klartext === 'string'
+          ? rawCompanyForm.klartext
+          : typeof rawCompanyForm?.kod === 'string'
+            ? rawCompanyForm.kod
+            : null;
+
+    // Safely extract status — same KodKlartext pattern
+    const rawStatus =
+      hvOrganisation?.organisationsstatusar?.[0]?.status ??
+      richOrganisation?.organisationsstatusar?.[0]?.status ??
+      null;
+    const status =
+      typeof rawStatus === 'string'
+        ? rawStatus
+        : typeof rawStatus?.klartext === 'string'
+          ? rawStatus.klartext
+          : typeof rawStatus?.kod === 'string'
+            ? rawStatus.kod
+            : null;
+
     return {
       organisationNumber:
         hvOrganisation?.identitetsbeteckning ??
@@ -45,14 +72,8 @@ export class CompanyNormalizer {
         hvOrganisation?.namn ??
         richOrganisation?.namn ??
         'Unknown company',
-      companyForm:
-        hvOrganisation?.organisationsform ??
-        richOrganisation?.organisationsform ??
-        null,
-      status:
-        hvOrganisation?.organisationsstatusar?.[0]?.status ??
-        richOrganisation?.organisationsstatusar?.[0]?.status ??
-        null,
+      companyForm,
+      status,
       registeredAt:
         hvOrganisation?.registreringsdatum ??
         richOrganisation?.registreringsdatum ??
