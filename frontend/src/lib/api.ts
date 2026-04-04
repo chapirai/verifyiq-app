@@ -296,5 +296,27 @@ export const api = {
       const response = await httpClient.post('/bolagsverket/documents', { identitetsbeteckning: orgNr });
       return response.data;
     },
+    async tokenCacheStatus() {
+      const response = await httpClient.get('/bolagsverket/token-cache');
+      return response.data as {
+        entries: Array<{
+          cacheKey: string;
+          expiresAt: number;
+          expiresInMs: number;
+          scope?: string;
+          tokenType?: string;
+        }>;
+        metrics: {
+          cacheHits: number;
+          cacheMisses: number;
+          refreshes: number;
+          requestFailures: number;
+        };
+      };
+    },
+    async healthCheck() {
+      const response = await httpClient.get('/bolagsverket/health');
+      return response.data as { status: string; latencyMs?: number };
+    },
   },
 };

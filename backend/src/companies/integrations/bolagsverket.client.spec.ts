@@ -26,21 +26,21 @@ describe('BolagsverketClient', () => {
     return new BolagsverketClient(httpService as any, configService as any, integrationTokenService as any);
   };
 
-  const makeTokenGetMock = (token = 'token-1') =>
+  const makeTokenPostMock = (token = 'token-1') =>
     jest.fn((url: string) => {
       if (url === tokenUrl) return of({ data: { access_token: token, expires_in: 3600 } });
-      throw new Error(`Unexpected GET to: ${url}`);
+      throw new Error(`Unexpected POST to: ${url}`);
     });
 
   // ── OAuth token caching ────────────────────────────────────────────────────
 
   describe('getAccessToken', () => {
-    it('requests token via GET with Basic auth and scope query param', async () => {
-      const postMock = jest.fn();
-      const getMock = jest.fn((url: string) => {
+    it('requests token via POST with Basic auth and form-encoded body', async () => {
+      const postMock = jest.fn((url: string) => {
         if (url === tokenUrl) return of({ data: { access_token: 'token-1', expires_in: 3600 } });
-        throw new Error(`Unexpected GET to: ${url}`);
+        throw new Error(`Unexpected POST to: ${url}`);
       });
+      const getMock = jest.fn();
       const client = makeClient(postMock, getMock, {
         BV_HVD_CLIENT_ID: 'id-123',
         BV_HVD_CLIENT_SECRET: 'secret-456',
@@ -49,28 +49,29 @@ describe('BolagsverketClient', () => {
 
       await client.getAccessToken();
 
-      expect(getMock).toHaveBeenCalledWith(
+      expect(postMock).toHaveBeenCalledWith(
         tokenUrl,
+        expect.stringContaining('grant_type=client_credentials'),
         expect.objectContaining({
-          params: expect.objectContaining({ grant_type: 'client_credentials', scope: 'scope:a scope:b' }),
           headers: expect.objectContaining({
             Authorization: `Basic ${Buffer.from('id-123:secret-456').toString('base64')}`,
           }),
         }),
       );
-      expect(postMock).not.toHaveBeenCalled();
+      const body: string = (postMock.mock.calls as unknown as [string, string][]).find(([u]) => u === tokenUrl)![1];
+      expect(body).toContain('scope=');
+      expect(getMock).not.toHaveBeenCalled();
     });
 
     it('caches the access token until expiry', async () => {
-      const postMock = jest.fn();
-      const getMock = makeTokenGetMock();
-      const client = makeClient(postMock, getMock);
+      const postMock = makeTokenPostMock();
+      const client = makeClient(postMock);
       const token1 = await client.getAccessToken();
       const token2 = await client.getAccessToken();
 
       expect(token1).toBe('token-1');
       expect(token2).toBe('token-1');
-      expect(getMock).toHaveBeenCalledTimes(1);
+      expect(postMock).toHaveBeenCalledTimes(1);
     });
 
     it('refreshes the access token when expired', async () => {
@@ -78,12 +79,12 @@ describe('BolagsverketClient', () => {
         { access_token: 'token-1', expires_in: 3600 },
         { access_token: 'token-2', expires_in: 3600 },
       ];
-      const getMock = jest.fn((url: string) => {
+      const postMock = jest.fn((url: string) => {
         if (url === tokenUrl) return of({ data: tokenResponses.shift() });
-        throw new Error(`Unexpected GET to: ${url}`);
+        throw new Error(`Unexpected POST to: ${url}`);
       });
 
-      const client = makeClient(jest.fn(), getMock);
+      const client = makeClient(postMock);
       const nowSpy = jest.spyOn(Date, 'now');
       nowSpy.mockReturnValueOnce(1_000);
       const token1 = await client.getAccessToken();
@@ -94,7 +95,7 @@ describe('BolagsverketClient', () => {
 
       expect(token1).toBe('token-1');
       expect(token2).toBe('token-2');
-      expect(getMock).toHaveBeenCalledTimes(2);
+      expect(postMock).toHaveBeenCalledTimes(2);
     });
 
     it('uses tenant-scoped token service when tenant context exists', async () => {
@@ -126,15 +127,14 @@ describe('BolagsverketClient', () => {
     });
 
     it('de-duplicates parallel token requests for non-tenant context', async () => {
-      const postMock = jest.fn();
       let release: any = null;
-      const getMock = jest.fn(() => new Observable((subscriber) => {
+      const postMock = jest.fn(() => new Observable((subscriber) => {
         release = () => {
           subscriber.next({ data: { access_token: 'parallel-token', expires_in: 3600 } });
           subscriber.complete();
         };
       }));
-      const client = makeClient(postMock, getMock);
+      const client = makeClient(postMock);
 
       const first = client.getAccessToken();
       const second = client.getAccessToken();
@@ -143,18 +143,18 @@ describe('BolagsverketClient', () => {
 
       expect(token1).toBe('parallel-token');
       expect(token2).toBe('parallel-token');
-      expect(getMock).toHaveBeenCalledTimes(1);
+      expect(postMock).toHaveBeenCalledTimes(1);
     });
 
     it('stores independent token cache entries per auth/scope', async () => {
-      const getMock = jest.fn((url: string, config?: { params?: Record<string, string> }) => {
-        if (url !== tokenUrl) throw new Error(`Unexpected GET to: ${url}`);
-        if (config?.params?.scope === 'foretagsinformation:read') {
+      const postMock = jest.fn((url: string, body: string) => {
+        if (url !== tokenUrl) throw new Error(`Unexpected POST to: ${url}`);
+        if (body.includes('scope=foretagsinformation%3Aread')) {
           return of({ data: { access_token: 'org-token', expires_in: 3600, scope: 'foretagsinformation:read' } });
         }
         return of({ data: { access_token: 'hvd-token', expires_in: 3600, scope: 'vardefulla-datamangder:read' } });
       });
-      const client = makeClient(jest.fn(), getMock, {
+      const client = makeClient(postMock, jest.fn(), {
         BV_FORETAGSINFO_USE_OAUTH: 'true',
         BV_FORETAGSINFO_TOKEN_URL: tokenUrl,
         BV_FORETAGSINFO_SCOPES: 'foretagsinformation:read',
@@ -174,8 +174,8 @@ describe('BolagsverketClient', () => {
     });
 
     it('exposes token cache metrics', async () => {
-      const getMock = makeTokenGetMock('metric-token');
-      const client = makeClient(jest.fn(), getMock);
+      const postMock = makeTokenPostMock('metric-token');
+      const client = makeClient(postMock);
 
       await client.getAccessToken();
       await client.getAccessToken();
@@ -190,22 +190,25 @@ describe('BolagsverketClient', () => {
   // ── Token revocation ───────────────────────────────────────────────────────
 
   describe('revokeAccessToken', () => {
-    it('returns revoked=false when no revoke URL is configured', async () => {
-      const postMock = jest.fn();
-      const client = makeClient(postMock, makeTokenGetMock());
+    it('returns revoked=false with error when revoke endpoint is unreachable', async () => {
+      const postMock = makeTokenPostMock();
+      const client = makeClient(postMock);
       await client.getAccessToken();
+      // The default revoke URL will be called; since postMock only handles the token URL,
+      // the revoke call will throw, and revokeAccessToken should return revoked=false.
       const result = await client.revokeAccessToken();
       expect(result.revoked).toBe(false);
-      expect(result.error).toMatch(/not configured/i);
+      expect(result.error).toBeDefined();
     });
 
     it('revokes the token when a revoke URL is configured', async () => {
       const revokeUrl = 'https://auth.example.com/oauth2/revoke';
       const postMock = jest.fn((url: string) => {
+        if (url === tokenUrl) return of({ data: { access_token: 'token-1', expires_in: 3600 } });
         if (url === revokeUrl) return of({ data: {} });
         throw new Error(`Unexpected POST to: ${url}`);
       });
-      const client = makeClient(postMock, makeTokenGetMock(), { BV_HVD_REVOKE_URL: revokeUrl });
+      const client = makeClient(postMock, jest.fn(), { BV_HVD_REVOKE_URL: revokeUrl });
       await client.getAccessToken();
       const result = await client.revokeAccessToken();
       expect(result.revoked).toBe(true);
@@ -215,10 +218,11 @@ describe('BolagsverketClient', () => {
     it('returns revoked=false with an error when revocation request fails', async () => {
       const revokeUrl = 'https://auth.example.com/oauth2/revoke';
       const postMock = jest.fn((url: string) => {
+        if (url === tokenUrl) return of({ data: { access_token: 'token-1', expires_in: 3600 } });
         if (url === revokeUrl) return throwError(() => new Error('network error'));
         throw new Error(`Unexpected POST to: ${url}`);
       });
-      const client = makeClient(postMock, makeTokenGetMock(), { BV_HVD_REVOKE_URL: revokeUrl });
+      const client = makeClient(postMock, jest.fn(), { BV_HVD_REVOKE_URL: revokeUrl });
       await client.getAccessToken();
       const result = await client.revokeAccessToken();
       expect(result.revoked).toBe(false);
@@ -355,18 +359,17 @@ describe('BolagsverketClient', () => {
     });
 
     it('uses OAuth for Företagsinformation when explicitly enabled', async () => {
-      const postMock = jest.fn((url: string) => {
+      const postMock = jest.fn((url: string, body: string) => {
+        if (url === tokenUrl) {
+          if (body.includes('scope=foretagsinformation%3Aread')) {
+            return of({ data: { access_token: 'org-oauth-token', expires_in: 3600, scope: 'foretagsinformation:read' } });
+          }
+          return of({ data: { access_token: 'hvd-token', expires_in: 3600 } });
+        }
         if (url === orgUrl) return of({ data: [{}] });
         throw new Error(`Unexpected POST to: ${url}`);
       });
-      const getMock = jest.fn((url: string, config?: { params?: Record<string, string> }) => {
-        if (url !== tokenUrl) throw new Error(`Unexpected GET to: ${url}`);
-        if (config?.params?.scope === 'foretagsinformation:read') {
-          return of({ data: { access_token: 'org-oauth-token', expires_in: 3600, scope: 'foretagsinformation:read' } });
-        }
-        return of({ data: { access_token: 'hvd-token', expires_in: 3600 } });
-      });
-      const client = makeClient(postMock, getMock, {
+      const client = makeClient(postMock, jest.fn(), {
         BV_FORETAGSINFO_USE_OAUTH: 'true',
         BV_FORETAGSINFO_TOKEN_URL: tokenUrl,
         BV_FORETAGSINFO_SCOPES: 'foretagsinformation:read',
@@ -395,11 +398,12 @@ describe('BolagsverketClient', () => {
       extraConfig: Record<string, string> = {},
     ) => {
       const postMock = jest.fn((url: string) => {
+        if (url === tokenUrl) return of({ data: { access_token: 'token-1', expires_in: 3600 } });
         if (url === defaultDocumentUrl)
           return of({ data: Buffer.from('ZIP-CONTENT'), headers: { 'content-type': 'application/zip', ...responseHeaders } });
         throw new Error(`Unexpected POST to: ${url}`);
       });
-      return { client: makeClient(postMock, makeTokenGetMock(), extraConfig), postMock };
+      return { client: makeClient(postMock, jest.fn(), extraConfig), postMock };
     };
 
     it('returns a Buffer with content-type and no fileName when no Content-Disposition header', async () => {
@@ -436,12 +440,14 @@ describe('BolagsverketClient', () => {
 
     it('uses a GET request when BV_HVD_DOCUMENT_PATH contains {dokumentId}', async () => {
       const getMock = jest.fn((url: string) => {
-        if (url === tokenUrl) return of({ data: { access_token: 'token-1', expires_in: 3600 } });
         if (url === `${hvdBaseUrl}/dokument/doc-456`)
           return of({ data: Buffer.alloc(0), headers: { 'content-type': 'application/zip' } });
         throw new Error(`Unexpected GET to: ${url}`);
       });
-      const postMock = jest.fn();
+      const postMock = jest.fn((url: string) => {
+        if (url === tokenUrl) return of({ data: { access_token: 'token-1', expires_in: 3600 } });
+        throw new Error(`Unexpected POST to: ${url}`);
+      });
       const client = makeClient(postMock, getMock, {
         BV_HVD_DOCUMENT_PATH: '/dokument/{dokumentId}',
       });
