@@ -12,16 +12,29 @@ export class CompanyNormalizer {
       hvOrganisation?.funktionarer ??
       [];
 
+    // Safely extract signatoryText — API may return an object { text: '...' } or a plain string
+    const rawSignatory = richOrganisation?.firmateckning;
     const signatoryText =
-      richOrganisation?.firmateckning?.text ??
-      richOrganisation?.firmateckning ??
-      null;
+      typeof rawSignatory === 'string'
+        ? rawSignatory
+        : typeof rawSignatory?.text === 'string'
+          ? rawSignatory.text
+          : null;
 
-    const businessDescription =
-      richOrganisation?.verksamhetsbeskrivning?.text ??
+    // Safely extract businessDescription — API may return { klartext: '...', kod: '...', fel: ..., dataproducent: ... }
+    // or { text: '...' } or a plain string. Never pass the raw object to the frontend.
+    const rawDesc =
       richOrganisation?.verksamhetsbeskrivning ??
       hvOrganisation?.verksamhetsbeskrivning ??
       null;
+    const businessDescription =
+      typeof rawDesc === 'string'
+        ? rawDesc
+        : typeof rawDesc?.text === 'string'
+          ? rawDesc.text
+          : typeof rawDesc?.klartext === 'string'
+            ? rawDesc.klartext
+            : null;
 
     return {
       organisationNumber:
