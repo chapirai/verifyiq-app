@@ -72,6 +72,30 @@ export interface CompanySearchResult {
   fetchedAt: string | null;
 }
 
+export interface BvDokument {
+  dokumentId?: string;
+  filformat?: string;
+  rapporteringsperiodTom?: string;
+  registreringstidpunkt?: string;
+  dokumenttyp?: string;
+}
+
+export interface CompanyListItem {
+  organisationNumber: string;
+  legalName: string | null;
+  status: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompanyListResponse {
+  data: CompanyListItem[];
+  total: number;
+  page: number;
+  limit: number;
+  has_next: boolean;
+}
+
 export interface CompanySearchResponse {
   results: CompanySearchResult[];
   metadata: {
@@ -244,8 +268,8 @@ export const api = {
     return response.data;
   },
 
-  async listCompanies() {
-    const response = await httpClient.get('/companies');
+  async listCompanies(): Promise<CompanyListResponse> {
+    const response = await httpClient.get<CompanyListResponse>('/companies');
     return response.data;
   },
 
@@ -292,9 +316,19 @@ export const api = {
       const response = await httpClient.post('/bolagsverket/company', { identitetsbeteckning: orgNr });
       return response.data;
     },
-    async documentList(orgNr: string) {
-      const response = await httpClient.post('/bolagsverket/documents', { identitetsbeteckning: orgNr });
+    async documentList(orgNr: string): Promise<{ dokument?: BvDokument[] }> {
+      const response = await httpClient.post<{ dokument?: BvDokument[] }>('/bolagsverket/documents', { identitetsbeteckning: orgNr });
       return response.data;
+    },
+    async downloadDocument(dokumentId: string): Promise<{ blob: Blob; fileName: string }> {
+      const response = await httpClient.get(
+        `/bolagsverket/documents/${encodeURIComponent(dokumentId)}/download`,
+        { responseType: 'blob' },
+      );
+      const disposition = (response.headers['content-disposition'] as string | undefined) ?? '';
+      const match = disposition.match(/filename="?([^";\r\n]+)"?/);
+      const fileName = match?.[1] ?? `${dokumentId}.zip`;
+      return { blob: response.data as Blob, fileName };
     },
     async tokenCacheStatus() {
       const response = await httpClient.get('/bolagsverket/token-cache');
