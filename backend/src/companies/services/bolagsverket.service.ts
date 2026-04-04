@@ -574,8 +574,9 @@ export class BolagsverketService {
                 : [];
             }
           } catch (lookupErr) {
+            const detail = lookupErr instanceof Error ? lookupErr.message : String(lookupErr);
             this.logger.warn(
-              `[cache] Failed to rehydrate raw payload for ${identitetsbeteckning}: ${lookupErr}`,
+              `[cache] Failed to rehydrate raw payload for ${identitetsbeteckning} (tenant ${tenantId}): ${detail}`,
             );
           }
           const cachedResult: CompleteCompanyProfile = {
