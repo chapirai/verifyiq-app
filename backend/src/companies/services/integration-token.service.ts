@@ -1,4 +1,4 @@
-import { randomUUID, randomBytes, createCipheriv, createDecipheriv, createHash } from 'crypto';
+import { randomUUID, randomBytes, createCipheriv, createHash } from 'crypto';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -239,19 +239,5 @@ export class IntegrationTokenService {
     const response = (error as { response?: { status?: unknown } }).response;
     if (!response || typeof response.status !== 'number') return undefined;
     return response.status;
-  }
-
-  private decrypt(value: string): string {
-    const [ivPart, tagPart, cipherPart] = value.split('.');
-    if (!ivPart || !tagPart || !cipherPart) {
-      throw new UnauthorizedException('Stored integration token is malformed');
-    }
-    const iv = Buffer.from(ivPart, 'base64');
-    const authTag = Buffer.from(tagPart, 'base64');
-    const encrypted = Buffer.from(cipherPart, 'base64');
-    const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
-    decipher.setAuthTag(authTag);
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-    return decrypted.toString('utf8');
   }
 }
