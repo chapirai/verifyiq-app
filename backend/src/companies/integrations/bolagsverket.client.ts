@@ -515,10 +515,18 @@ export class BolagsverketClient {
 
   // ── Public API methods ────────────────────────────────────────────────────
 
-  /** GET /isalive – verify API availability before making data requests. */
+  /** GET /isalive – verify HVD API availability before making data requests. */
   async healthCheck(): Promise<{ status: string }> {
     const { responseData } = await this.requestWithRetry<string>('get', this.buildUrl(this.getHvdBaseUrl(), '/isalive'), undefined, {
       auth: 'hvd',
+    });
+    return { status: responseData === 'OK' ? 'OK' : 'UNKNOWN' };
+  }
+
+  /** GET /isalive – verify Företagsinformation v4 API availability. */
+  async foretagsinfoHealthCheck(): Promise<{ status: string }> {
+    const { responseData } = await this.requestWithRetry<string>('get', this.buildUrl(this.getOrganisationBaseUrl(), '/isalive'), undefined, {
+      auth: 'org',
     });
     return { status: responseData === 'OK' ? 'OK' : 'UNKNOWN' };
   }

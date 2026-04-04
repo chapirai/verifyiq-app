@@ -74,10 +74,16 @@ export class BolagsverketController {
     }
   }
 
-  /** GET /bolagsverket/health – check Bolagsverket API availability. */
+  /** GET /bolagsverket/health – check Bolagsverket HVD API availability. */
   @Get('health')
   healthCheck() {
     return this.bolagsverketService.healthCheck();
+  }
+
+  /** GET /bolagsverket/health/foretagsinfo – check Företagsinformation v4 API availability. */
+  @Get('health/foretagsinfo')
+  foretagsinfoHealthCheck() {
+    return this.bolagsverketService.foretagsinfoHealthCheck();
   }
 
   /** GET /bolagsverket/token-cache – expose OAuth token cache diagnostics. */

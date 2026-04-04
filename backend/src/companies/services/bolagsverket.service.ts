@@ -97,6 +97,10 @@ export class BolagsverketService {
     return this.client.healthCheck();
   }
 
+  async foretagsinfoHealthCheck(): Promise<{ status: string }> {
+    return this.client.foretagsinfoHealthCheck();
+  }
+
   async isAlive(): Promise<{ status: string }> {
     return this.healthCheck();
   }
@@ -556,11 +560,32 @@ export class BolagsverketService {
             policyDecision: policyDecisionLabel,
             isStaleFallback,
           });
+          // Re-hydrate HVD + OrgInfo from the stored raw payload so the frontend
+          // can render both API sections even when data is served from cache.
+          let cachedHvd: HighValueDatasetResponse | null = null;
+          let cachedOrgInfo: OrganisationInformationResponse[] = [];
+          let cachedDocuments: DocumentListResponse | null = null;
+          try {
+            const org = await this.bvPersistenceService.findByOrgNr(tenantId, identitetsbeteckning);
+            if (org?.rawPayload) {
+              cachedHvd = (org.rawPayload['highValueDataset'] as HighValueDatasetResponse) ?? null;
+              const rawOrgInfo = org.rawPayload['organisationInformation'];
+              cachedOrgInfo = Array.isArray(rawOrgInfo)
+                ? (rawOrgInfo as OrganisationInformationResponse[])
+                : [];
+              cachedDocuments = (org.rawPayload['documents'] as DocumentListResponse) ?? null;
+            }
+          } catch (lookupErr) {
+            const detail = lookupErr instanceof Error ? lookupErr.message : String(lookupErr);
+            this.logger.warn(
+              `[cache] Failed to rehydrate raw payload for ${identitetsbeteckning} (tenant ${tenantId}): ${detail}`,
+            );
+          }
           const cachedResult: CompleteCompanyProfile = {
             normalisedData: cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany,
-            highValueDataset: null,
-            organisationInformation: [],
-            documents: null,
+            highValueDataset: cachedHvd,
+            organisationInformation: cachedOrgInfo,
+            documents: cachedDocuments,
             retrievedAt: cacheCheck.snapshot.fetchedAt.toISOString(),
           };
           return {
@@ -694,6 +719,7 @@ export class BolagsverketService {
       const org = await this.bvPersistenceService.upsertOrganisation(tenantId, result.normalisedData, {
         highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
         organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
+        documents: result.documents as unknown as Record<string, unknown>,
       });
 
       // 4. Store raw payload with checksum-based deduplication (P02-T02)
