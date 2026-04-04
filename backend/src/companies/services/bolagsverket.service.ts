@@ -11,6 +11,7 @@ import {
   HighValueDatasetResponse,
   OrganisationInformationResponse,
   OrganisationsengagemangResponse,
+  PersonResponse,
 } from '../integrations/bolagsverket.types';
 import { sanitizeBolagsverketFilename } from '../integrations/bolagsverket.utils';
 import { BvCacheService } from './bv-cache.service';
@@ -212,17 +213,10 @@ export class BolagsverketService {
 
   async getPersonInformation(
     identitetsbeteckning: string,
-    pageNumber = 1,
-    pageSize = 20,
     context?: BvRequestContext,
-  ): Promise<OrganisationsengagemangResponse> {
-    const { responsePayload } = await this.client.fetchOrganizationEngagements(
+  ): Promise<PersonResponse> {
+    const { responsePayload } = await this.client.fetchPersonInformation(
       identitetsbeteckning,
-      pageNumber,
-      pageSize,
-      undefined,
-      undefined,
-      undefined,
       context,
     );
     return responsePayload;

@@ -411,6 +411,31 @@ export interface BvFiltrering {
   statusar?: string[];
 }
 
+// ── Person information (foretagsinformation/v4/personer) ────────────────────
+
+export interface BvPersonAdress {
+  adresstyp?: string;
+  utdelningsadress?: string;
+  postnummer?: string;
+  postort?: string;
+  lan?: string;
+  land?: string;
+  fel?: BvFel;
+}
+
+export interface PersonInformationResponse {
+  identitetsbeteckning?: string;
+  namn?: string;
+  fodelsedatum?: string;
+  nationalitet?: string;
+  adresser?: BvPersonAdress[];
+  roller?: BvOfficerRole[];
+  organisationsengagemang?: OrganisationsengagemangResponse;
+  fel?: BvFel;
+}
+
+export type PersonResponse = PersonInformationResponse[];
+
 // ── Generic API error body ───────────────────────────────────────────────────
 
 export interface BvApiError {

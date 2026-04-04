@@ -29,6 +29,7 @@ import {
   OrganisationInformationResponse,
   OrganisationsengagemangResponse,
   OAuthTokenResponse,
+  PersonResponse,
   SortAttributeEngagemang,
   SortOrder,
 } from './bolagsverket.types';
@@ -783,5 +784,28 @@ export class BolagsverketClient {
       { auth: 'org', context },
     );
     return { requestPayload: payload, responsePayload: responseData, requestId };
+  }
+
+  /**
+   * POST /foretagsinformation/v4/personer
+   * Retrieve person information by personal identity number (personnummer).
+   */
+  async fetchPersonInformation(
+    identitetsbeteckning: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+  ): Promise<{
+    requestPayload: Record<string, unknown>;
+    responsePayload: PersonResponse;
+    requestId: string;
+  }> {
+    const payload: Record<string, unknown> = { identitetsbeteckning };
+    const { responseData, requestId } = await this.requestWithRetry<PersonResponse>(
+      'post',
+      this.buildUrl(this.getOrganisationBaseUrl(), '/personer'),
+      payload,
+      { auth: 'org', context },
+    );
+    const responseArray = this.ensureArray(responseData);
+    return { requestPayload: payload, responsePayload: responseArray, requestId };
   }
 }
