@@ -355,11 +355,11 @@ export class BolagsverketClient {
     while (attempt < maxAttempts) {
       try {
         const response = await firstValueFrom(
-          this.httpService.get(tokenUrl, {
-            params: Object.fromEntries(params.entries()),
+          this.httpService.post(tokenUrl, params.toString(), {
             headers: {
               Authorization: authHeader,
               Accept: 'application/json',
+              'content-type': 'application/x-www-form-urlencoded',
               'x-request-id': requestId,
             },
           }),
