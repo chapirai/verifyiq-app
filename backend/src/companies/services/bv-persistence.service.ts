@@ -35,6 +35,21 @@ export class BvPersistenceService {
     entity.senastUppdaterad = new Date();
     entity.rawPayload = rawPayload;
 
+    // Derive a lightweight data quality snapshot from field-level errors.
+    const fieldErrors = normalised.fieldErrors ?? [];
+    const errorSources = [...new Set(fieldErrors.map((e) => e.field))];
+    const totalFields = 7; // tracked canonical fields
+    const completenessScore = Math.round(
+      ((totalFields - Math.min(errorSources.length, totalFields)) / totalFields) * 100,
+    );
+    entity.dataQuality = {
+      completenessScore,
+      missingFields: errorSources,
+      errorSources: [...new Set(fieldErrors.map((e) => e.errorType))],
+      fieldErrors,
+      lastUpdated: new Date().toISOString(),
+    };
+
     const saved = await this.orgRepo.save(entity);
     this.logger.log(
       `Upserted organisation ${normalised.organisationNumber} for tenant ${tenantId}`,

@@ -24,14 +24,43 @@ interface FinancialReport {
   status?: { klartext?: string };
 }
 
+interface AddressRow {
+  adresstyp?: string | null;
+  utdelningsadress?: string | null;
+  gatuadress?: string | null;
+  postnummer?: string | null;
+  postort?: string | null;
+  land?: string | null;
+}
+
+interface FieldError {
+  field: string;
+  errorType: string;
+}
+
 interface NormalisedData {
   organisationNumber?: string;
   legalName?: string;
   companyForm?: string | null;
   status?: string | null;
   registeredAt?: string | null;
+  deregisteredAt?: string | null;
+  countryCode?: string | null;
+  businessDescription?: string | null;
+  signatoryText?: string | null;
+  industryCode?: string | null;
   officers?: OfficerRow[];
   financialReports?: FinancialReport[];
+  addresses?: AddressRow[];
+  allNames?: Array<{ namn?: string; namnTyp?: string }>;
+  permits?: Array<Record<string, unknown>>;
+  fieldErrors?: FieldError[];
+  sourcePayloadSummary?: {
+    hasHighValueDataset?: boolean;
+    hasRichOrganisationInformation?: boolean;
+    partialDataFields?: string[];
+    historicalRecords?: unknown[];
+  };
 }
 
 interface SnapshotRow {
@@ -226,8 +255,113 @@ export default function BolagsverketPage() {
                     : null
                 }
               />
+              <ProfileRow
+                label="Deregistered"
+                value={
+                  normalisedData.deregisteredAt
+                    ? new Date(normalisedData.deregisteredAt).toLocaleDateString('sv-SE')
+                    : null
+                }
+              />
+              <ProfileRow label="Industry Code" value={normalisedData.industryCode} />
+              <ProfileRow label="Country" value={normalisedData.countryCode} />
+              <ProfileRow label="Business Description" value={normalisedData.businessDescription} />
+              <ProfileRow label="Signatory" value={normalisedData.signatoryText} />
             </dl>
           </div>
+
+          {/* Data quality warning */}
+          {normalisedData.fieldErrors && normalisedData.fieldErrors.length > 0 && (
+            <div className="rounded-2xl border border-yellow-700/50 bg-yellow-900/20 p-4">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-yellow-400">
+                ⚠ Partial Data — {normalisedData.fieldErrors.length} field error{normalisedData.fieldErrors.length !== 1 ? 's' : ''}
+              </h2>
+              <ul className="space-y-1">
+                {normalisedData.fieldErrors.map((fe, i) => (
+                  <li key={i} className="flex items-center gap-2 text-xs text-yellow-300">
+                    <span className="rounded bg-yellow-800/60 px-1.5 py-0.5 font-mono">{fe.field}</span>
+                    <span className="text-yellow-500">{fe.errorType}</span>
+                  </li>
+                ))}
+              </ul>
+              {normalisedData.sourcePayloadSummary?.partialDataFields &&
+                normalisedData.sourcePayloadSummary.partialDataFields.length > 0 && (
+                  <p className="mt-2 text-xs text-yellow-500">
+                    Partial: {normalisedData.sourcePayloadSummary.partialDataFields.join(', ')}
+                  </p>
+                )}
+            </div>
+          )}
+
+          {/* Addresses */}
+          {normalisedData.addresses && normalisedData.addresses.length > 0 && (
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">
+                Addresses
+              </h2>
+              <div className="space-y-3">
+                {normalisedData.addresses.map((a, i) => (
+                  <div key={i} className="rounded-xl bg-slate-800/40 px-4 py-3 text-sm">
+                    {a.adresstyp && (
+                      <span className="mb-1 inline-block rounded bg-slate-700 px-1.5 py-0.5 text-xs text-slate-300">
+                        {a.adresstyp}
+                      </span>
+                    )}
+                    <p className="text-white">
+                      {a.utdelningsadress ?? a.gatuadress ?? '—'}
+                    </p>
+                    <p className="text-slate-400">
+                      {[a.postnummer, a.postort, a.land].filter(Boolean).join(', ') || '—'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* All registered names */}
+          {normalisedData.allNames && normalisedData.allNames.length > 0 && (
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">
+                Registered Names
+              </h2>
+              <ul className="space-y-1">
+                {normalisedData.allNames.map((n, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm">
+                    {n.namnTyp && (
+                      <span className="rounded bg-slate-700 px-1.5 py-0.5 text-xs text-slate-400">
+                        {n.namnTyp}
+                      </span>
+                    )}
+                    <span className="text-white">{n.namn ?? '—'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* HVD / data source badges */}
+          {normalisedData.sourcePayloadSummary && (
+            <div className="flex flex-wrap gap-2">
+              {normalisedData.sourcePayloadSummary.hasHighValueDataset && (
+                <span className="rounded-full bg-violet-800/50 px-3 py-1 text-xs font-medium text-violet-300">
+                  ✓ High-Value Dataset
+                </span>
+              )}
+              {normalisedData.sourcePayloadSummary.hasRichOrganisationInformation && (
+                <span className="rounded-full bg-teal-800/50 px-3 py-1 text-xs font-medium text-teal-300">
+                  ✓ Rich Organisation Information
+                </span>
+              )}
+              {normalisedData.sourcePayloadSummary.historicalRecords &&
+                normalisedData.sourcePayloadSummary.historicalRecords.length > 0 && (
+                  <span className="rounded-full bg-slate-700/70 px-3 py-1 text-xs font-medium text-slate-300">
+                    {normalisedData.sourcePayloadSummary.historicalRecords.length} historical record
+                    {normalisedData.sourcePayloadSummary.historicalRecords.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+            </div>
+          )}
 
           {/* Officers */}
           {normalisedData.officers && normalisedData.officers.length > 0 && (
