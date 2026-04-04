@@ -1,14 +1,27 @@
-import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches, ValidateIf } from 'class-validator';
 
 /** Swedish organisation number: 10 or 12 digits. */
 const ORG_NR_REGEX = /^(\d{10}|\d{12})$/;
 
 export class LookupCompanyDto {
+  /** Primary identifier — 10- or 12-digit Swedish organisation number. */
+  @ValidateIf((o) => !o.orgNumber)
+  @IsString()
+  @Matches(ORG_NR_REGEX, {
+    message: 'identitetsbeteckning must be a 10-digit or 12-digit Swedish organisation number',
+  })
+  identitetsbeteckning?: string;
+
+  /**
+   * @deprecated Use `identitetsbeteckning` instead.
+   * Kept for backward compatibility with older clients.
+   */
+  @ValidateIf((o) => !o.identitetsbeteckning)
   @IsString()
   @Matches(ORG_NR_REGEX, {
     message: 'orgNumber must be a 10-digit or 12-digit Swedish organisation number',
   })
-  orgNumber!: string;
+  orgNumber?: string;
 
   @IsOptional()
   @IsBoolean()

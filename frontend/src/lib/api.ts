@@ -241,7 +241,10 @@ export const api = {
   async lookupCompanyByOrgNumber(
     payload: CompanyLookupByOrgNumberPayload,
   ): Promise<CompanyLookupResponse> {
-    const response = await httpClient.post<CompanyLookupResponse>('/companies/lookup', payload);
+    const response = await httpClient.post<CompanyLookupResponse>('/companies/lookup', {
+      identitetsbeteckning: payload.orgNumber,
+      force_refresh: payload.force_refresh,
+    });
     return response.data;
   },
 

@@ -183,7 +183,7 @@ export class BolagsverketService {
       );
     }
 
-    const normalisedData = this.mapper.map(highValueDataset, organisationInformation);
+    const normalisedData = this.mapper.map(highValueDataset, organisationInformation, identitetsbeteckning);
 
     return {
       normalisedData,

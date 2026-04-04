@@ -54,6 +54,7 @@ export class BolagsverketMapper {
   map(
     highValue: HighValueDatasetResponse | null | undefined,
     richInfoArray: OrganisationInformationResponse[] | null | undefined,
+    fallbackIdentifier?: string,
   ): NormalisedCompany {
     // ── Multi-record handling ──────────────────────────────────────────────
     // HVD may return an array; sort descending by registreringsdatum and take
@@ -135,7 +136,7 @@ export class BolagsverketMapper {
 
     return {
       organisationNumber:
-        hvOrg.identitetsbeteckning ?? richOrg.identitetsbeteckning ?? '',
+        hvOrg.identitetsbeteckning ?? richOrg.identitetsbeteckning ?? fallbackIdentifier ?? '',
       legalName:
         hvOrg.namn ?? richOrg.namn ?? DEFAULT_COMPANY_NAME,
       companyForm:
