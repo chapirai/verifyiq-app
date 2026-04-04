@@ -23,7 +23,7 @@ const RETRY_CONFIG = {
 } as const;
 const HVD_BASE_URL = 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1';
 const DEFAULT_HVD_SCOPES = 'vardefulla-datamangder:read vardefulla-datamangder:ping';
-const DEFAULT_HVD_TOKEN_PATH = '/oauth2/token';
+const DEFAULT_HVD_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token';
 
 @Injectable()
 export class IntegrationTokenService {
@@ -185,7 +185,7 @@ export class IntegrationTokenService {
   private getHvdTokenUrl(): string {
     const configured = this.configService.get<string>('BV_HVD_TOKEN_URL');
     if (configured) return configured;
-    return this.buildUrl(this.getHvdBaseUrl(), DEFAULT_HVD_TOKEN_PATH);
+    return DEFAULT_HVD_TOKEN_URL;
   }
 
   private getTokenClientId(auth: 'hvd' | 'org'): string {

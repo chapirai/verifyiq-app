@@ -51,7 +51,8 @@ const RETRY_CONFIG = {
 const HVD_BASE_URL = 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1';
 const ORG_BASE_URL = 'https://gw.api.bolagsverket.se/foretagsinformation/v4';
 const DEFAULT_HVD_SCOPES = 'vardefulla-datamangder:read vardefulla-datamangder:ping';
-const DEFAULT_HVD_TOKEN_PATH = '/oauth2/token';
+const DEFAULT_HVD_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token';
+const DEFAULT_HVD_REVOKE_URL = 'https://portal.api.bolagsverket.se/oauth2/revoke';
 const DEFAULT_HVD_DOCUMENT_PATH = '/dokument';
 const TOKEN_REFRESH_SKEW_MS = 60_000;
 const BEARER_PREFIX_PATTERN = /^Bearer\s+/i;
@@ -111,11 +112,11 @@ export class BolagsverketClient {
   private getHvdTokenUrl(): string {
     const configured = this.configService.get<string>('BV_HVD_TOKEN_URL');
     if (configured) return configured;
-    return this.buildUrl(this.getHvdBaseUrl(), DEFAULT_HVD_TOKEN_PATH);
+    return DEFAULT_HVD_TOKEN_URL;
   }
 
   private getHvdRevokeUrl(): string | null {
-    return this.configService.get<string>('BV_HVD_REVOKE_URL') ?? null;
+    return this.configService.get<string>('BV_HVD_REVOKE_URL') ?? DEFAULT_HVD_REVOKE_URL;
   }
 
   private getHvdScopes(): string {
