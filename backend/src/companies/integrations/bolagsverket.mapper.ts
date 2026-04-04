@@ -41,6 +41,19 @@ export interface NormalisedCompany {
   fieldErrors: FieldError[];
 }
 
+/** Safely extract a plain string from a KodKlartext object or a plain string. */
+function extractKodKlartext(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    if (typeof obj['klartext'] === 'string') return obj['klartext'];
+    if (typeof obj['kod'] === 'string') return obj['kod'];
+    if (typeof obj['text'] === 'string') return obj['text'];
+  }
+  return null;
+}
+
 @Injectable()
 export class BolagsverketMapper {
   /**
@@ -134,17 +147,25 @@ export class BolagsverketMapper {
       });
     }
 
+    // ── Safe KodKlartext extractions ──────────────────────────────────────
+    const companyForm =
+      extractKodKlartext(hvOrg.organisationsform) ??
+      extractKodKlartext(richOrg.organisationsform) ??
+      null;
+
+    const rawStatus =
+      hvOrg.organisationsstatusar?.[0]?.status ??
+      richOrg.organisationsstatusar?.[0]?.status ??
+      null;
+    const status = extractKodKlartext(rawStatus);
+
     return {
       organisationNumber:
         hvOrg.identitetsbeteckning ?? richOrg.identitetsbeteckning ?? fallbackIdentifier ?? '',
       legalName:
         hvOrg.namn ?? richOrg.namn ?? DEFAULT_COMPANY_NAME,
-      companyForm:
-        hvOrg.organisationsform ?? richOrg.organisationsform ?? null,
-      status:
-        hvOrg.organisationsstatusar?.[0]?.status ??
-        richOrg.organisationsstatusar?.[0]?.status ??
-        null,
+      companyForm,
+      status,
       registeredAt:
         hvOrg.registreringsdatum ?? richOrg.registreringsdatum ?? null,
       countryCode: 'SE',
@@ -175,7 +196,7 @@ export class BolagsverketMapper {
 
   /**
    * Safely extract a value from a field that may contain a `{ fel: ... }` error
-   * object.  When a `fel` is detected the field is mapped to `null` and an entry
+   * object. When a `fel` is detected the field is mapped to `null` and an entry
    * is added to `fieldErrors`.
    */
   private extractFieldOrNull<TRaw, TOut>(
