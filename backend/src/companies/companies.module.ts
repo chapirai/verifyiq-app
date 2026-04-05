@@ -13,6 +13,7 @@ import { BvFetchSnapshotEntity } from './entities/bv-fetch-snapshot.entity';
 import { BvStoredDocumentEntity } from './entities/bv-stored-document.entity';
 import { BvHvdPayloadEntity } from './entities/bv-hvd-payload.entity';
 import { BvForetagsinfoPayloadEntity } from './entities/bv-foretagsinfo-payload.entity';
+import { BvDocumentListEntity } from './entities/bv-document-list.entity';
 import { BolagsverketClient } from './integrations/bolagsverket.client';
 import { BolagsverketMapper } from './integrations/bolagsverket.mapper';
 import { CompanyNormalizer } from './mappers/company-normalizer';
@@ -65,6 +66,7 @@ import { BV_ENRICHMENT_QUEUE } from './queues/bv-enrichment.queue';
       BvStoredDocumentEntity,
       BvHvdPayloadEntity,
       BvForetagsinfoPayloadEntity,
+      BvDocumentListEntity,
       BvRawPayloadEntity,
       NormalizedCompanyEntity,
       CompanyVersionEntity,

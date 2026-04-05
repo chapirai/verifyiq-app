@@ -43,6 +43,8 @@ export interface CompleteCompanyProfile {
   hvdRequestId?: string | null;
   /** Request ID returned by the Företagsinformation v4 API, if available. */
   v4RequestId?: string | null;
+  /** Request ID returned by the document-list API, if available. */
+  docRequestId?: string | null;
 }
 
 export interface OfficerProfile {
@@ -192,6 +194,10 @@ export class BolagsverketService {
     }
 
     const normalisedData = this.mapper.map(highValueDataset, organisationInformation, identitetsbeteckning);
+    // Attach document list so it flows through to the lookup response
+    normalisedData.documentList = documents?.dokument?.length ? documents.dokument : null;
+
+    const docRequestId = docResult.status === 'fulfilled' ? (docResult.value.requestId ?? null) : null;
 
     return {
       normalisedData,
@@ -201,6 +207,7 @@ export class BolagsverketService {
       retrievedAt: new Date().toISOString(),
       hvdRequestId: hvdResult.status === 'fulfilled' ? (hvdResult.value.requestId ?? null) : null,
       v4RequestId: richResult.status === 'fulfilled' ? (richResult.value.requestId ?? null) : null,
+      docRequestId,
     };
   }
 
@@ -587,8 +594,13 @@ export class BolagsverketService {
               `[cache] Failed to rehydrate raw payload for ${identitetsbeteckning} (tenant ${tenantId}): ${detail}`,
             );
           }
+          const cachedNormalisedData = cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany;
+          // Backfill documentList for cache entries that predate this field
+          if (!cachedNormalisedData.documentList && cachedDocuments?.dokument?.length) {
+            cachedNormalisedData.documentList = cachedDocuments.dokument;
+          }
           const cachedResult: CompleteCompanyProfile = {
-            normalisedData: cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany,
+            normalisedData: cachedNormalisedData,
             highValueDataset: cachedHvd,
             organisationInformation: cachedOrgInfo,
             documents: cachedDocuments,
@@ -807,6 +819,21 @@ export class BolagsverketService {
           )
           .catch((err: unknown) =>
             this.logger.warn(`Företagsinformation payload storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
+          );
+      }
+      // Store document list (HVD /dokumentlista) best-effort
+      if (result.documents?.dokument?.length) {
+        this.bvPersistenceService
+          .storeDocumentList(
+            tenantId,
+            identitetsbeteckning,
+            fetchedAt,
+            result.documents.dokument,
+            result.docRequestId ?? null,
+            snapshot.id,
+          )
+          .catch((err: unknown) =>
+            this.logger.warn(`Document list storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
           );
       }
 

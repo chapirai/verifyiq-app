@@ -70,6 +70,7 @@ function makeEnrichResult(isFromCache: boolean, ageInDays: number | null) {
         fieldErrors: [],
         hvdSection: null,
         v4Section: null,
+        documentList: null,
       },
       highValueDataset: null,
       organisationInformation: [],

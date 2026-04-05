@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { BvOrganisationEntity } from '../entities/bv-organisation.entity';
 import { BvHvdPayloadEntity } from '../entities/bv-hvd-payload.entity';
 import { BvForetagsinfoPayloadEntity } from '../entities/bv-foretagsinfo-payload.entity';
+import { BvDocumentListEntity } from '../entities/bv-document-list.entity';
 import { NormalisedCompany } from '../integrations/bolagsverket.mapper';
 
 @Injectable()
@@ -17,6 +18,8 @@ export class BvPersistenceService {
     private readonly hvdPayloadRepo: Repository<BvHvdPayloadEntity>,
     @InjectRepository(BvForetagsinfoPayloadEntity)
     private readonly foretagsinfoPayloadRepo: Repository<BvForetagsinfoPayloadEntity>,
+    @InjectRepository(BvDocumentListEntity)
+    private readonly documentListRepo: Repository<BvDocumentListEntity>,
   ) {}
 
   async upsertOrganisation(
@@ -135,5 +138,36 @@ export class BvPersistenceService {
    */
   async backfillForetagsinfoSnapshotId(foretagsinfoPayloadId: string, snapshotId: string): Promise<void> {
     await this.foretagsinfoPayloadRepo.update(foretagsinfoPayloadId, { snapshotId });
+  }
+
+  /**
+   * Store the full HVD /dokumentlista response (list of available annual reports).
+   */
+  async storeDocumentList(
+    tenantId: string,
+    organisationsnummer: string,
+    fetchedAt: Date,
+    documents: Array<{
+      dokumentId?: string;
+      filformat?: string;
+      rapporteringsperiodTom?: string;
+      registreringstidpunkt?: string;
+      dokumenttyp?: string;
+    }>,
+    requestId?: string | null,
+    snapshotId?: string | null,
+  ): Promise<BvDocumentListEntity> {
+    const entity = this.documentListRepo.create({
+      tenantId,
+      organisationsnummer,
+      fetchedAt,
+      documents,
+      documentCount: documents.length,
+      requestId: requestId ?? null,
+      snapshotId: snapshotId ?? null,
+    });
+    const saved = await this.documentListRepo.save(entity);
+    this.logger.debug(`Stored document list (${documents.length} entries) ${saved.id} for ${organisationsnummer}`);
+    return saved;
   }
 }

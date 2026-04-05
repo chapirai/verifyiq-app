@@ -17,6 +17,7 @@ import { FreshnessPanel } from '@/components/company/FreshnessPanel';
 import { SourcePanel } from '@/components/company/SourcePanel';
 import { SnapshotHistoryPanel } from '@/components/company/SnapshotHistoryPanel';
 import { ChangeSummaryPanel } from '@/components/company/ChangeSummaryPanel';
+import { api } from '@/lib/api';
 
 // ─── Structured section types (mirrors backend NormalisedCompany sections) ───
 
@@ -57,6 +58,16 @@ interface V4StructuredSection {
   utlandskFilialagandeOrganisation: { utlandskOrganisationNamn: string | null; utlandskOrganisationIdentitetsbeteckning: string | null; utlandskOrganisationLand: string | null } | null;
   finansiellaRapporter: Array<{ rapporttyp: string | null; rapporteringsperiodFran: string | null; rapporteringsperiodTom: string | null; registreringsdatum: string | null; dokumentId: string | null }>;
   ovrigOrganisationsinformation: Record<string, unknown> | null;
+}
+
+// ─── Annual reports (HVD dokumentlista) types ─────────────────────────────────
+
+interface BvDokument {
+  dokumentId?: string;
+  filformat?: string;
+  rapporteringsperiodTom?: string;
+  registreringstidpunkt?: string;
+  dokumenttyp?: string;
 }
 
 // ─── Shared display helpers ───────────────────────────────────────────────────
@@ -488,6 +499,116 @@ function V4DataSection({ v4 }: { v4: V4StructuredSection }) {
   );
 }
 
+// ─── Annual Reports Section ───────────────────────────────────────────────────
+
+function AnnualReportsSection({ documents }: { documents: BvDokument[] }) {
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  async function handleDownload(doc: BvDokument) {
+    if (!doc.dokumentId) return;
+    setDownloading(doc.dokumentId);
+    setDownloadError(null);
+    try {
+      const { blob, fileName } = await api.bolagsverket.downloadDocument(doc.dokumentId);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Download failed. Please try again.';
+      setDownloadError(msg);
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  return (
+    <SectionCard
+      title="Årsredovisningar (Annual Reports)"
+      badge={<SourceBadge label="HVD API" color="violet" />}
+    >
+      {downloadError && (
+        <div className="mb-4 rounded-xl border border-red-700 bg-red-900/30 px-4 py-3 text-sm text-red-300">
+          {downloadError}
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs uppercase tracking-widest text-slate-500">
+              <th className="pb-2 pr-4">Report period</th>
+              <th className="pb-2 pr-4">Type</th>
+              <th className="pb-2 pr-4">Format</th>
+              <th className="pb-2 pr-4">Registered</th>
+              <th className="pb-2">Download</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {documents.map((doc, i) => {
+              const isLoading = downloading === doc.dokumentId;
+              const period = doc.rapporteringsperiodTom
+                ? new Date(doc.rapporteringsperiodTom).getFullYear().toString()
+                : doc.rapporteringsperiodTom ?? '—';
+              const registered = doc.registreringstidpunkt
+                ? (() => { try { return new Date(doc.registreringstidpunkt!).toLocaleDateString('sv-SE'); } catch { return doc.registreringstidpunkt ?? '—'; } })()
+                : '—';
+              return (
+                <tr key={doc.dokumentId ?? i}>
+                  <td className="py-2 pr-4 text-white font-medium">{period}</td>
+                  <td className="py-2 pr-4 text-slate-300">{doc.dokumenttyp ?? '—'}</td>
+                  <td className="py-2 pr-4">
+                    {doc.filformat && (
+                      <span className="rounded bg-slate-700 px-1.5 py-0.5 text-xs text-slate-300 uppercase">
+                        {doc.filformat}
+                      </span>
+                    )}
+                    {!doc.filformat && <span className="text-slate-500">—</span>}
+                  </td>
+                  <td className="py-2 pr-4 text-slate-400 text-xs">{registered}</td>
+                  <td className="py-2">
+                    {doc.dokumentId ? (
+                      <button
+                        onClick={() => handleDownload(doc)}
+                        disabled={!!downloading}
+                        title={`Download annual report for ${period}`}
+                        className="flex items-center gap-1.5 rounded-lg bg-violet-700/40 px-3 py-1.5 text-xs font-medium text-violet-200 transition hover:bg-violet-700/70 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isLoading ? (
+                          <>
+                            <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Downloading…
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-500">N/A</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
 // ─── Skeleton helpers ─────────────────────────────────────────────────────────
 
 function SkeletonBlock({ className }: { className?: string }) {
@@ -558,6 +679,7 @@ export default function CompanyProfilePage() {
   const metadata = data?.metadata;
   const hvdSection = (company?.hvdSection ?? null) as HvdStructuredSection | null;
   const v4Section = (company?.v4Section ?? null) as V4StructuredSection | null;
+  const documentList = (company?.documentList ?? null) as BvDokument[] | null;
 
   return (
     <div className="space-y-6">
@@ -707,6 +829,11 @@ export default function CompanyProfilePage() {
 
           {/* Företagsinformation v4 section */}
           {v4Section && <V4DataSection v4={v4Section} />}
+
+          {/* Annual reports (HVD dokumentlista) */}
+          {documentList && documentList.length > 0 && (
+            <AnnualReportsSection documents={documentList} />
+          )}
 
           <div className="grid gap-6 lg:grid-cols-3">
             <FreshnessPanel

@@ -196,6 +196,18 @@ export interface NormalisedCompany {
   hvdSection: HvdStructuredSection | null;
   /** Fully structured Företagsinformation v4 section — no raw JSON blobs. Null when v4 fetch failed. */
   v4Section: V4StructuredSection | null;
+  /**
+   * Available annual report documents from the HVD /dokumentlista endpoint.
+   * Each entry has dokumentId (for download), filformat, rapporteringsperiodTom, etc.
+   * Null when the document list fetch failed or returned no data.
+   */
+  documentList: Array<{
+    dokumentId?: string;
+    filformat?: string;
+    rapporteringsperiodTom?: string;
+    registreringstidpunkt?: string;
+    dokumenttyp?: string;
+  }> | null;
 }
 
 /** Safely extract a plain string from a KodKlartext object or a plain string. */
@@ -567,6 +579,7 @@ export class BolagsverketMapper {
       fieldErrors,
       hvdSection,
       v4Section,
+      documentList: null, // backfilled by BolagsverketService after calling fetchDocumentList
     };
   }
 
