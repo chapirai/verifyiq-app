@@ -553,10 +553,8 @@ function AnnualReportsSection({ documents }: { documents: BvDokument[] }) {
               const isLoading = downloading === doc.dokumentId;
               const period = doc.rapporteringsperiodTom
                 ? new Date(doc.rapporteringsperiodTom).getFullYear().toString()
-                : doc.rapporteringsperiodTom ?? '—';
-              const registered = doc.registreringstidpunkt
-                ? (() => { try { return new Date(doc.registreringstidpunkt!).toLocaleDateString('sv-SE'); } catch { return doc.registreringstidpunkt ?? '—'; } })()
                 : '—';
+              const registered = fmt(doc.registreringstidpunkt);
               return (
                 <tr key={doc.dokumentId ?? i}>
                   <td className="py-2 pr-4 text-white font-medium">{period}</td>
