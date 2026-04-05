@@ -642,7 +642,7 @@ export class BolagsverketClient {
     }
     const { responseData, requestId } = await this.requestWithRetry<OrganisationInformationResponse[]>(
       'post',
-      this.buildUrl(this.getOrganisationBaseUrl(), '/organisationsinformation'),
+      this.buildUrl(this.getOrganisationBaseUrl(), '/organisationer'),
       payload,
       { auth: 'org', context },
     );
