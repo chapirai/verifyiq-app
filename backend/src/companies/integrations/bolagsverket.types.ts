@@ -92,17 +92,45 @@ export interface HvdIndustryCode {
   fel?: BvFel;
 }
 
+export interface HvdOrganisationsnamn {
+  namn?: string;
+  namnstyp?: string;
+  sprak?: string;
+  registreringsdatum?: string;
+  avregistreringsdatum?: string;
+  fel?: BvFel;
+}
+
 export interface HvdOrganisation {
   identitetsbeteckning?: string;
   namn?: string;
+  /** List of all registered names (current + historical). */
+  organisationsnamnLista?: HvdOrganisationsnamn[];
   organisationsform?: string;
+  organisationsdatum?: string;
   registreringsdatum?: string;
   organisationsstatusar?: HvdOrganisationStatus[];
   juridiskForm?: string;
   adresser?: HvdAddress[];
+  /** Postal address for organisation. */
+  postadressOrganisation?: HvdAddress;
   snikoder?: HvdIndustryCode[];
+  /** Industry/activity description. */
+  verksamhetsbeskrivning?: string;
   avregistreringsinformation?: HvdDeregistrationInfo;
+  /** Whether the organisation is deregistered. */
+  avregistreradOrganisation?: string;
   rekonstruktionsstatus?: HvdRestructuringStatus;
+  /** Whether the organisation is currently active. */
+  verksamOrganisation?: string;
+  /** Country of registration (e.g. 'SE'). */
+  registreringsland?: string;
+  /** External identity reference. */
+  organisationsidentitet?: string;
+  /** Marketing opt-out flag (reklamstopp). */
+  reklamsparr?: string;
+  /** Whether winding-up / restructuring proceedings are ongoing. */
+  pagaendeAvvecklingsEllerOmstruktureringsforfarande?: string;
   fel?: BvFel;
 }
 
@@ -268,6 +296,8 @@ export interface OrganisationInformationResponse {
   identitetsbeteckning?: string;
   namn?: string;
   organisationsform?: string;
+  /** Date of organisation formation/establishment. */
+  organisationsdatum?: string;
   registreringsdatum?: string;
   organisationsstatusar?: HvdOrganisationStatus[];
   funktionarer?: BvOfficer[];

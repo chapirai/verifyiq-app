@@ -68,6 +68,8 @@ function makeEnrichResult(isFromCache: boolean, ageInDays: number | null) {
         deregisteredAt: null,
         sourcePayloadSummary: {},
         fieldErrors: [],
+        hvdSection: null,
+        v4Section: null,
       },
       highValueDataset: null,
       organisationInformation: [],

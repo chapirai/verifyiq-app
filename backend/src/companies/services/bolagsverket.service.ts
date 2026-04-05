@@ -39,6 +39,10 @@ export interface CompleteCompanyProfile {
   organisationInformation: OrganisationInformationResponse[];
   documents: DocumentListResponse | null;
   retrievedAt: string;
+  /** Request ID returned by the HVD API, if available. */
+  hvdRequestId?: string | null;
+  /** Request ID returned by the Företagsinformation v4 API, if available. */
+  v4RequestId?: string | null;
 }
 
 export interface OfficerProfile {
@@ -195,6 +199,8 @@ export class BolagsverketService {
       organisationInformation,
       documents,
       retrievedAt: new Date().toISOString(),
+      hvdRequestId: hvdResult.status === 'fulfilled' ? (hvdResult.value.requestId ?? null) : null,
+      v4RequestId: richResult.status === 'fulfilled' ? (richResult.value.requestId ?? null) : null,
     };
   }
 
@@ -772,6 +778,37 @@ export class BolagsverketService {
         isStaleFallback: false,
         rawPayloadId,
       });
+
+      // 5a. Store full HVD and Företagsinformation payloads in dedicated tables (best-effort).
+      const fetchedAt = new Date();
+      if (result.highValueDataset) {
+        this.bvPersistenceService
+          .storeHvdPayload(
+            tenantId,
+            identitetsbeteckning,
+            fetchedAt,
+            result.highValueDataset as unknown as Record<string, unknown>,
+            result.hvdRequestId ?? null,
+            snapshot.id,
+          )
+          .catch((err: unknown) =>
+            this.logger.warn(`HVD payload storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
+          );
+      }
+      if (result.organisationInformation?.length) {
+        this.bvPersistenceService
+          .storeForetagsinfoPayload(
+            tenantId,
+            identitetsbeteckning,
+            fetchedAt,
+            { organisationInformation: result.organisationInformation } as Record<string, unknown>,
+            result.v4RequestId ?? null,
+            snapshot.id,
+          )
+          .catch((err: unknown) =>
+            this.logger.warn(`Företagsinformation payload storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
+          );
+      }
 
       // 6. Link snapshot into version chain and trigger comparison (P02-T08)
       // Both operations are best-effort: failures must NOT block snapshot creation.
