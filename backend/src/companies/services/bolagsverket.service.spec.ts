@@ -38,6 +38,9 @@ function makeNormalisedCompany(overrides: Partial<NormalisedCompany> = {}): Norm
       partialDataFields: [],
     },
     fieldErrors: [],
+    hvdSection: null,
+    v4Section: null,
+    documentList: null,
     ...overrides,
   };
 }
@@ -46,7 +49,7 @@ describe('BolagsverketService', () => {
   let service: BolagsverketService;
   let auditService: { emitAuditEvent: jest.Mock };
   let cacheService: { checkFreshness: jest.Mock; createSnapshot: jest.Mock };
-  let persistenceService: { upsertOrganisation: jest.Mock };
+  let persistenceService: { upsertOrganisation: jest.Mock; storeHvdPayload: jest.Mock; storeForetagsinfoPayload: jest.Mock; storeDocumentList: jest.Mock };
   let rawPayloadStorageService: { storeRawPayload: jest.Mock };
   let snapshotChainService: { linkSnapshot: jest.Mock };
   let snapshotComparisonService: { compareSnapshots: jest.Mock };
@@ -59,7 +62,7 @@ describe('BolagsverketService', () => {
 
   beforeEach(async () => {
     cacheService = { checkFreshness: jest.fn(), createSnapshot: jest.fn() };
-    persistenceService = { upsertOrganisation: jest.fn() };
+    persistenceService = { upsertOrganisation: jest.fn(), storeHvdPayload: jest.fn().mockResolvedValue({ id: 'hvd-payload-1' }), storeForetagsinfoPayload: jest.fn().mockResolvedValue({ id: 'v4-payload-1' }), storeDocumentList: jest.fn().mockResolvedValue({ id: 'doc-list-1' }) };
     rawPayloadStorageService = { storeRawPayload: jest.fn() };
     snapshotChainService = { linkSnapshot: jest.fn() };
     snapshotComparisonService = { compareSnapshots: jest.fn() };

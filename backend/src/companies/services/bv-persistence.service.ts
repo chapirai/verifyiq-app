@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BvOrganisationEntity } from '../entities/bv-organisation.entity';
+import { BvHvdPayloadEntity } from '../entities/bv-hvd-payload.entity';
+import { BvForetagsinfoPayloadEntity } from '../entities/bv-foretagsinfo-payload.entity';
+import { BvDocumentListEntity } from '../entities/bv-document-list.entity';
 import { NormalisedCompany } from '../integrations/bolagsverket.mapper';
 
 @Injectable()
@@ -11,6 +14,12 @@ export class BvPersistenceService {
   constructor(
     @InjectRepository(BvOrganisationEntity)
     private readonly orgRepo: Repository<BvOrganisationEntity>,
+    @InjectRepository(BvHvdPayloadEntity)
+    private readonly hvdPayloadRepo: Repository<BvHvdPayloadEntity>,
+    @InjectRepository(BvForetagsinfoPayloadEntity)
+    private readonly foretagsinfoPayloadRepo: Repository<BvForetagsinfoPayloadEntity>,
+    @InjectRepository(BvDocumentListEntity)
+    private readonly documentListRepo: Repository<BvDocumentListEntity>,
   ) {}
 
   async upsertOrganisation(
@@ -65,5 +74,100 @@ export class BvPersistenceService {
     organisationsnummer: string,
   ): Promise<BvOrganisationEntity | null> {
     return this.orgRepo.findOne({ where: { tenantId, organisationsnummer } });
+  }
+
+  /**
+   * Store the full HVD payload for a fetch snapshot.
+   * Returns the created entity so the caller can backfill snapshotId afterward.
+   */
+  async storeHvdPayload(
+    tenantId: string,
+    organisationsnummer: string,
+    fetchedAt: Date,
+    payload: Record<string, unknown>,
+    requestId?: string | null,
+    snapshotId?: string | null,
+  ): Promise<BvHvdPayloadEntity> {
+    const entity = this.hvdPayloadRepo.create({
+      tenantId,
+      organisationsnummer,
+      fetchedAt,
+      payload,
+      requestId: requestId ?? null,
+      snapshotId: snapshotId ?? null,
+    });
+    const saved = await this.hvdPayloadRepo.save(entity);
+    this.logger.debug(`Stored HVD payload ${saved.id} for ${organisationsnummer}`);
+    return saved;
+  }
+
+  /**
+   * Store the full Företagsinformation v4 payload for a fetch snapshot.
+   * Returns the created entity so the caller can backfill snapshotId afterward.
+   */
+  async storeForetagsinfoPayload(
+    tenantId: string,
+    organisationsnummer: string,
+    fetchedAt: Date,
+    payload: Record<string, unknown>,
+    requestId?: string | null,
+    snapshotId?: string | null,
+  ): Promise<BvForetagsinfoPayloadEntity> {
+    const entity = this.foretagsinfoPayloadRepo.create({
+      tenantId,
+      organisationsnummer,
+      fetchedAt,
+      payload,
+      requestId: requestId ?? null,
+      snapshotId: snapshotId ?? null,
+    });
+    const saved = await this.foretagsinfoPayloadRepo.save(entity);
+    this.logger.debug(`Stored Företagsinformation payload ${saved.id} for ${organisationsnummer}`);
+    return saved;
+  }
+
+  /**
+   * Backfill the snapshotId on a previously-created HVD payload record.
+   */
+  async backfillHvdSnapshotId(hvdPayloadId: string, snapshotId: string): Promise<void> {
+    await this.hvdPayloadRepo.update(hvdPayloadId, { snapshotId });
+  }
+
+  /**
+   * Backfill the snapshotId on a previously-created Företagsinformation payload record.
+   */
+  async backfillForetagsinfoSnapshotId(foretagsinfoPayloadId: string, snapshotId: string): Promise<void> {
+    await this.foretagsinfoPayloadRepo.update(foretagsinfoPayloadId, { snapshotId });
+  }
+
+  /**
+   * Store the full HVD /dokumentlista response (list of available annual reports).
+   */
+  async storeDocumentList(
+    tenantId: string,
+    organisationsnummer: string,
+    fetchedAt: Date,
+    documents: Array<{
+      dokumentId?: string;
+      filformat?: string;
+      rapporteringsperiodTom?: string;
+      registreringstidpunkt?: string;
+      dokumenttyp?: string;
+    }>,
+    requestId?: string | null,
+    snapshotId?: string | null,
+  ): Promise<BvDocumentListEntity> {
+    const entity = this.documentListRepo.create({
+      tenantId,
+      organisationsnummer,
+      fetchedAt,
+      documents,
+      documentCount: documents.length,
+      requestId: requestId ?? null,
+      snapshotId: snapshotId ?? null,
+    });
+    const saved = await this.documentListRepo.save(entity);
+    this.logger.debug(`Stored document list (${documents.length} entries) ${saved.id} for ${organisationsnummer}`);
+    return saved;
   }
 }

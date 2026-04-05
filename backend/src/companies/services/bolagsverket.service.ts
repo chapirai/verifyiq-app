@@ -39,6 +39,12 @@ export interface CompleteCompanyProfile {
   organisationInformation: OrganisationInformationResponse[];
   documents: DocumentListResponse | null;
   retrievedAt: string;
+  /** Request ID returned by the HVD API, if available. */
+  hvdRequestId?: string | null;
+  /** Request ID returned by the Företagsinformation v4 API, if available. */
+  v4RequestId?: string | null;
+  /** Request ID returned by the document-list API, if available. */
+  docRequestId?: string | null;
 }
 
 export interface OfficerProfile {
@@ -188,6 +194,10 @@ export class BolagsverketService {
     }
 
     const normalisedData = this.mapper.map(highValueDataset, organisationInformation, identitetsbeteckning);
+    // Attach document list so it flows through to the lookup response
+    normalisedData.documentList = documents?.dokument?.length ? documents.dokument : null;
+
+    const docRequestId = docResult.status === 'fulfilled' ? (docResult.value.requestId ?? null) : null;
 
     return {
       normalisedData,
@@ -195,6 +205,9 @@ export class BolagsverketService {
       organisationInformation,
       documents,
       retrievedAt: new Date().toISOString(),
+      hvdRequestId: hvdResult.status === 'fulfilled' ? (hvdResult.value.requestId ?? null) : null,
+      v4RequestId: richResult.status === 'fulfilled' ? (richResult.value.requestId ?? null) : null,
+      docRequestId,
     };
   }
 
@@ -581,8 +594,13 @@ export class BolagsverketService {
               `[cache] Failed to rehydrate raw payload for ${identitetsbeteckning} (tenant ${tenantId}): ${detail}`,
             );
           }
+          const cachedNormalisedData = cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany;
+          // Backfill documentList for cache entries that predate this field
+          if (!cachedNormalisedData.documentList && cachedDocuments?.dokument?.length) {
+            cachedNormalisedData.documentList = cachedDocuments.dokument;
+          }
           const cachedResult: CompleteCompanyProfile = {
-            normalisedData: cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany,
+            normalisedData: cachedNormalisedData,
             highValueDataset: cachedHvd,
             organisationInformation: cachedOrgInfo,
             documents: cachedDocuments,
@@ -772,6 +790,52 @@ export class BolagsverketService {
         isStaleFallback: false,
         rawPayloadId,
       });
+
+      // 5a. Store full HVD and Företagsinformation payloads in dedicated tables (best-effort).
+      const fetchedAt = new Date();
+      if (result.highValueDataset) {
+        this.bvPersistenceService
+          .storeHvdPayload(
+            tenantId,
+            identitetsbeteckning,
+            fetchedAt,
+            result.highValueDataset as unknown as Record<string, unknown>,
+            result.hvdRequestId ?? null,
+            snapshot.id,
+          )
+          .catch((err: unknown) =>
+            this.logger.warn(`HVD payload storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
+          );
+      }
+      if (result.organisationInformation?.length) {
+        this.bvPersistenceService
+          .storeForetagsinfoPayload(
+            tenantId,
+            identitetsbeteckning,
+            fetchedAt,
+            { organisationInformation: result.organisationInformation } as Record<string, unknown>,
+            result.v4RequestId ?? null,
+            snapshot.id,
+          )
+          .catch((err: unknown) =>
+            this.logger.warn(`Företagsinformation payload storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
+          );
+      }
+      // Store document list (HVD /dokumentlista) best-effort
+      if (result.documents?.dokument?.length) {
+        this.bvPersistenceService
+          .storeDocumentList(
+            tenantId,
+            identitetsbeteckning,
+            fetchedAt,
+            result.documents.dokument,
+            result.docRequestId ?? null,
+            snapshot.id,
+          )
+          .catch((err: unknown) =>
+            this.logger.warn(`Document list storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
+          );
+      }
 
       // 6. Link snapshot into version chain and trigger comparison (P02-T08)
       // Both operations are best-effort: failures must NOT block snapshot creation.
