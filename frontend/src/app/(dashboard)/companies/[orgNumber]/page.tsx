@@ -18,12 +18,12 @@ import { SourcePanel } from '@/components/company/SourcePanel';
 import { SnapshotHistoryPanel } from '@/components/company/SnapshotHistoryPanel';
 import { ChangeSummaryPanel } from '@/components/company/ChangeSummaryPanel';
 import { api } from '@/lib/api';
+import { type KodKlartext, toText } from '@/utils/bolagsverket';
 
 // ─── Structured section types (mirrors backend NormalisedCompany sections) ───
-
 interface MappedName { namn: string | null; namnstyp: string | null; sprak: string | null; registreringsdatum: string | null; avregistreringsdatum: string | null }
 interface MappedAddress { adresstyp: string | null; gatuadress: string | null; postnummer: string | null; postort: string | null; land: string | null }
-interface MappedStatus { status: string | null; statusdatum: string | null }
+interface MappedStatus { status: string | KodKlartext | null; statusdatum: string | null }
 interface MappedIndustryCode { snikod: string | null; snikodText: string | null }
 interface MappedOfficer {
   namn: string | null; personId: string | null; fodelseAr: string | null; nationalitet: string | null;
@@ -32,18 +32,18 @@ interface MappedOfficer {
 
 interface HvdStructuredSection {
   identitetsbeteckning: string | null; namn: string | null; names: MappedName[];
-  juridiskForm: string | null; organisationsform: string | null; organisationsdatum: string | null; registreringsdatum: string | null;
+  juridiskForm: string | KodKlartext | null; organisationsform: string | KodKlartext | null; organisationsdatum: string | null; registreringsdatum: string | null;
   verksamhetsbeskrivning: string | null; naringsgren: MappedIndustryCode[]; statusar: MappedStatus[];
   adresser: MappedAddress[]; postadressOrganisation: MappedAddress | null;
   reklamsparr: string | null; avregistreradOrganisation: string | null;
   avregistreringsorsak: string | null; avregistreringsdatum: string | null;
   pagaendeAvvecklingsEllerOmstruktureringsforfarande: string | null;
   verksamOrganisation: string | null; registreringsland: string | null; organisationsidentitet: string | null;
-  rekonstruktionsstatus: string | null; rekonstruktionsdatum: string | null;
+  rekonstruktionsstatus: string | KodKlartext | null; rekonstruktionsdatum: string | null;
 }
 
 interface V4StructuredSection {
-  identitetsbeteckning: string | null; organisationsnamn: string | null; organisationsform: string | null;
+  identitetsbeteckning: string | null; organisationsnamn: string | null; organisationsform: string | KodKlartext | null;
   organisationsdatum: string | null; registreringsdatum: string | null; organisationsstatusar: MappedStatus[];
   hemvistkommun: { kommunnamn: string | null; kommunkod: string | null } | null;
   rakenskapsar: { rakenskapsarInleds: string | null; rakenskapsarAvslutas: string | null; forstaRakenskapsarInleds: string | null; forstaRakenskapsarAvslutas: string | null } | null;
@@ -131,8 +131,8 @@ function HvdDataSection({ hvd }: { hvd: HvdStructuredSection }) {
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Row label="Organisation number" value={hvd.identitetsbeteckning} />
           <Row label="Legal name" value={hvd.namn} />
-          <Row label="Legal form (Juridisk form)" value={hvd.juridiskForm} />
-          <Row label="Company form" value={hvd.organisationsform} />
+          <Row label="Legal form (Juridisk form)" value={toText(hvd.juridiskForm)} />
+          <Row label="Company form" value={toText(hvd.organisationsform)} />
           <Row label="Organisation date" value={fmt(hvd.organisationsdatum)} />
           <Row label="Registered" value={fmt(hvd.registreringsdatum)} />
           <Row label="Country" value={hvd.registreringsland} />
@@ -150,7 +150,7 @@ function HvdDataSection({ hvd }: { hvd: HvdStructuredSection }) {
             <Row label="Pending winding-up / restructuring" value={hvd.pagaendeAvvecklingsEllerOmstruktureringsforfarande} />
           )}
           {(hvd.rekonstruktionsstatus || hvd.rekonstruktionsdatum) && (
-            <Row label="Restructuring status" value={`${hvd.rekonstruktionsstatus ?? ''}${hvd.rekonstruktionsdatum ? ` (${fmt(hvd.rekonstruktionsdatum)})` : ''}`.trim() || null} />
+            <Row label="Restructuring status" value={`${toText(hvd.rekonstruktionsstatus) ?? ''}${hvd.rekonstruktionsdatum ? ` (${fmt(hvd.rekonstruktionsdatum)})` : ''}`.trim() || null} />
           )}
         </dl>
 
@@ -167,7 +167,7 @@ function HvdDataSection({ hvd }: { hvd: HvdStructuredSection }) {
             <div className="flex flex-wrap gap-2">
               {hvd.statusar.map((s, i) => (
                 <span key={i} className="rounded-full bg-slate-700/60 px-3 py-1 text-xs text-slate-300">
-                  {s.status ?? '—'}{s.statusdatum ? ` · ${fmt(s.statusdatum)}` : ''}
+                  {toText(s.status) ?? '—'}{s.statusdatum ? ` · ${fmt(s.statusdatum)}` : ''}
                 </span>
               ))}
             </div>
@@ -231,7 +231,7 @@ function V4DataSection({ v4 }: { v4: V4StructuredSection }) {
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Row label="Organisation number" value={v4.identitetsbeteckning} />
           <Row label="Name" value={v4.organisationsnamn} />
-          <Row label="Company form" value={v4.organisationsform} />
+          <Row label="Company form" value={toText(v4.organisationsform)} />
           <Row label="Organisation date" value={fmt(v4.organisationsdatum)} />
           <Row label="Registered" value={fmt(v4.registreringsdatum)} />
           {v4.hemvistkommun && (
@@ -260,7 +260,7 @@ function V4DataSection({ v4 }: { v4: V4StructuredSection }) {
             <div className="flex flex-wrap gap-2">
               {v4.organisationsstatusar.map((s, i) => (
                 <span key={i} className="rounded-full bg-slate-700/60 px-3 py-1 text-xs text-slate-300">
-                  {s.status ?? '—'}{s.statusdatum ? ` · ${fmt(s.statusdatum)}` : ''}
+                  {toText(s.status) ?? '—'}{s.statusdatum ? ` · ${fmt(s.statusdatum)}` : ''}
                 </span>
               ))}
             </div>
