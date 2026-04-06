@@ -1,0 +1,35 @@
+Schema name: AktiekapitalforandringRequest
+API: Bolagsverket Aktie API
+Response path: request body
+
+Raw structure:
+{
+"identitetsbeteckning": "5560123456",
+"fromdatum": "2024-01-01",
+"tomdatum": "2024-12-31"
+}
+
+Fields:
+
+* identitetsbeteckning: string
+* fromdatum: string
+* tomdatum: string
+
+Mapping:
+
+* identitetsbeteckning -> organisationId
+* fromdatum -> fromDate
+* tomdatum -> toDate
+
+Rules:
+
+* type conversion: fromdatum and tomdatum (YYYY-MM-DD) → Date objects if required internally
+* optional/missing handling: fromdatum and tomdatum optional; identitetsbeteckning required
+* special parsing: validate date format YYYY-MM-DD; ensure fromdatum ≤ tomdatum if both provided; only applicable for limited liability companies
+
+Target type:
+{
+"organisationId": "string",
+"fromDate": "date",
+"toDate": "date"
+}

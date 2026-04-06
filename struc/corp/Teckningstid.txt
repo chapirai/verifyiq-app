@@ -1,0 +1,31 @@
+Schema name: Teckningstid
+API: Bolagsverket Aktie API
+Response path: *.teckningsoptioner.aktieteckning | *.teckningsoptioner.tidForNyteckning | *.konvertibler.utbyte
+
+Raw structure:
+{
+"from": "2019-08-24",
+"tom": "2019-08-24"
+}
+
+Fields:
+
+* from: string<date>
+* tom: string<date>
+
+Mapping:
+
+* from -> from
+* tom -> tom
+
+Rules:
+
+* type conversion: convert string<date> to Date only if internal model requires it
+* optional/missing handling: from and tom may be missing independently depending on interval definition
+* special parsing: none
+
+Target type:
+{
+"from": "string<date>",
+"tom": "string<date>"
+}

@@ -1,0 +1,82 @@
+Schema name: FunktionarUtlandsk
+API: organisations/lookup
+Response path: response.body[].utlandskFilialagandeOrganisation.funktionarer[]
+
+Raw structure:
+{
+"namn": "string",
+"idnummer": "string",
+"postadress": {
+"coAdress": "string",
+"adress": "string",
+"postnummer": "string",
+"postort": "string",
+"adressrad1": "string",
+"adressrad2": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"funktion": "string"
+}
+
+Fields:
+
+* namn: string
+* idnummer: string
+* postadress: object
+* postadress.coAdress: string
+* postadress.adress: string
+* postadress.postnummer: string
+* postadress.postort: string
+* postadress.adressrad1: string
+* postadress.adressrad2: string
+* postadress.land: object
+* postadress.land.kod: string
+* postadress.land.klartext: string
+* funktion: string
+
+Mapping:
+
+* namn -> name
+* idnummer -> idNumber
+* postadress -> address
+* postadress.coAdress -> address.co
+* postadress.adress -> address.street
+* postadress.postnummer -> address.postalCode
+* postadress.postort -> address.city
+* postadress.adressrad1 -> address.addressLine1
+* postadress.adressrad2 -> address.addressLine2
+* postadress.land -> address.country
+* postadress.land.kod -> address.country.code
+* postadress.land.klartext -> address.country.text
+* funktion -> role
+
+Rules:
+
+* namn: required string, preserve as-is
+* idnummer: string, do not cast to number
+* postadress: optional nested object, fields may be partially populated
+* postadress.land: preserve as nested KodKlartext object
+* funktion: free-text role string, preserve as-is
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"name": "string",
+"idNumber": "string",
+"address": {
+"co": "string",
+"street": "string",
+"postalCode": "string",
+"city": "string",
+"addressLine1": "string",
+"addressLine2": "string",
+"country": {
+"code": "string",
+"text": "string"
+}
+},
+"role": "string"
+}

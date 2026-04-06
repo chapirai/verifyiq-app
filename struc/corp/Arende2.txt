@@ -1,0 +1,37 @@
+Schema name: Arende
+API: Bolagsverket Financial API
+Usage: Embedded object (used across multiple responses, e.g. FinansiellRapport, Aktiekapitalförändring, etc.)
+
+Raw structure:
+{
+"arendenummer": "123456/2025",
+"avslutatTidpunkt": "2024-12-31T12:12+02:00"
+}
+
+Fields:
+
+* arendenummer: string
+* avslutatTidpunkt: string<date-time>
+
+Mapping:
+
+* arendenummer -> arendenummer
+* avslutatTidpunkt -> avslutatTidpunkt
+
+Rules:
+
+* type conversion: avslutatTidpunkt should be parsed as ISO 8601 datetime if your system supports datetime types, otherwise keep as string
+* optional/missing handling: both fields should be treated as required when object exists, but the entire arende object can be nullable depending on endpoint
+* format constraint:
+
+  * arendenummer must follow pattern: `number/year` (e.g. 123456/2025)
+  * avslutatTidpunkt must follow ISO 8601 with timezone
+
+Target type:
+{
+"arendenummer": "string",
+"avslutatTidpunkt": "string<date-time>"
+}
+
+Implementation note (important for your agent):
+This is a reusable core object. Define it once in your domain model and reference it across all schemas instead of duplicating it.

@@ -1,0 +1,47 @@
+Schema name: AktiekapitalUtlandskt
+API: organisations/lookup
+Response path: response.body[].utlandskFilialagandeOrganisation.aktieinformation
+
+Raw structure:
+{
+"belopp": 0,
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"inbetaltBelopp": 0
+}
+
+Fields:
+
+* belopp: number
+* valuta: object
+* valuta.kod: string
+* valuta.klartext: string
+* inbetaltBelopp: number
+
+Mapping:
+
+* belopp -> amount
+* valuta -> currency
+* valuta.kod -> currency.code
+* valuta.klartext -> currency.text
+* inbetaltBelopp -> paidAmount
+
+Rules:
+
+* belopp and inbetaltBelopp: numeric, preserve precision
+* valuta: object with code and text, must not be flattened into string
+* valuta.kod: required identifier for currency
+* valuta.klartext: descriptive text, optional for internal usage but should be preserved
+* missing values should be null or omitted, not defaulted
+
+Target type:
+{
+"amount": 0,
+"currency": {
+"code": "string",
+"text": "string"
+},
+"paidAmount": 0
+}

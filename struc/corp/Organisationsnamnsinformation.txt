@@ -1,0 +1,92 @@
+Schema name: Organisationsnamnsinformation
+API: organisations/lookup
+Response path: response.body[].samtligaOrganisationsnamn[]
+
+Raw structure:
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string",
+"registreringsdatum": "2019-08-24",
+"verksamhetsbeskrivningSarskiltForetagsnamn": "string",
+"beslutAvStamma": true,
+"iBestammelser": true,
+"registreringslan": {
+"kod": "string",
+"klartext": "string"
+},
+"registreringFlerLan": [
+{
+"kod": "string",
+"klartext": "string"
+}
+]
+}
+
+Fields:
+
+* typ: object
+* typ.kod: string
+* typ.klartext: string
+* namn: string
+* registreringsdatum: string
+* verksamhetsbeskrivningSarskiltForetagsnamn: string
+* beslutAvStamma: boolean
+* iBestammelser: boolean
+* registreringslan: object
+* registreringslan.kod: string
+* registreringslan.klartext: string
+* registreringFlerLan: array[object]
+* registreringFlerLan[].kod: string
+* registreringFlerLan[].klartext: string
+
+Mapping:
+
+* typ -> type
+* typ.kod -> type.code
+* typ.klartext -> type.text
+* namn -> name
+* registreringsdatum -> registrationDate
+* verksamhetsbeskrivningSarskiltForetagsnamn -> description
+* beslutAvStamma -> decidedAtMeeting
+* iBestammelser -> inRegulations
+* registreringslan -> registrationCounty
+* registreringslan.kod -> registrationCounty.code
+* registreringslan.klartext -> registrationCounty.text
+* registreringFlerLan -> additionalRegistrationCounties
+* registreringFlerLan[].kod -> additionalRegistrationCounties[].code
+* registreringFlerLan[].klartext -> additionalRegistrationCounties[].text
+
+Rules:
+
+* registreringsdatum: date string in YYYY-MM-DD format
+* typ and registreringslan: KodKlartext objects, preserve both code and text
+* registreringFlerLan: array of KodKlartext objects, preserve structure
+* beslutAvStamma and iBestammelser: boolean flags, do not default if missing
+* verksamhetsbeskrivningSarskiltForetagsnamn: free text, preserve as-is
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"type": {
+"code": "string",
+"text": "string"
+},
+"name": "string",
+"registrationDate": "2019-08-24",
+"description": "string",
+"decidedAtMeeting": true,
+"inRegulations": true,
+"registrationCounty": {
+"code": "string",
+"text": "string"
+},
+"additionalRegistrationCounties": [
+{
+"code": "string",
+"text": "string"
+}
+]
+}

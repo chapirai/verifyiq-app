@@ -1,0 +1,31 @@
+Schema name: FortsattStamma
+API: Bolagsverket Financial API
+Response path: FinansiellaRapporterResponse.finansiellaRapporter[].rakenskapsperioder[].fortsattStamma
+
+Raw structure:
+{
+"stammodatum": "string",
+"fritext": "string"
+}
+
+Fields:
+
+* stammodatum: string
+* fritext: string
+
+Mapping:
+
+* stammodatum -> stammodatum
+* fritext -> fritext
+
+Rules:
+
+* type conversion: convert stammodatum to Date only if internal model requires it
+* optional/missing handling: both fields may be missing or null depending on whether a resumed meeting exists
+* special parsing: none
+
+Target type:
+{
+"stammodatum": "string",
+"fritext": "string"
+}

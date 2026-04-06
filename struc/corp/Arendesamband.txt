@@ -1,0 +1,46 @@
+Schema name: Arendesamband
+API: Bolagsverket Arende API
+Response path: ArendeResponse[].arendesamband
+
+Raw structure:
+[
+{
+"utgarFranArendenummer": "string",
+"fortsatterIArendenummer": "string",
+"arendesambandstyp": {
+"kod": "string",
+"klartext": "string"
+}
+}
+]
+
+Fields:
+
+* utgarFranArendenummer: string
+* fortsatterIArendenummer: string
+* arendesambandstyp.kod: string
+* arendesambandstyp.klartext: string
+
+Mapping:
+
+* utgarFranArendenummer -> proceedsFromCaseNumber
+* fortsatterIArendenummer -> continuesToCaseNumber
+* arendesambandstyp -> relationType
+
+Rules:
+
+* type conversion: none
+* optional/missing handling: utgarFranArendenummer and fortsatterIArendenummer may be missing depending on relation direction; array may be empty
+* special parsing: none
+
+Target type:
+[
+{
+"proceedsFromCaseNumber": "string",
+"continuesToCaseNumber": "string",
+"relationType": {
+"kod": "string",
+"klartext": "string"
+}
+}
+]

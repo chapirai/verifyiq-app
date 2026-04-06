@@ -1,0 +1,140 @@
+Schema name: FunktionarsOrganisationsengagemang
+API: Bolagsverket Person API
+Response path: Organisationsengagemangsinformation.funktionarsOrganisationsengagemang
+
+Raw structure:
+[
+{
+"organisation": {
+"identitet": {
+"typ": {}
+},
+"namnskyddslopnummer": 2,
+"organisationsnamn": {
+"typ": {}
+},
+"organisationsform": {},
+"organisationsstatusar": [
+{}
+]
+},
+"funktionar": {
+"personnamn": {},
+"organisationsnamn": {
+"typ": {}
+},
+"identitet": {
+"typ": {}
+},
+"funktionarsroller": [
+{}
+],
+"arFirmatecknare": "JA",
+"anteckning": "string"
+}
+}
+]
+
+Fields:
+
+* organisation.identitet.typ.kod: string
+* organisation.identitet.typ.klartext: string
+* organisation.identitet.identitetsbeteckning: string
+* organisation.namnskyddslopnummer: integer
+* organisation.organisationsnamn.typ.kod: string
+* organisation.organisationsnamn.typ.klartext: string
+* organisation.organisationsnamn.namn: string
+* organisation.organisationsform.kod: string
+* organisation.organisationsform.klartext: string
+* organisation.organisationsstatusar: array<object>
+* organisation.organisationsstatusar.kod: string
+* organisation.organisationsstatusar.klartext: string
+* organisation.organisationsstatusar.typ: string
+* organisation.organisationsstatusar.datum: string<date>
+* funktionar.personnamn.fornamn: string
+* funktionar.personnamn.efternamn: string
+* funktionar.organisationsnamn.typ.kod: string
+* funktionar.organisationsnamn.typ.klartext: string
+* funktionar.organisationsnamn.namn: string
+* funktionar.identitet.typ.kod: string
+* funktionar.identitet.typ.klartext: string
+* funktionar.identitet.identitetsbeteckning: string
+* funktionar.funktionarsroller: array<object>
+* funktionar.funktionarsroller.kod: string
+* funktionar.funktionarsroller.klartext: string
+* funktionar.arFirmatecknare: string
+* funktionar.anteckning: string
+
+Mapping:
+
+* organisation -> organisation
+* funktionar -> funktionar
+
+Rules:
+
+* type conversion: convert organisationsstatusar.datum to Date only if internal model requires it
+* optional/missing handling: namnskyddslopnummer, organisationsstatusar, organisationsnamn, personnamn, anteckning may be missing or null depending on entity type
+* special parsing: validate funktionar.arFirmatecknare against allowed enum values (JA, NEJ)
+
+Target type:
+[
+{
+"organisation": {
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"namnskyddslopnummer": "integer",
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"organisationsstatusar": [
+{
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "string<date>"
+}
+]
+},
+"funktionar": {
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"arFirmatecknare": "string",
+"anteckning": "string"
+}
+}
+]

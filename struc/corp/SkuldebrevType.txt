@@ -1,0 +1,162 @@
+Schema name: SkuldebrevType
+API: Bolagsverket Aktie API
+Response path: AktiekapitalforandringResponse.skuldebrev[].skuldebrev
+
+Raw structure:
+{
+"lopnummer": "string",
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "2019-08-24"
+},
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"forandringsbelopp": {
+"beslutatBelopp": 0,
+"lagst": 25000,
+"hogst": 100000
+},
+"tecknatBelopp": 0,
+"aktieslag": "string",
+"aktiekapitalKanOkasMedBelopp": 0,
+"teckningsoptioner": {
+"belopp": 0,
+"aktieteckning": {
+"from": "2019-08-24",
+"tom": "2019-08-24"
+},
+"antal": {
+"faktisktAntal": 0,
+"lagst": 0,
+"hogst": 0
+},
+"utanLan": true,
+"medLan": true,
+"tidForNyteckning": {
+"from": "2019-08-24",
+"tom": "2019-08-24"
+}
+},
+"konvertibler": {
+"belopp": 0,
+"utbyte": {
+"from": "2019-08-24",
+"tom": "2019-08-24"
+}
+},
+"fritext": "string"
+}
+
+Fields:
+
+* lopnummer: string
+* typ.kod: string
+* typ.klartext: string
+* beslutAvInstans.instanstyp.kod: string
+* beslutAvInstans.instanstyp.klartext: string
+* beslutAvInstans.beslutsdatum: string<date>
+* valuta.kod: string
+* valuta.klartext: string
+* forandringsbelopp.beslutatBelopp: number
+* forandringsbelopp.lagst: number
+* forandringsbelopp.hogst: number
+* tecknatBelopp: number
+* aktieslag: string
+* aktiekapitalKanOkasMedBelopp: number
+* teckningsoptioner.belopp: number
+* teckningsoptioner.aktieteckning.from: string<date>
+* teckningsoptioner.aktieteckning.tom: string<date>
+* teckningsoptioner.antal.faktisktAntal: integer
+* teckningsoptioner.antal.lagst: number
+* teckningsoptioner.antal.hogst: number
+* teckningsoptioner.utanLan: boolean
+* teckningsoptioner.medLan: boolean
+* teckningsoptioner.tidForNyteckning.from: string<date>
+* teckningsoptioner.tidForNyteckning.tom: string<date>
+* konvertibler.belopp: number
+* konvertibler.utbyte.from: string<date>
+* konvertibler.utbyte.tom: string<date>
+* fritext: string
+
+Mapping:
+
+* lopnummer -> lopnummer
+* typ -> typ
+* beslutAvInstans -> beslutAvInstans
+* valuta -> valuta
+* forandringsbelopp -> forandringsbelopp
+* tecknatBelopp -> tecknatBelopp
+* aktieslag -> aktieslag
+* aktiekapitalKanOkasMedBelopp -> aktiekapitalKanOkasMedBelopp
+* teckningsoptioner -> teckningsoptioner
+* konvertibler -> konvertibler
+* fritext -> fritext
+
+Rules:
+
+* type conversion: convert all string<date> fields to Date only if internal model requires it; keep number and integer values numeric
+* optional/missing handling: teckningsoptioner, konvertibler, forandringsbelopp, and nested fields may be missing or null depending on debt instrument type
+* special parsing: preserve numeric precision for amount fields
+
+Target type:
+{
+"lopnummer": "string",
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+},
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"forandringsbelopp": {
+"beslutatBelopp": "number",
+"lagst": "number",
+"hogst": "number"
+},
+"tecknatBelopp": "number",
+"aktieslag": "string",
+"aktiekapitalKanOkasMedBelopp": "number",
+"teckningsoptioner": {
+"belopp": "number",
+"aktieteckning": {
+"from": "string<date>",
+"tom": "string<date>"
+},
+"antal": {
+"faktisktAntal": "integer",
+"lagst": "number",
+"hogst": "number"
+},
+"utanLan": "boolean",
+"medLan": "boolean",
+"tidForNyteckning": {
+"from": "string<date>",
+"tom": "string<date>"
+}
+},
+"konvertibler": {
+"belopp": "number",
+"utbyte": {
+"from": "string<date>",
+"tom": "string<date>"
+}
+},
+"fritext": "string"
+}

@@ -1,0 +1,32 @@
+Schema name: identitetsbeteckning
+API: Bolagsverket (common field across multiple endpoints)
+Usage: Core identifier (company or personal identity number)
+
+Raw structure:
+"string"
+
+Fields:
+
+* identitetsbeteckning: string
+
+Mapping:
+
+* identitetsbeteckning -> identitetsbeteckning
+
+Rules:
+
+* type conversion: keep as string (never numeric due to leading zeros and formatting)
+* format constraint:
+
+  * must be 10 or 12 digits
+  * no separators (no dash or space)
+* validation:
+
+  * only digits allowed
+  * length must be exactly 10 or 12
+* optional/missing handling: typically required in requests; in responses it should always be present when identity object exists
+
+Target type:
+{
+"identitetsbeteckning": "string"
+}

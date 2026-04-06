@@ -1,0 +1,94 @@
+Schema name: firmateckningsregel
+API: organisations/lookup
+Response path: response.body[].firmateckning.kodad[][]
+
+Raw structure:
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"ordning": 1,
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"funktionarer": [
+{
+"personnamn": {},
+"organisationsnamn": {
+"typ": {}
+},
+"identitet": {
+"typ": {}
+}
+}
+]
+}
+
+Fields:
+
+* typ: object
+* typ.kod: string
+* typ.klartext: string
+* ordning: number
+* funktionarsroller: array[object]
+* funktionarsroller[].kod: string
+* funktionarsroller[].klartext: string
+* funktionarer: array[object]
+* funktionarer[].personnamn: object
+* funktionarer[].organisationsnamn: object
+* funktionarer[].organisationsnamn.typ: object
+* funktionarer[].identitet: object
+* funktionarer[].identitet.typ: object
+
+Mapping:
+
+* typ -> type
+* typ.kod -> type.code
+* typ.klartext -> type.text
+* ordning -> order
+* funktionarsroller -> roles
+* funktionarsroller[].kod -> roles[].code
+* funktionarsroller[].klartext -> roles[].text
+* funktionarer -> officers
+* funktionarer[].personnamn -> officers[].personName
+* funktionarer[].organisationsnamn -> officers[].organizationName
+* funktionarer[].identitet -> officers[].identity
+
+Rules:
+
+* ordning: defines execution order, must be preserved exactly
+* funktionarsroller: array of KodKlartext, do not flatten into strings
+* funktionarer: array of nested officer objects, preserve structure
+* this object exists inside a nested array structure (array[array]) and must not be flattened
+* empty nested objects indicate separate schema definitions
+* missing optional arrays should be [] if present but empty, otherwise null/omitted
+
+Target type:
+{
+"type": {
+"code": "string",
+"text": "string"
+},
+"order": 1,
+"roles": [
+{
+"code": "string",
+"text": "string"
+}
+],
+"officers": [
+{
+"personName": {},
+"organizationName": {
+"typ": {}
+},
+"identity": {
+"typ": {}
+}
+}
+]
+}

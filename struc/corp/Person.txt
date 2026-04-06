@@ -1,0 +1,190 @@
+Schema name: Person
+API: Bolagsverket Person API
+Response path: person
+
+Raw structure:
+{
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsengagemang": [
+{
+"organisation": {
+"identitet": {},
+"personnamn": {},
+"organisationsnamn": {},
+"organisationsform": {},
+"organisationsstatusar": []
+},
+"funktionar": {
+"personnamn": {},
+"organisationsnamn": {},
+"identitet": {},
+"funktionarsroller": [],
+"postadress": {},
+"representerasAv": {}
+}
+}
+],
+"personligKonkurs": [
+{
+"dodsbonummer": "string",
+"insolvensforfarande": {},
+"process": {
+"inledd": {},
+"avslutad": {},
+"upphavd": {}
+},
+"konkursforvaltare": {
+"personnamn": {},
+"postadress": {}
+}
+}
+],
+"bitradesforbud": {
+"fritext": "string",
+"slutligt": {
+"from": "2019-08-24",
+"tom": "2019-08-24"
+},
+"tillfalligt": {
+"from": "2019-08-24"
+},
+"beslut": {
+"typ": "string",
+"datum": "2019-08-24",
+"beslutsinstans": {}
+}
+},
+"naringsforbud": {
+"fritext": "string",
+"slutligt": {
+"from": "2019-08-24",
+"tom": "2019-08-24"
+},
+"tillfalligt": {
+"from": "2019-08-24"
+},
+"beslut": {
+"typ": "string",
+"datum": "2019-08-24",
+"beslutsinstans": {}
+},
+"undantag": {
+"from": "2019-08-24",
+"tom": "2019-08-24",
+"aterkallatDatum": "2019-08-24"
+},
+"avveckling": "2019-08-24"
+}
+}
+
+Fields:
+
+* identitet.typ.kod: string
+* identitet.typ.klartext: string
+* identitet.identitetsbeteckning: string
+* personnamn.fornamn: string
+* personnamn.efternamn: string
+* organisationsengagemang: array
+* organisationsengagemang[].organisation.identitet.identitetsbeteckning: string
+* organisationsengagemang[].organisation.organisationsnamn.namn: string
+* organisationsengagemang[].organisation.organisationsform.kod: string
+* organisationsengagemang[].organisation.organisationsstatusar[].kod: string
+* organisationsengagemang[].funktionar.identitet.identitetsbeteckning: string
+* organisationsengagemang[].funktionar.funktionarsroller[].kod: string
+* organisationsengagemang[].funktionar.postadress.adress: string
+* organisationsengagemang[].funktionar.postadress.postnummer: string
+* organisationsengagemang[].funktionar.postadress.postort: string
+* personligKonkurs: array
+* personligKonkurs[].dodsbonummer: string
+* personligKonkurs[].process.inledd.datum: string
+* personligKonkurs[].process.avslutad.datum: string
+* personligKonkurs[].process.upphavd.datum: string
+* bitradesforbud.fritext: string
+* bitradesforbud.slutligt.from: string
+* bitradesforbud.slutligt.tom: string
+* bitradesforbud.beslut.typ: string
+* bitradesforbud.beslut.datum: string
+* naringsforbud.fritext: string
+* naringsforbud.slutligt.from: string
+* naringsforbud.slutligt.tom: string
+* naringsforbud.beslut.typ: string
+* naringsforbud.beslut.datum: string
+* naringsforbud.avveckling: string
+
+Mapping:
+
+* identitet.identitetsbeteckning -> personalId
+* identitet.typ.kod -> idTypeCode
+* identitet.typ.klartext -> idTypeText
+* personnamn.fornamn -> firstName
+* personnamn.efternamn -> lastName
+* organisationsengagemang -> engagements
+* organisationsengagemang[].organisation.identitet.identitetsbeteckning -> engagements[].orgId
+* organisationsengagemang[].organisation.organisationsnamn.namn -> engagements[].orgName
+* organisationsengagemang[].organisation.organisationsform.kod -> engagements[].orgForm
+* organisationsengagemang[].funktionar.funktionarsroller[].kod -> engagements[].roles
+* organisationsengagemang[].funktionar.postadress -> engagements[].address
+* personligKonkurs -> bankruptcies
+* personligKonkurs[].dodsbonummer -> bankruptcies[].estateId
+* personligKonkurs[].process.inledd.datum -> bankruptcies[].startDate
+* personligKonkurs[].process.avslutad.datum -> bankruptcies[].endDate
+* bitradesforbud -> financialBan
+* naringsforbud -> businessBan
+
+Rules:
+
+* type conversion: date strings (YYYY-MM-DD) → Date objects
+* optional/missing handling: all nested objects nullable, arrays default to []
+* special parsing: flatten nested structures (organisation, funktionar, konkurs) into simplified internal objects
+
+Target type:
+{
+"personalId": "string",
+"idTypeCode": "string",
+"idTypeText": "string",
+"firstName": "string",
+"lastName": "string",
+"engagements": [
+{
+"orgId": "string",
+"orgName": "string",
+"orgForm": "string",
+"roles": ["string"],
+"address": {
+"adress": "string",
+"postnummer": "string",
+"postort": "string"
+}
+}
+],
+"bankruptcies": [
+{
+"estateId": "string",
+"startDate": "date",
+"endDate": "date"
+}
+],
+"financialBan": {
+"from": "date",
+"to": "date",
+"decisionType": "string",
+"decisionDate": "date"
+},
+"businessBan": {
+"from": "date",
+"to": "date",
+"decisionType": "string",
+"decisionDate": "date",
+"endedAt": "date"
+}
+}

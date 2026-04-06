@@ -1,0 +1,45 @@
+Schema name: Sakfragor
+API: Bolagsverket Arende API
+Response path: ArendeResponse[].sakfragor
+
+Raw structure:
+{
+"sakfraga": {
+"kod": "string",
+"klartext": "string"
+},
+"avslutsorsak": {
+"kod": "string",
+"klartext": "string"
+}
+}
+
+Fields:
+
+* sakfraga.kod: string
+* sakfraga.klartext: string
+* avslutsorsak.kod: string
+* avslutsorsak.klartext: string
+
+Mapping:
+
+* sakfraga -> subject
+* avslutsorsak -> closingReason
+
+Rules:
+
+* type conversion: none
+* optional/missing handling: avslutsorsak may be missing if case is not closed
+* special parsing: none
+
+Target type:
+{
+"subject": {
+"kod": "string",
+"klartext": "string"
+},
+"closingReason": {
+"kod": "string",
+"klartext": "string"
+}
+}

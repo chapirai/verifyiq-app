@@ -1,0 +1,40 @@
+Schema name: KodKlartextDatum
+API: organisations/lookup
+Response path: multiple
+
+Raw structure:
+{
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "2019-08-24"
+}
+
+Fields:
+
+* kod: string
+* klartext: string
+* typ: string
+* datum: string
+
+Mapping:
+
+* kod -> code
+* klartext -> text
+* typ -> type
+* datum -> date
+
+Rules:
+
+* datum: date string in YYYY-MM-DD format
+* kod and klartext must be preserved as-is
+* typ: string identifier, do not transform
+* object should not be flattened
+
+Target type:
+{
+"code": "string",
+"text": "string",
+"type": "string",
+"date": "2019-08-24"
+}

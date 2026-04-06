@@ -1,0 +1,35 @@
+Schema name: FinansiellaRapporterRequest
+API: Bolagsverket Financial API
+Response path: request body
+
+Raw structure:
+{
+"identitetsbeteckning": "string",
+"fromdatum": "2024-01-01",
+"tomdatum": "2024-12-31"
+}
+
+Fields:
+
+* identitetsbeteckning: string
+* fromdatum: string<date>
+* tomdatum: string<date>
+
+Mapping:
+
+* identitetsbeteckning -> identitetsbeteckning
+* fromdatum -> fromdatum
+* tomdatum -> tomdatum
+
+Rules:
+
+* type conversion: convert fromdatum and tomdatum to Date only if internal model requires it
+* optional/missing handling: fromdatum and tomdatum are optional; identitetsbeteckning is required
+* special parsing: validate date format as ISO 8601 (YYYY-MM-DD)
+
+Target type:
+{
+"identitetsbeteckning": "string",
+"fromdatum": "string<date>",
+"tomdatum": "string<date>"
+}

@@ -1,0 +1,31 @@
+Schema name: Arende
+API: Bolagsverket Arende API
+Response path: organisationArende
+
+Raw structure:
+{
+"arendenummer": "1234/2024",
+"avslutatTidpunkt": "2000-01-01T00:00:00.000+02:00"
+}
+
+Fields:
+
+* arendenummer: string
+* avslutatTidpunkt: string
+
+Mapping:
+
+* arendenummer -> caseNumber
+* avslutatTidpunkt -> completedAt
+
+Rules:
+
+* type conversion: avslutatTidpunkt (ISO datetime) → DateTime
+* optional/missing handling: both fields expected; if missing, treat as null
+* special parsing: none
+
+Target type:
+{
+"caseNumber": "string",
+"completedAt": "datetime"
+}

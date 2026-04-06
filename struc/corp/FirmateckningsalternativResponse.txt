@@ -1,0 +1,316 @@
+Schema name: FirmateckningsalternativResponse
+API: Bolagsverket Person API
+Response path: response body
+
+Raw structure:
+{
+"firmateckningInformation": [
+{
+"funktionar": {
+"personnamn": {},
+"organisationsnamn": {},
+"identitet": {},
+"funktionarsroller": [],
+"postadress": {},
+"representerasAv": {}
+},
+"firmateckningOrganisation": {
+"identitet": {},
+"organisationsnamn": {},
+"organisationsform": {},
+"organisationsstatusar": [],
+"inneliggandeArenden": {}
+},
+"firmateckningssvar": {
+"firmateckningsutfallJaSvar": [],
+"firmateckningsutfallNejSvar": {}
+}
+}
+]
+}
+
+Fields:
+
+* firmateckningInformation: array<object>
+* firmateckningInformation.funktionar: object
+* firmateckningInformation.funktionar.personnamn: object
+* firmateckningInformation.funktionar.personnamn.fornamn: string
+* firmateckningInformation.funktionar.personnamn.efternamn: string
+* firmateckningInformation.funktionar.organisationsnamn: object
+* firmateckningInformation.funktionar.organisationsnamn.typ: object
+* firmateckningInformation.funktionar.organisationsnamn.typ.kod: string
+* firmateckningInformation.funktionar.organisationsnamn.typ.klartext: string
+* firmateckningInformation.funktionar.organisationsnamn.namn: string
+* firmateckningInformation.funktionar.identitet: object
+* firmateckningInformation.funktionar.identitet.typ: object
+* firmateckningInformation.funktionar.identitet.typ.kod: string
+* firmateckningInformation.funktionar.identitet.typ.klartext: string
+* firmateckningInformation.funktionar.identitet.identitetsbeteckning: string
+* firmateckningInformation.funktionar.funktionarsroller: array<object>
+* firmateckningInformation.funktionar.funktionarsroller.kod: string
+* firmateckningInformation.funktionar.funktionarsroller.klartext: string
+* firmateckningInformation.funktionar.postadress: object
+* firmateckningInformation.funktionar.postadress.coAdress: string
+* firmateckningInformation.funktionar.postadress.adress: string
+* firmateckningInformation.funktionar.postadress.postnummer: string
+* firmateckningInformation.funktionar.postadress.postort: string
+* firmateckningInformation.funktionar.postadress.adressrad1: string
+* firmateckningInformation.funktionar.postadress.adressrad2: string
+* firmateckningInformation.funktionar.postadress.land: object
+* firmateckningInformation.funktionar.postadress.land.kod: string
+* firmateckningInformation.funktionar.postadress.land.klartext: string
+* firmateckningInformation.funktionar.representerasAv: object
+* firmateckningInformation.funktionar.representerasAv.personnamn: object
+* firmateckningInformation.funktionar.representerasAv.personnamn.fornamn: string
+* firmateckningInformation.funktionar.representerasAv.personnamn.efternamn: string
+* firmateckningInformation.funktionar.representerasAv.identitet: object
+* firmateckningInformation.funktionar.representerasAv.identitet.typ: object
+* firmateckningInformation.funktionar.representerasAv.identitet.typ.kod: string
+* firmateckningInformation.funktionar.representerasAv.identitet.typ.klartext: string
+* firmateckningInformation.funktionar.representerasAv.identitet.identitetsbeteckning: string
+* firmateckningInformation.funktionar.insats: string
+* firmateckningInformation.funktionar.anteckning: string
+* firmateckningInformation.firmateckningOrganisation: object
+* firmateckningInformation.firmateckningOrganisation.identitet: object
+* firmateckningInformation.firmateckningOrganisation.identitet.typ: object
+* firmateckningInformation.firmateckningOrganisation.identitet.typ.kod: string
+* firmateckningInformation.firmateckningOrganisation.identitet.typ.klartext: string
+* firmateckningInformation.firmateckningOrganisation.identitet.identitetsbeteckning: string
+* firmateckningInformation.firmateckningOrganisation.namnskyddslopnummer: integer
+* firmateckningInformation.firmateckningOrganisation.organisationsnamn: object
+* firmateckningInformation.firmateckningOrganisation.organisationsnamn.typ: object
+* firmateckningInformation.firmateckningOrganisation.organisationsnamn.typ.kod: string
+* firmateckningInformation.firmateckningOrganisation.organisationsnamn.typ.klartext: string
+* firmateckningInformation.firmateckningOrganisation.organisationsnamn.namn: string
+* firmateckningInformation.firmateckningOrganisation.organisationsform: object
+* firmateckningInformation.firmateckningOrganisation.organisationsform.kod: string
+* firmateckningInformation.firmateckningOrganisation.organisationsform.klartext: string
+* firmateckningInformation.firmateckningOrganisation.organisationsstatusar: array<object>
+* firmateckningInformation.firmateckningOrganisation.organisationsstatusar.kod: string
+* firmateckningInformation.firmateckningOrganisation.organisationsstatusar.klartext: string
+* firmateckningInformation.firmateckningOrganisation.organisationsstatusar.typ: string
+* firmateckningInformation.firmateckningOrganisation.organisationsstatusar.datum: string<date>
+* firmateckningInformation.firmateckningOrganisation.inneliggandeArenden: object
+* firmateckningInformation.firmateckningOrganisation.inneliggandeArenden.antal: integer
+* firmateckningInformation.firmateckningssvar: object
+* firmateckningInformation.firmateckningssvar.utfall: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar: array<object>
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.alternativ: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination: array<object>
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.typ: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.typ.kod: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.typ.klartext: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.ordning: number
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarsroller: array<object>
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarsroller.kod: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarsroller.klartext: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer: array<object>
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.personnamn: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.personnamn.fornamn: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.personnamn.efternamn: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.typ: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.typ.kod: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.typ.klartext: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.namn: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.typ: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.typ.kod: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.typ.klartext: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.identitetsbeteckning: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.namnKanEjListas: boolean
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ: array<array<object>>
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.personnamn: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.personnamn.fornamn: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.personnamn.efternamn: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn.typ: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn.typ.kod: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn.typ.klartext: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn.namn: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.identitet: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.identitet.typ: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.identitet.typ.kod: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.identitet.typ.klartext: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallJatillsammansAlternativ.identitet.identitetsbeteckning: string
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallNejSvar: object
+* firmateckningInformation.firmateckningssvar.firmateckningsutfallNejSvar.alternativ: string
+
+Mapping:
+
+* firmateckningInformation -> firmateckningInformation
+
+Rules:
+
+* type conversion: convert all string<date> fields to internal date type only if internal model requires it
+* optional/missing handling: firmateckningInformation is required and may contain more than one company entry; firmateckningsutfallJaSvar is populated when utfall = JA; firmateckningsutfallNejSvar is populated when utfall = NEJ; nested objects may be null or omitted
+* special parsing: utfall enum values are JA or NEJ; if JA, alternativ values are ENSAM, LOPANDE, TILLSAMMANS, FULLMAKT; if NEJ, alternativ values are EJ_AKTIV_ORGANISATION, EJ_FUNKTIONAR, EJ_FIRMATECKNARE; firmateckningsutfallJatillsammansAlternativ is an array of alternative valid signer combinations
+
+Target type:
+{
+"firmateckningInformation": [
+{
+"funktionar": {
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"postadress": {
+"coAdress": "string",
+"adress": "string",
+"postnummer": "string",
+"postort": "string",
+"adressrad1": "string",
+"adressrad2": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"representerasAv": {
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+},
+"insats": "string",
+"anteckning": "string"
+},
+"firmateckningOrganisation": {
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"namnskyddslopnummer": "integer",
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"organisationsstatusar": [
+{
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "string<date>"
+}
+],
+"inneliggandeArenden": {
+"antal": "integer"
+}
+},
+"firmateckningssvar": {
+"utfall": "string",
+"firmateckningsutfallJaSvar": [
+{
+"alternativ": "string",
+"firmateckningsutfallOrsak": {
+"firmateckningskombination": [
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"ordning": "number",
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"funktionarer": [
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+}
+]
+}
+]
+},
+"namnKanEjListas": "boolean",
+"firmateckningsutfallJatillsammansAlternativ": [
+[
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+}
+]
+]
+}
+],
+"firmateckningsutfallNejSvar": {
+"alternativ": "string"
+}
+}
+}
+]
+}

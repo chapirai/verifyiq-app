@@ -1,0 +1,89 @@
+Schema name: FirmateckningsutfallOrsak
+API: Bolagsverket Person API
+Response path: firmateckningsutfallJa.firmateckningsutfallOrsak
+
+Raw structure:
+{
+"firmateckningskombination": [
+{
+"typ": {},
+"ordning": 1,
+"funktionarsroller": [
+{}
+],
+"funktionarer": [
+{}
+]
+}
+]
+}
+
+Fields:
+
+* firmateckningskombination: array<object>
+* firmateckningskombination.typ.kod: string
+* firmateckningskombination.typ.klartext: string
+* firmateckningskombination.ordning: number
+* firmateckningskombination.funktionarsroller: array<object>
+* firmateckningskombination.funktionarsroller.kod: string
+* firmateckningskombination.funktionarsroller.klartext: string
+* firmateckningskombination.funktionarer: array<object>
+* firmateckningskombination.funktionarer.personnamn.fornamn: string
+* firmateckningskombination.funktionarer.personnamn.efternamn: string
+* firmateckningskombination.funktionarer.organisationsnamn.typ.kod: string
+* firmateckningskombination.funktionarer.organisationsnamn.typ.klartext: string
+* firmateckningskombination.funktionarer.organisationsnamn.namn: string
+* firmateckningskombination.funktionarer.identitet.typ.kod: string
+* firmateckningskombination.funktionarer.identitet.typ.klartext: string
+* firmateckningskombination.funktionarer.identitet.identitetsbeteckning: string
+
+Mapping:
+
+* firmateckningskombination -> firmateckningskombination
+
+Rules:
+
+* type conversion: none
+* optional/missing handling: firmateckningskombination may be missing or empty; nested fields inside each rule may be missing or null
+* special parsing: rules in firmateckningskombination must be read in ordning order
+
+Target type:
+{
+"firmateckningskombination": [
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"ordning": "number",
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"funktionarer": [
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+}
+]
+}
+]
+}

@@ -1,0 +1,31 @@
+Schema name: FirmateckningsalternativRequest
+API: Bolagsverket Person API
+Response path: request body
+
+Raw structure:
+{
+"funktionarIdentitetsbeteckning": "string",
+"organisationIdentitetsbeteckning": "string"
+}
+
+Fields:
+
+* funktionarIdentitetsbeteckning: string
+* organisationIdentitetsbeteckning: string
+
+Mapping:
+
+* funktionarIdentitetsbeteckning -> functionaryIdentityNumber
+* organisationIdentitetsbeteckning -> organisationIdentityNumber
+
+Rules:
+
+* type conversion: none
+* optional/missing handling: both fields required, reject request if either is missing or empty
+* special parsing: none
+
+Target type:
+{
+"functionaryIdentityNumber": "string",
+"organisationIdentityNumber": "string"
+}

@@ -1,0 +1,33 @@
+Schema name: PersonRequest
+API: Bolagsverket Person API
+Response path: request body
+
+Raw structure:
+{
+"identitetsbeteckning": "string",
+"personInformationsmangd": [
+"ORGANISATIONSENGAGEMANG"
+]
+}
+
+Fields:
+
+* identitetsbeteckning: string
+* personInformationsmangd: array<string>
+
+Mapping:
+
+* identitetsbeteckning -> personalId
+* personInformationsmangd -> requestedDataTypes
+
+Rules:
+
+* type conversion: none
+* optional/missing handling: personInformationsmangd optional, default to ["BASIC"] internally if missing
+* special parsing: validate enum values against allowed set (ORGANISATIONSENGAGEMANG, PERSONLIG_KONKURS, BITRADESFORBUD, NARINGSFORBUD)
+
+Target type:
+{
+"personalId": "string",
+"requestedDataTypes": ["string"]
+}

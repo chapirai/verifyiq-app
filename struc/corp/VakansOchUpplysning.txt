@@ -1,0 +1,47 @@
+Schema name: VakansOchUpplysning
+API: organisations/lookup
+Response path: response.body[].vakanserOchUpplysningar.vakansOchUpplysning[]
+
+Raw structure:
+{
+"typ": {
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "2019-08-24"
+}
+}
+
+Fields:
+
+* typ: object
+* typ.kod: string
+* typ.klartext: string
+* typ.typ: string
+* typ.datum: string
+
+Mapping:
+
+* typ -> type
+* typ.kod -> type.code
+* typ.klartext -> type.text
+* typ.typ -> type.type
+* typ.datum -> type.date
+
+Rules:
+
+* typ follows KodKlartextDatum schema and must preserve all fields
+* typ.datum: date string in YYYY-MM-DD format
+* typ.typ: string identifier, do not transform
+* object should not be flattened
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"type": {
+"code": "string",
+"text": "string",
+"type": "string",
+"date": "2019-08-24"
+}
+}

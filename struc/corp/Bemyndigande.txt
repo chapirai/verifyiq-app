@@ -1,0 +1,49 @@
+Schema name: Bemyndigande
+API: Bolagsverket Aktie API
+Response path: AktiekapitalforandringResponse.bemyndiganden[].bemyndigandegrupper[].bemyndiganden
+
+Raw structure:
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"bemyndigandeDatum": "2019-08-24",
+"bemyndigandeAnvandsFore": {
+"ordinarieBolagsstammaAr": 0,
+"annatDatum": "2019-08-24"
+}
+}
+
+Fields:
+
+* typ.kod: string
+* typ.klartext: string
+* bemyndigandeDatum: string<date>
+* bemyndigandeAnvandsFore.ordinarieBolagsstammaAr: integer
+* bemyndigandeAnvandsFore.annatDatum: string<date>
+
+Mapping:
+
+* typ -> typ
+* bemyndigandeDatum -> bemyndigandeDatum
+* bemyndigandeAnvandsFore -> bemyndigandeAnvandsFore
+
+Rules:
+
+* type conversion: convert string<date> fields to Date only if internal model requires it; keep integer values numeric
+* optional/missing handling: bemyndigandeAnvandsFore may be missing or null; ordinarieBolagsstammaAr and annatDatum may be missing depending on how the authorisation is limited
+* special parsing: none
+
+Target type:
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"bemyndigandeDatum": "string<date>",
+"bemyndigandeAnvandsFore": {
+"ordinarieBolagsstammaAr": "integer",
+"annatDatum": "string<date>"
+}
+}

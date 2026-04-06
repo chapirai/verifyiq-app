@@ -1,0 +1,32 @@
+Schema name: KodKlartext
+API: organisations/lookup
+Response path: multiple
+
+Raw structure:
+{
+"kod": "string",
+"klartext": "string"
+}
+
+Fields:
+
+* kod: string
+* klartext: string
+
+Mapping:
+
+* kod -> code
+* klartext -> text
+
+Rules:
+
+* both fields are strings and should be preserved as-is
+* kod is typically used as a stable identifier
+* klartext is human-readable text and should not be transformed
+* object should not be flattened into a single string
+
+Target type:
+{
+"code": "string",
+"text": "string"
+}

@@ -1,0 +1,72 @@
+Schema name: Bemyndigandeinformation
+API: Bolagsverket Aktie API
+Response path: AktiekapitalforandringResponse.bemyndiganden
+
+Raw structure:
+{
+"arende": {
+"arendenummer": "1234/2024",
+"avslutatTidpunkt": "2000-01-01T00:00:00.000+02:00"
+},
+"bemyndigandegrupper": [
+{
+"lopnummer": "string",
+"fritext": "string",
+"bemyndiganden": [
+{}
+]
+}
+]
+}
+
+Fields:
+
+* arende.arendenummer: string
+* arende.avslutatTidpunkt: string
+* bemyndigandegrupper: array<object>
+* bemyndigandegrupper.lopnummer: string
+* bemyndigandegrupper.fritext: string
+* bemyndigandegrupper.bemyndiganden: array<object>
+* bemyndigandegrupper.bemyndiganden.typ.kod: string
+* bemyndigandegrupper.bemyndiganden.typ.klartext: string
+* bemyndigandegrupper.bemyndiganden.bemyndigandeDatum: string<date>
+* bemyndigandegrupper.bemyndiganden.bemyndigandeAnvandsFore.ordinarieBolagsstammaAr: integer
+* bemyndigandegrupper.bemyndiganden.bemyndigandeAnvandsFore.annatDatum: string<date>
+
+Mapping:
+
+* arende -> arende
+* bemyndigandegrupper -> bemyndigandegrupper
+
+Rules:
+
+* type conversion: convert arende.avslutatTidpunkt to DateTime only if internal model requires it; convert string<date> fields to Date only if internal model requires it; keep integer values numeric
+* optional/missing handling: bemyndigandegrupper may be missing or empty; nested bemyndiganden and bemyndigandeAnvandsFore may be missing or null
+* special parsing: preserve group order and bemyndiganden order as returned by source
+
+Target type:
+{
+"arende": {
+"arendenummer": "string",
+"avslutatTidpunkt": "string"
+},
+"bemyndigandegrupper": [
+{
+"lopnummer": "string",
+"fritext": "string",
+"bemyndiganden": [
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"bemyndigandeDatum": "string<date>",
+"bemyndigandeAnvandsFore": {
+"ordinarieBolagsstammaAr": "integer",
+"annatDatum": "string<date>"
+}
+}
+]
+}
+]
+}

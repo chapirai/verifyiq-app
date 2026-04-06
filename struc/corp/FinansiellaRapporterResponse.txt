@@ -1,0 +1,134 @@
+Schema name: FinansiellaRapporterResponse
+API: Bolagsverket Financial API
+Response path: response body
+
+Raw structure:
+{
+"identitetsbeteckning": "string",
+"finansiellaRapporter": [
+{
+"arende": {},
+"rakenskapsperioder": [
+{}
+]
+}
+]
+}
+
+Fields:
+
+* identitetsbeteckning: string
+* finansiellaRapporter: array<object>
+* finansiellaRapporter.arende.arendenummer: string
+* finansiellaRapporter.arende.avslutatTidpunkt: string<date-time>
+* finansiellaRapporter.rakenskapsperioder: array<object>
+* finansiellaRapporter.rakenskapsperioder.start: string<date>
+* finansiellaRapporter.rakenskapsperioder.slut: string<date>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar: array<object>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.rapporteringsperiod.periodFrom: string<date>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.rapporteringsperiod.periodTom: string<date>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.rapporttyp.kod: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.rapporttyp.klartext: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.ankomsttidpunkt: string<date-time>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.registreradTidpunkt: string<date-time>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.arsredovisningsinnehall: array<object>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.arsredovisningsinnehall.kod: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.arsredovisningsinnehall.klartext: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.brister: array<object>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.brister.kod: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.brister.klartext: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.handlaggningAvslutadDatum: string<date>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.arsredovisningspaminnelse.skickadTidpunkt: string<date-time>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.arsredovisningspaminnelse.arsredovisningspaminnelsetyp.kod: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.arsredovisningspaminnelse.arsredovisningspaminnelsetyp.klartext: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.vinstutdelning.beslutadDatum: string<date>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.vinstutdelning.valuta.kod: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.vinstutdelning.valuta.klartext: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.vinstutdelning.belopp: number
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.vinstutdelning.vinstutdelningstyp.kod: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.vinstutdelning.vinstutdelningstyp.klartext: string
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.fortsattStamma.stammodatum: string<date>
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar.fortsattStamma.fritext: string
+
+Mapping:
+
+* identitetsbeteckning -> identitetsbeteckning
+* finansiellaRapporter -> reports
+* finansiellaRapporter.arende -> reports.arende
+* finansiellaRapporter.rakenskapsperioder -> reports.periods
+* finansiellaRapporter.rakenskapsperioder.arsredovisningar -> reports.periods.annualReports
+
+Rules:
+
+* type conversion: convert all date and datetime fields to Date/DateTime only if internal model requires
+* optional/missing handling: many nested fields (arsredovisningar, vinstutdelning, paminnelse, fortsattStamma, brister) may be absent depending on report completeness
+* special parsing: arrays such as arsredovisningsinnehall and brister should be preserved as-is; monetary fields (belopp) remain numeric
+
+Target type:
+{
+"identitetsbeteckning": "string",
+"reports": [
+{
+"arende": {
+"arendenummer": "string",
+"avslutatTidpunkt": "string<date-time>"
+},
+"periods": [
+{
+"start": "string<date>",
+"slut": "string<date>",
+"annualReports": [
+{
+"rapporteringsperiod": {
+"periodFrom": "string<date>",
+"periodTom": "string<date>"
+},
+"rapporttyp": {
+"kod": "string",
+"klartext": "string"
+},
+"ankomsttidpunkt": "string<date-time>",
+"registreradTidpunkt": "string<date-time>",
+"arsredovisningsinnehall": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"brister": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"handlaggningAvslutadDatum": "string<date>",
+"arsredovisningspaminnelse": {
+"skickadTidpunkt": "string<date-time>",
+"arsredovisningspaminnelsetyp": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"vinstutdelning": {
+"beslutadDatum": "string<date>",
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"belopp": "number",
+"vinstutdelningstyp": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"fortsattStamma": {
+"stammodatum": "string<date>",
+"fritext": "string"
+}
+}
+]
+}
+]
+}
+]
+}

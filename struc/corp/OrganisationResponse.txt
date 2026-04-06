@@ -1,0 +1,522 @@
+Schema name: OrganisationResponse
+API: organisations/lookup
+Response path: response.body[]
+
+Raw structure:
+[
+{
+"identitet": {
+"typ": {},
+"identitetsbeteckning": "string"
+},
+"namnskyddslopnummer": 2,
+"arende": {
+"arendenummer": "1234/2024",
+"avslutatTidpunkt": "2000-01-01T00:00:00.000+02:00"
+},
+"organisationsnamn": {
+"typ": {},
+"namn": "string"
+},
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"organisationsstatusar": [
+{}
+],
+"organisationsdatum": {
+"registreringsdatum": "2019-08-24",
+"bildatDatum": "2019-08-24"
+},
+"hemvistkommun": {
+"typ": "string",
+"lanForHemvistkommun": {},
+"kommun": {}
+},
+"rakenskapsar": {
+"rakenskapsarInleds": "string",
+"rakenskapsarAvslutas": "string"
+},
+"verksamhetsbeskrivning": "string",
+"organisationsadresser": {
+"postadress": {
+"land": {}
+},
+"epostadress": "string"
+},
+"firmateckning": {
+"kodad": [
+[]
+],
+"klartext": "string",
+"prokuratext": "string"
+},
+"samtligaOrganisationsnamn": [
+{
+"typ": {},
+"registreringslan": {},
+"registreringFlerLan": []
+}
+],
+"funktionarer": [
+{
+"personnamn": {},
+"organisationsnamn": {},
+"identitet": {},
+"funktionarsroller": [],
+"postadress": {},
+"representerasAv": {}
+}
+],
+"antalValdaFunktionarer": {
+"ledamoter": 0,
+"suppleanter": 0
+},
+"aktieinformation": {
+"aktiekapital": {},
+"antalAktier": 1200,
+"aktiegranser": {
+"aktiekapitalGranser": {},
+"antalAktierGranser": {}
+},
+"aktieslag": [
+{}
+],
+"fritext": "Antalet aktier av respektive slag får motsvara högst hela antalet aktier i bolaget.",
+"kvotvarde": {},
+"nedsattningPagar": true
+},
+"organisationsengagemang": [
+{
+"organisation": {}
+}
+],
+"tillstand": {
+"typ": {},
+"datum": "2019-08-24",
+"aterkallatDatum": "2019-08-24",
+"forlangtDatum": "2019-08-24",
+"forverkatDatum": "2019-08-24"
+},
+"ovrigOrganisationinformation": {
+"externaAnteckningar": "string",
+"ovrigaRegisteruppgifter": "string"
+},
+"organisationsmarkeringar": [
+{}
+],
+"bestammelser": {
+"typ": {},
+"godkannandeKravs": true,
+"kungorelsedatum": "2019-08-24",
+"registreringsdatum": "2019-08-24",
+"antagetDatum": "2019-08-24",
+"kallelsesatt": "string",
+"godkandAvInstanser": [
+{}
+],
+"styrelsegranser": {
+"ledamoter": {},
+"suppleanter": {}
+},
+"stammotidManader": [
+null
+],
+"stammotidSenastManad": "string",
+"stammotidInomSexManader": true,
+"frivilligaBestammelser": [
+{}
+],
+"fritext": "string"
+},
+"vakanserOchUpplysningar": {
+"vakansOchUpplysning": [
+{}
+],
+"fritext": "string"
+},
+"ekonomiskPlan": {
+"registreradDatum": "2019-08-24",
+"senastRegistreradDatum": "2019-08-24",
+"forenkladRegistreradDatum": "2019-08-24"
+},
+"utlandskFilialagandeOrganisation": {
+"identitet": {
+"typ": {}
+},
+"angivetEuid": "string",
+"organisationsnamn": {
+"typ": {}
+},
+"registreringsdatum": "2019-08-24",
+"verksamhetsbeskrivning": "string",
+"sate": "string",
+"postadress": {
+"land": {}
+},
+"rakenskapsar": {},
+"ejVerifieratOrganisationsregister": {
+"land": {}
+},
+"aktieinformation": {
+"valuta": {}
+},
+"funktionarer": [
+{}
+]
+},
+"finansiellaRapporter": [
+{
+"arende": {},
+"rapporter": []
+}
+]
+}
+]
+
+Fields:
+
+* identitet: object
+* identitet.typ: object
+* identitet.identitetsbeteckning: string
+* namnskyddslopnummer: integer
+* arende: object
+* arende.arendenummer: string
+* arende.avslutatTidpunkt: string
+* organisationsnamn: object
+* organisationsnamn.typ: object
+* organisationsnamn.namn: string
+* organisationsform: object
+* organisationsform.kod: string
+* organisationsform.klartext: string
+* organisationsstatusar: array[object]
+* organisationsdatum: object
+* organisationsdatum.registreringsdatum: string
+* organisationsdatum.bildatDatum: string
+* hemvistkommun: object
+* hemvistkommun.typ: string
+* hemvistkommun.lanForHemvistkommun: object
+* hemvistkommun.kommun: object
+* rakenskapsar: object
+* rakenskapsar.rakenskapsarInleds: string
+* rakenskapsar.rakenskapsarAvslutas: string
+* verksamhetsbeskrivning: string
+* organisationsadresser: object
+* organisationsadresser.postadress: object
+* organisationsadresser.postadress.land: object
+* organisationsadresser.epostadress: string
+* firmateckning: object
+* firmateckning.kodad: array[array]
+* firmateckning.klartext: string
+* firmateckning.prokuratext: string
+* samtligaOrganisationsnamn: array[object]
+* samtligaOrganisationsnamn[].typ: object
+* samtligaOrganisationsnamn[].registreringslan: object
+* samtligaOrganisationsnamn[].registreringFlerLan: array
+* funktionarer: array[object]
+* funktionarer[].personnamn: object
+* funktionarer[].organisationsnamn: object
+* funktionarer[].identitet: object
+* funktionarer[].funktionarsroller: array
+* funktionarer[].postadress: object
+* funktionarer[].representerasAv: object
+* antalValdaFunktionarer: object
+* antalValdaFunktionarer.ledamoter: number
+* antalValdaFunktionarer.suppleanter: number
+* aktieinformation: object
+* aktieinformation.aktiekapital: object
+* aktieinformation.antalAktier: integer
+* aktieinformation.aktiegranser: object
+* aktieinformation.aktiegranser.aktiekapitalGranser: object
+* aktieinformation.aktiegranser.antalAktierGranser: object
+* aktieinformation.aktieslag: array[object]
+* aktieinformation.fritext: string
+* aktieinformation.kvotvarde: object
+* aktieinformation.nedsattningPagar: boolean
+* organisationsengagemang: array[object]
+* organisationsengagemang[].organisation: object
+* tillstand: object
+* tillstand.typ: object
+* tillstand.datum: string
+* tillstand.aterkallatDatum: string
+* tillstand.forlangtDatum: string
+* tillstand.forverkatDatum: string
+* ovrigOrganisationinformation: object
+* ovrigOrganisationinformation.externaAnteckningar: string
+* ovrigOrganisationinformation.ovrigaRegisteruppgifter: string
+* organisationsmarkeringar: array[object]
+* bestammelser: object
+* bestammelser.typ: object
+* bestammelser.godkannandeKravs: boolean
+* bestammelser.kungorelsedatum: string
+* bestammelser.registreringsdatum: string
+* bestammelser.antagetDatum: string
+* bestammelser.kallelsesatt: string
+* bestammelser.godkandAvInstanser: array[object]
+* bestammelser.styrelsegranser: object
+* bestammelser.styrelsegranser.ledamoter: object
+* bestammelser.styrelsegranser.suppleanter: object
+* bestammelser.stammotidManader: array[string|null]
+* bestammelser.stammotidSenastManad: string
+* bestammelser.stammotidInomSexManader: boolean
+* bestammelser.frivilligaBestammelser: array[object]
+* bestammelser.fritext: string
+* vakanserOchUpplysningar: object
+* vakanserOchUpplysningar.vakansOchUpplysning: array[object]
+* vakanserOchUpplysningar.fritext: string
+* ekonomiskPlan: object
+* ekonomiskPlan.registreradDatum: string
+* ekonomiskPlan.senastRegistreradDatum: string
+* ekonomiskPlan.forenkladRegistreradDatum: string
+* utlandskFilialagandeOrganisation: object
+* utlandskFilialagandeOrganisation.identitet: object
+* utlandskFilialagandeOrganisation.identitet.typ: object
+* utlandskFilialagandeOrganisation.angivetEuid: string
+* utlandskFilialagandeOrganisation.organisationsnamn: object
+* utlandskFilialagandeOrganisation.organisationsnamn.typ: object
+* utlandskFilialagandeOrganisation.registreringsdatum: string
+* utlandskFilialagandeOrganisation.verksamhetsbeskrivning: string
+* utlandskFilialagandeOrganisation.sate: string
+* utlandskFilialagandeOrganisation.postadress: object
+* utlandskFilialagandeOrganisation.postadress.land: object
+* utlandskFilialagandeOrganisation.rakenskapsar: object
+* utlandskFilialagandeOrganisation.ejVerifieratOrganisationsregister: object
+* utlandskFilialagandeOrganisation.ejVerifieratOrganisationsregister.land: object
+* utlandskFilialagandeOrganisation.aktieinformation: object
+* utlandskFilialagandeOrganisation.aktieinformation.valuta: object
+* utlandskFilialagandeOrganisation.funktionarer: array[object]
+* finansiellaRapporter: array[object]
+* finansiellaRapporter[].arende: object
+* finansiellaRapporter[].rapporter: array
+
+Mapping:
+
+* identitet -> identity
+* identitet.typ -> identity.type
+* identitet.identitetsbeteckning -> identity.number
+* namnskyddslopnummer -> sequenceNumber
+* arende -> latestCase
+* arende.arendenummer -> latestCase.caseNumber
+* arende.avslutatTidpunkt -> latestCase.completedAt
+* organisationsnamn -> organizationName
+* organisationsnamn.typ -> organizationName.type
+* organisationsnamn.namn -> organizationName.name
+* organisationsform -> organizationForm
+* organisationsform.kod -> organizationForm.code
+* organisationsform.klartext -> organizationForm.text
+* organisationsstatusar -> statuses
+* organisationsdatum -> organizationDates
+* organisationsdatum.registreringsdatum -> organizationDates.registrationDate
+* organisationsdatum.bildatDatum -> organizationDates.foundedDate
+* hemvistkommun -> domicile
+* hemvistkommun.typ -> domicile.type
+* hemvistkommun.lanForHemvistkommun -> domicile.county
+* hemvistkommun.kommun -> domicile.municipality
+* rakenskapsar -> financialYear
+* rakenskapsar.rakenskapsarInleds -> financialYear.startCode
+* rakenskapsar.rakenskapsarAvslutas -> financialYear.endCode
+* verksamhetsbeskrivning -> businessDescription
+* organisationsadresser -> addresses
+* organisationsadresser.postadress -> addresses.postalAddress
+* organisationsadresser.epostadress -> addresses.email
+* firmateckning -> signingAuthority
+* samtligaOrganisationsnamn -> allOrganizationNames
+* funktionarer -> officers
+* antalValdaFunktionarer -> electedOfficerCounts
+* aktieinformation -> shareInformation
+* organisationsengagemang -> organizationEngagements
+* tillstand -> permits
+* ovrigOrganisationinformation -> otherOrganizationInformation
+* organisationsmarkeringar -> organizationMarkers
+* bestammelser -> regulations
+* vakanserOchUpplysningar -> vacanciesAndNotices
+* ekonomiskPlan -> financialPlan
+* utlandskFilialagandeOrganisation -> foreignBranchOwnerOrganization
+* finansiellaRapporter -> financialReports
+
+Rules:
+
+* response is an array, even when only one company is returned
+* namnskyddslopnummer: integer in response, convert to string if internal model requires padded or canonical identifier handling
+* dates may appear as date-only strings or full timestamps with timezone, parse by field type
+* many sections are optional and only appear when requested or available
+* empty objects in examples mean nested schema must be resolved separately before strict validation
+* organisationsstatusar, funktionarer, samtligaOrganisationsnamn, aktieslag, organisationsengagemang, organisationsmarkeringar, godkandAvInstanser, frivilligaBestammelser, vakansOchUpplysning, finansiellaRapporter, rapporter are repeatable collections
+* firmateckning.kodad is a nested array and must be preserved as nested structure unless explicitly flattened internally
+* stammotidManader may contain null values and must allow null entries
+* tillstand is documented as object, but permit information may need internal normalization to array if multiple permits are possible in practice
+* numeric values for capital and counts should preserve precision and safe integer handling
+* missing optional objects should be stored as null or omitted, not as empty placeholders
+* code/text objects should be kept intact unless internal model splits them into code and display text fields
+
+Target type:
+{
+"identity": {
+"type": {},
+"number": "string"
+},
+"sequenceNumber": 2,
+"latestCase": {
+"caseNumber": "1234/2024",
+"completedAt": "2000-01-01T00:00:00.000+02:00"
+},
+"organizationName": {
+"type": {},
+"name": "string"
+},
+"organizationForm": {
+"code": "string",
+"text": "string"
+},
+"statuses": [
+{}
+],
+"organizationDates": {
+"registrationDate": "2019-08-24",
+"foundedDate": "2019-08-24"
+},
+"domicile": {
+"type": "string",
+"county": {},
+"municipality": {}
+},
+"financialYear": {
+"startCode": "string",
+"endCode": "string"
+},
+"businessDescription": "string",
+"addresses": {
+"postalAddress": {
+"land": {}
+},
+"email": "string"
+},
+"signingAuthority": {
+"kodad": [
+[]
+],
+"klartext": "string",
+"prokuratext": "string"
+},
+"allOrganizationNames": [
+{
+"typ": {},
+"registreringslan": {},
+"registreringFlerLan": []
+}
+],
+"officers": [
+{
+"personnamn": {},
+"organisationsnamn": {},
+"identitet": {},
+"funktionarsroller": [],
+"postadress": {},
+"representerasAv": {}
+}
+],
+"electedOfficerCounts": {
+"ledamoter": 0,
+"suppleanter": 0
+},
+"shareInformation": {
+"aktiekapital": {},
+"antalAktier": 1200,
+"aktiegranser": {
+"aktiekapitalGranser": {},
+"antalAktierGranser": {}
+},
+"aktieslag": [
+{}
+],
+"fritext": "Antalet aktier av respektive slag får motsvara högst hela antalet aktier i bolaget.",
+"kvotvarde": {},
+"nedsattningPagar": true
+},
+"organizationEngagements": [
+{
+"organisation": {}
+}
+],
+"permits": {
+"typ": {},
+"datum": "2019-08-24",
+"aterkallatDatum": "2019-08-24",
+"forlangtDatum": "2019-08-24",
+"forverkatDatum": "2019-08-24"
+},
+"otherOrganizationInformation": {
+"externaAnteckningar": "string",
+"ovrigaRegisteruppgifter": "string"
+},
+"organizationMarkers": [
+{}
+],
+"regulations": {
+"typ": {},
+"godkannandeKravs": true,
+"kungorelsedatum": "2019-08-24",
+"registreringsdatum": "2019-08-24",
+"antagetDatum": "2019-08-24",
+"kallelsesatt": "string",
+"godkandAvInstanser": [
+{}
+],
+"styrelsegranser": {
+"ledamoter": {},
+"suppleanter": {}
+},
+"stammotidManader": [
+null
+],
+"stammotidSenastManad": "string",
+"stammotidInomSexManader": true,
+"frivilligaBestammelser": [
+{}
+],
+"fritext": "string"
+},
+"vacanciesAndNotices": {
+"vakansOchUpplysning": [
+{}
+],
+"fritext": "string"
+},
+"financialPlan": {
+"registreradDatum": "2019-08-24",
+"senastRegistreradDatum": "2019-08-24",
+"forenkladRegistreradDatum": "2019-08-24"
+},
+"foreignBranchOwnerOrganization": {
+"identitet": {
+"typ": {}
+},
+"angivetEuid": "string",
+"organisationsnamn": {
+"typ": {}
+},
+"registreringsdatum": "2019-08-24",
+"verksamhetsbeskrivning": "string",
+"sate": "string",
+"postadress": {
+"land": {}
+},
+"rakenskapsar": {},
+"ejVerifieratOrganisationsregister": {
+"land": {}
+},
+"aktieinformation": {
+"valuta": {}
+},
+"funktionarer": [
+{}
+]
+},
+"financialReports": [
+{
+"arende": {},
+"rapporter": []
+}
+]
+}

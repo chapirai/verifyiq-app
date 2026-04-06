@@ -1,0 +1,148 @@
+Schema name: Rakenskapsperiod
+API: Bolagsverket Financial API
+Response path: FinansiellaRapporterResponse.finansiellaRapporter[].rakenskapsperioder
+
+Raw structure:
+{
+"start": "2024-12-31",
+"slut": "2024-12-31",
+"arsredovisningar": [
+{
+"rapporteringsperiod": {},
+"rapporttyp": {},
+"ankomsttidpunkt": "string",
+"registreradTidpunkt": "string",
+"arsredovisningsinnehall": [
+{}
+],
+"brister": [
+{}
+],
+"handlaggningAvslutadDatum": "string"
+}
+],
+"arsredovisningspaminnelse": {
+"skickadTidpunkt": "string",
+"arsredovisningspaminnelsetyp": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"vinstutdelning": {
+"beslutadDatum": "string",
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"belopp": 0,
+"vinstutdelningstyp": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"fortsattStamma": {
+"stammodatum": "string",
+"fritext": "string"
+}
+}
+
+Fields:
+
+* start: string<date>
+* slut: string<date>
+* arsredovisningar: array<object>
+* arsredovisningar.rapporteringsperiod.periodFrom: string<date>
+* arsredovisningar.rapporteringsperiod.periodTom: string<date>
+* arsredovisningar.rapporttyp.kod: string
+* arsredovisningar.rapporttyp.klartext: string
+* arsredovisningar.ankomsttidpunkt: string<date-time>
+* arsredovisningar.registreradTidpunkt: string<date-time>
+* arsredovisningar.arsredovisningsinnehall: array<object>
+* arsredovisningar.arsredovisningsinnehall.kod: string
+* arsredovisningar.arsredovisningsinnehall.klartext: string
+* arsredovisningar.brister: array<object>
+* arsredovisningar.brister.kod: string
+* arsredovisningar.brister.klartext: string
+* arsredovisningar.handlaggningAvslutadDatum: string<date>
+* arsredovisningspaminnelse.skickadTidpunkt: string<date-time>
+* arsredovisningspaminnelse.arsredovisningspaminnelsetyp.kod: string
+* arsredovisningspaminnelse.arsredovisningspaminnelsetyp.klartext: string
+* vinstutdelning.beslutadDatum: string<date>
+* vinstutdelning.valuta.kod: string
+* vinstutdelning.valuta.klartext: string
+* vinstutdelning.belopp: number
+* vinstutdelning.vinstutdelningstyp.kod: string
+* vinstutdelning.vinstutdelningstyp.klartext: string
+* fortsattStamma.stammodatum: string<date>
+* fortsattStamma.fritext: string
+
+Mapping:
+
+* start -> start
+* slut -> slut
+* arsredovisningar -> arsredovisningar
+* arsredovisningspaminnelse -> arsredovisningspaminnelse
+* vinstutdelning -> vinstutdelning
+* fortsattStamma -> fortsattStamma
+
+Rules:
+
+* type conversion: convert all string<date> and string<date-time> fields only if internal model requires it
+* optional/missing handling: arsredovisningar may be empty; arsredovisningspaminnelse, vinstutdelning, and fortsattStamma may be missing or null
+* special parsing: preserve all arrays as-is and in source order
+
+Target type:
+{
+"start": "string<date>",
+"slut": "string<date>",
+"arsredovisningar": [
+{
+"rapporteringsperiod": {
+"periodFrom": "string<date>",
+"periodTom": "string<date>"
+},
+"rapporttyp": {
+"kod": "string",
+"klartext": "string"
+},
+"ankomsttidpunkt": "string<date-time>",
+"registreradTidpunkt": "string<date-time>",
+"arsredovisningsinnehall": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"brister": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"handlaggningAvslutadDatum": "string<date>"
+}
+],
+"arsredovisningspaminnelse": {
+"skickadTidpunkt": "string<date-time>",
+"arsredovisningspaminnelsetyp": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"vinstutdelning": {
+"beslutadDatum": "string<date>",
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"belopp": "number",
+"vinstutdelningstyp": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"fortsattStamma": {
+"stammodatum": "string<date>",
+"fritext": "string"
+}
+}

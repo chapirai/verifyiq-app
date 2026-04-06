@@ -1,0 +1,441 @@
+Schema name: PersonResponse
+API: Bolagsverket Person API
+Response path: response body
+
+Raw structure: [no exact example provided by source for full response schema]
+
+Fields:
+
+* identitet: object
+* identitet.typ: object
+* identitet.typ.kod: string
+* identitet.typ.klartext: string
+* identitet.identitetsbeteckning: string
+* personnamn: object
+* personnamn.fornamn: string
+* personnamn.efternamn: string
+* organisationsengagemang: array<object>
+* organisationsengagemang.organisation: object
+* organisationsengagemang.organisation.identitet: object
+* organisationsengagemang.organisation.identitet.typ: object
+* organisationsengagemang.organisation.identitet.typ.kod: string
+* organisationsengagemang.organisation.identitet.typ.klartext: string
+* organisationsengagemang.organisation.identitet.identitetsbeteckning: string
+* organisationsengagemang.organisation.namnskyddslopnummer: integer
+* organisationsengagemang.organisation.personnamn: object
+* organisationsengagemang.organisation.personnamn.fornamn: string
+* organisationsengagemang.organisation.personnamn.efternamn: string
+* organisationsengagemang.organisation.organisationsnamn: object
+* organisationsengagemang.organisation.organisationsnamn.typ: object
+* organisationsengagemang.organisation.organisationsnamn.typ.kod: string
+* organisationsengagemang.organisation.organisationsnamn.typ.klartext: string
+* organisationsengagemang.organisation.organisationsnamn.namn: string
+* organisationsengagemang.organisation.organisationsform: object
+* organisationsengagemang.organisation.organisationsform.kod: string
+* organisationsengagemang.organisation.organisationsform.klartext: string
+* organisationsengagemang.organisation.organisationsstatusar: array<object>
+* organisationsengagemang.organisation.organisationsstatusar.kod: string
+* organisationsengagemang.organisation.organisationsstatusar.klartext: string
+* organisationsengagemang.organisation.organisationsstatusar.typ: string
+* organisationsengagemang.organisation.organisationsstatusar.datum: string<date>
+* organisationsengagemang.funktionar: object
+* organisationsengagemang.funktionar.personnamn: object
+* organisationsengagemang.funktionar.personnamn.fornamn: string
+* organisationsengagemang.funktionar.personnamn.efternamn: string
+* organisationsengagemang.funktionar.organisationsnamn: object
+* organisationsengagemang.funktionar.organisationsnamn.typ: object
+* organisationsengagemang.funktionar.organisationsnamn.typ.kod: string
+* organisationsengagemang.funktionar.organisationsnamn.typ.klartext: string
+* organisationsengagemang.funktionar.organisationsnamn.namn: string
+* organisationsengagemang.funktionar.identitet: object
+* organisationsengagemang.funktionar.identitet.typ: object
+* organisationsengagemang.funktionar.identitet.typ.kod: string
+* organisationsengagemang.funktionar.identitet.typ.klartext: string
+* organisationsengagemang.funktionar.identitet.identitetsbeteckning: string
+* organisationsengagemang.funktionar.funktionarsroller: array<object>
+* organisationsengagemang.funktionar.funktionarsroller.kod: string
+* organisationsengagemang.funktionar.funktionarsroller.klartext: string
+* organisationsengagemang.funktionar.postadress: object
+* organisationsengagemang.funktionar.postadress.coAdress: string
+* organisationsengagemang.funktionar.postadress.adress: string
+* organisationsengagemang.funktionar.postadress.postnummer: string
+* organisationsengagemang.funktionar.postadress.postort: string
+* organisationsengagemang.funktionar.postadress.adressrad1: string
+* organisationsengagemang.funktionar.postadress.adressrad2: string
+* organisationsengagemang.funktionar.postadress.land: object
+* organisationsengagemang.funktionar.postadress.land.kod: string
+* organisationsengagemang.funktionar.postadress.land.klartext: string
+* organisationsengagemang.funktionar.representerasAv: object
+* organisationsengagemang.funktionar.representerasAv.personnamn: object
+* organisationsengagemang.funktionar.representerasAv.personnamn.fornamn: string
+* organisationsengagemang.funktionar.representerasAv.personnamn.efternamn: string
+* organisationsengagemang.funktionar.representerasAv.identitet: object
+* organisationsengagemang.funktionar.representerasAv.identitet.typ: object
+* organisationsengagemang.funktionar.representerasAv.identitet.typ.kod: string
+* organisationsengagemang.funktionar.representerasAv.identitet.typ.klartext: string
+* organisationsengagemang.funktionar.representerasAv.identitet.identitetsbeteckning: string
+* organisationsengagemang.funktionar.insats: string
+* organisationsengagemang.funktionar.anteckning: string
+* personligKonkurs: array<object>
+* personligKonkurs.dodsbonummer: string
+* personligKonkurs.insolvensforfarande: object
+* personligKonkurs.insolvensforfarande.huvud: string
+* personligKonkurs.insolvensforfarande.sekundart: string
+* personligKonkurs.insolvensforfarande.territorielltBegransat: string
+* personligKonkurs.process: object
+* personligKonkurs.process.inledd: object
+* personligKonkurs.process.inledd.malnummer: string
+* personligKonkurs.process.inledd.datum: string<date>
+* personligKonkurs.process.inledd.overklaganSenastDatum: string<date>
+* personligKonkurs.process.inledd.anmalanFordringarSenastDatum: string<date>
+* personligKonkurs.process.inledd.beslutsinstans: object
+* personligKonkurs.process.inledd.beslutsinstans.svensk: object
+* personligKonkurs.process.inledd.beslutsinstans.svensk.kod: string
+* personligKonkurs.process.inledd.beslutsinstans.svensk.klartext: string
+* personligKonkurs.process.inledd.beslutsinstans.utlandsk: object
+* personligKonkurs.process.inledd.beslutsinstans.utlandsk.namn: string
+* personligKonkurs.process.inledd.beslutsinstans.utlandsk.land: object
+* personligKonkurs.process.inledd.beslutsinstans.utlandsk.land.kod: string
+* personligKonkurs.process.inledd.beslutsinstans.utlandsk.land.klartext: string
+* personligKonkurs.process.overklagande: object
+* personligKonkurs.process.overklagande.beslutsinstans: object
+* personligKonkurs.process.overklagande.beslutsinstans.svensk: object
+* personligKonkurs.process.overklagande.beslutsinstans.svensk.kod: string
+* personligKonkurs.process.overklagande.beslutsinstans.svensk.klartext: string
+* personligKonkurs.process.overklagande.beslutsinstans.utlandsk: object
+* personligKonkurs.process.overklagande.beslutsinstans.utlandsk.namn: string
+* personligKonkurs.process.overklagande.beslutsinstans.utlandsk.land: object
+* personligKonkurs.process.overklagande.beslutsinstans.utlandsk.land.kod: string
+* personligKonkurs.process.overklagande.beslutsinstans.utlandsk.land.klartext: string
+* personligKonkurs.process.avslutad: object
+* personligKonkurs.process.avslutad.datum: string<date>
+* personligKonkurs.process.upphavd: object
+* personligKonkurs.process.upphavd.malnummer: string
+* personligKonkurs.process.upphavd.datum: string<date>
+* personligKonkurs.process.upphavd.beslutsinstans: object
+* personligKonkurs.process.upphavd.beslutsinstans.svensk: object
+* personligKonkurs.process.upphavd.beslutsinstans.svensk.kod: string
+* personligKonkurs.process.upphavd.beslutsinstans.svensk.klartext: string
+* personligKonkurs.process.upphavd.beslutsinstans.utlandsk: object
+* personligKonkurs.process.upphavd.beslutsinstans.utlandsk.namn: string
+* personligKonkurs.process.upphavd.beslutsinstans.utlandsk.land: object
+* personligKonkurs.process.upphavd.beslutsinstans.utlandsk.land.kod: string
+* personligKonkurs.process.upphavd.beslutsinstans.utlandsk.land.klartext: string
+* personligKonkurs.process.upphavd.overklagande: object
+* personligKonkurs.process.upphavd.overklagande.datum: string<date>
+* personligKonkurs.process.upphavd.overklagande.beslutsinstans: object
+* personligKonkurs.process.upphavd.overklagande.beslutsinstans.svensk: object
+* personligKonkurs.process.upphavd.overklagande.beslutsinstans.svensk.kod: string
+* personligKonkurs.process.upphavd.overklagande.beslutsinstans.svensk.klartext: string
+* personligKonkurs.process.upphavd.overklagande.beslutsinstans.utlandsk: object
+* personligKonkurs.process.upphavd.overklagande.beslutsinstans.utlandsk.namn: string
+* personligKonkurs.process.upphavd.overklagande.beslutsinstans.utlandsk.land: object
+* personligKonkurs.process.upphavd.overklagande.beslutsinstans.utlandsk.land.kod: string
+* personligKonkurs.process.upphavd.overklagande.beslutsinstans.utlandsk.land.klartext: string
+* personligKonkurs.konkursforvaltare: object
+* personligKonkurs.konkursforvaltare.personnamn: object
+* personligKonkurs.konkursforvaltare.personnamn.fornamn: string
+* personligKonkurs.konkursforvaltare.personnamn.efternamn: string
+* personligKonkurs.konkursforvaltare.postadress: object
+* personligKonkurs.konkursforvaltare.postadress.coAdress: string
+* personligKonkurs.konkursforvaltare.postadress.adress: string
+* personligKonkurs.konkursforvaltare.postadress.postnummer: string
+* personligKonkurs.konkursforvaltare.postadress.postort: string
+* personligKonkurs.konkursforvaltare.postadress.adressrad1: string
+* personligKonkurs.konkursforvaltare.postadress.adressrad2: string
+* personligKonkurs.konkursforvaltare.postadress.land: object
+* personligKonkurs.konkursforvaltare.postadress.land.kod: string
+* personligKonkurs.konkursforvaltare.postadress.land.klartext: string
+* bitradesforbud: object
+* bitradesforbud.fritext: string
+* bitradesforbud.slutligt: object
+* bitradesforbud.slutligt.from: string<date>
+* bitradesforbud.slutligt.tom: string<date>
+* bitradesforbud.tillfalligt: object
+* bitradesforbud.tillfalligt.from: string<date>
+* bitradesforbud.beslut: object
+* bitradesforbud.beslut.typ: string
+* bitradesforbud.beslut.datum: string<date>
+* bitradesforbud.beslut.beslutsinstans: object
+* bitradesforbud.beslut.beslutsinstans.kod: string
+* bitradesforbud.beslut.beslutsinstans.klartext: string
+* naringsforbud: object
+* naringsforbud.fritext: string
+* naringsforbud.slutligt: object
+* naringsforbud.slutligt.from: string<date>
+* naringsforbud.slutligt.tom: string<date>
+* naringsforbud.tillfalligt: object
+* naringsforbud.tillfalligt.from: string<date>
+* naringsforbud.beslut: object
+* naringsforbud.beslut.typ: string
+* naringsforbud.beslut.datum: string<date>
+* naringsforbud.beslut.beslutsinstans: object
+* naringsforbud.beslut.beslutsinstans.kod: string
+* naringsforbud.beslut.beslutsinstans.klartext: string
+* naringsforbud.undantag: object
+* naringsforbud.undantag.from: string<date>
+* naringsforbud.undantag.tom: string<date>
+* naringsforbud.undantag.aterkallatDatum: string<date>
+* naringsforbud.avveckling: string<date>
+
+Mapping:
+
+* identitet -> identitet
+* personnamn -> personnamn
+* organisationsengagemang -> organisationsengagemang
+* personligKonkurs -> personligKonkurs
+* bitradesforbud -> bitradesforbud
+* naringsforbud -> naringsforbud
+
+Rules:
+
+* type conversion: convert all string<date> fields to internal date type only if internal model requires it
+* optional/missing handling: organisationsengagemang and personligKonkurs may be missing or empty depending on requested information objects; nested objects may be null or omitted
+* special parsing: only populate sections requested in PersonRequest.personInformationsmangd; if personInformationsmangd is omitted, response may only contain identitet and personnamn
+
+Target type:
+{
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsengagemang": [
+{
+"organisation": {
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"namnskyddslopnummer": "integer",
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"organisationsstatusar": [
+{
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "string<date>"
+}
+]
+},
+"funktionar": {
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"postadress": {
+"coAdress": "string",
+"adress": "string",
+"postnummer": "string",
+"postort": "string",
+"adressrad1": "string",
+"adressrad2": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"representerasAv": {
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+},
+"insats": "string",
+"anteckning": "string"
+}
+}
+],
+"personligKonkurs": [
+{
+"dodsbonummer": "string",
+"insolvensforfarande": {
+"huvud": "string",
+"sekundart": "string",
+"territorielltBegransat": "string"
+},
+"process": {
+"inledd": {
+"malnummer": "string",
+"datum": "string<date>",
+"overklaganSenastDatum": "string<date>",
+"anmalanFordringarSenastDatum": "string<date>",
+"beslutsinstans": {
+"svensk": {
+"kod": "string",
+"klartext": "string"
+},
+"utlandsk": {
+"namn": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+}
+}
+},
+"overklagande": {
+"beslutsinstans": {
+"svensk": {
+"kod": "string",
+"klartext": "string"
+},
+"utlandsk": {
+"namn": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+}
+}
+},
+"avslutad": {
+"datum": "string<date>"
+},
+"upphavd": {
+"malnummer": "string",
+"datum": "string<date>",
+"beslutsinstans": {
+"svensk": {
+"kod": "string",
+"klartext": "string"
+},
+"utlandsk": {
+"namn": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+}
+},
+"overklagande": {
+"datum": "string<date>",
+"beslutsinstans": {
+"svensk": {
+"kod": "string",
+"klartext": "string"
+},
+"utlandsk": {
+"namn": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+}
+}
+}
+}
+},
+"konkursforvaltare": {
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"postadress": {
+"coAdress": "string",
+"adress": "string",
+"postnummer": "string",
+"postort": "string",
+"adressrad1": "string",
+"adressrad2": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+}
+}
+}
+],
+"bitradesforbud": {
+"fritext": "string",
+"slutligt": {
+"from": "string<date>",
+"tom": "string<date>"
+},
+"tillfalligt": {
+"from": "string<date>"
+},
+"beslut": {
+"typ": "string",
+"datum": "string<date>",
+"beslutsinstans": {
+"kod": "string",
+"klartext": "string"
+}
+}
+},
+"naringsforbud": {
+"fritext": "string",
+"slutligt": {
+"from": "string<date>",
+"tom": "string<date>"
+},
+"tillfalligt": {
+"from": "string<date>"
+},
+"beslut": {
+"typ": "string",
+"datum": "string<date>",
+"beslutsinstans": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"undantag": {
+"from": "string<date>",
+"tom": "string<date>",
+"aterkallatDatum": "string<date>"
+},
+"avveckling": "string<date>"
+}
+}

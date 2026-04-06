@@ -1,0 +1,51 @@
+Schema name: Styrelsegrans
+API: organisations/lookup
+Response path: response.body[].bestammelser.styrelsegranser
+
+Raw structure:
+{
+"ledamoter": {
+"lagst": 1000,
+"hogst": 10000
+},
+"suppleanter": {
+"lagst": 1000,
+"hogst": 10000
+}
+}
+
+Fields:
+
+* ledamoter: object
+* ledamoter.lagst: integer
+* ledamoter.hogst: integer
+* suppleanter: object
+* suppleanter.lagst: integer
+* suppleanter.hogst: integer
+
+Mapping:
+
+* ledamoter -> boardMembers
+* ledamoter.lagst -> boardMembers.min
+* ledamoter.hogst -> boardMembers.max
+* suppleanter -> deputyMembers
+* suppleanter.lagst -> deputyMembers.min
+* suppleanter.hogst -> deputyMembers.max
+
+Rules:
+
+* all numeric fields are int64 and must be handled without precision loss
+* both ledamoter and suppleanter follow LagstHogstAntal schema
+* missing nested objects should be null or omitted, not defaulted
+
+Target type:
+{
+"boardMembers": {
+"min": 1000,
+"max": 10000
+},
+"deputyMembers": {
+"min": 1000,
+"max": 10000
+}
+}

@@ -1,0 +1,41 @@
+Schema name: BeslutType
+API: organisations/lookup
+Response path: multiple
+
+Raw structure:
+{
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "2019-08-24"
+}
+
+Fields:
+
+* instanstyp: object
+* instanstyp.kod: string
+* instanstyp.klartext: string
+* beslutsdatum: string
+
+Mapping:
+
+* instanstyp -> authorityType
+* instanstyp.kod -> authorityType.code
+* instanstyp.klartext -> authorityType.text
+* beslutsdatum -> decisionDate
+
+Rules:
+
+* beslutsdatum: date string in YYYY-MM-DD format
+* instanstyp: KodKlartext object, preserve both code and text
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"authorityType": {
+"code": "string",
+"text": "string"
+},
+"decisionDate": "2019-08-24"
+}

@@ -1,0 +1,62 @@
+Schema name: Postadress
+API: organisations/lookup
+Response path: multiple
+
+Raw structure:
+{
+"coAdress": "string",
+"adress": "string",
+"postnummer": "string",
+"postort": "string",
+"adressrad1": "string",
+"adressrad2": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+}
+
+Fields:
+
+* coAdress: string
+* adress: string
+* postnummer: string
+* postort: string
+* adressrad1: string
+* adressrad2: string
+* land: object
+* land.kod: string
+* land.klartext: string
+
+Mapping:
+
+* coAdress -> co
+* adress -> street
+* postnummer -> postalCode
+* postort -> city
+* adressrad1 -> addressLine1
+* adressrad2 -> addressLine2
+* land -> country
+* land.kod -> country.code
+* land.klartext -> country.text
+
+Rules:
+
+* all fields are strings and should be preserved as-is
+* land: KodKlartext object, must retain both code and text
+* some fields may be empty depending on domestic vs foreign address
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"co": "string",
+"street": "string",
+"postalCode": "string",
+"city": "string",
+"addressLine1": "string",
+"addressLine2": "string",
+"country": {
+"code": "string",
+"text": "string"
+}
+}

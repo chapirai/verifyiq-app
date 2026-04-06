@@ -1,0 +1,31 @@
+Schema name: LagstHogstKapital
+API: organisations/lookup
+Response path: multiple
+
+Raw structure:
+{
+"lagst": 25000,
+"hogst": 100000
+}
+
+Fields:
+
+* lagst: number
+* hogst: number
+
+Mapping:
+
+* lagst -> min
+* hogst -> max
+
+Rules:
+
+* lagst and hogst: decimal numbers, preserve precision (multiple of 0.000001)
+* do not cast to integer or lose fractional precision
+* missing fields should be null or omitted, not defaulted
+
+Target type:
+{
+"min": 25000,
+"max": 100000
+}

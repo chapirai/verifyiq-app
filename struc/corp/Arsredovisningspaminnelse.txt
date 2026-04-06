@@ -1,0 +1,38 @@
+Schema name: Arsredovisningspaminnelse
+API: Bolagsverket Financial API
+Response path: FinansiellaRapporterResponse.finansiellaRapporter[].rakenskapsperioder[].arsredovisningspaminnelse
+
+Raw structure:
+{
+"skickadTidpunkt": "string",
+"arsredovisningspaminnelsetyp": {
+"kod": "string",
+"klartext": "string"
+}
+}
+
+Fields:
+
+* skickadTidpunkt: string<date-time>
+* arsredovisningspaminnelsetyp.kod: string
+* arsredovisningspaminnelsetyp.klartext: string
+
+Mapping:
+
+* skickadTidpunkt -> skickadTidpunkt
+* arsredovisningspaminnelsetyp -> arsredovisningspaminnelsetyp
+
+Rules:
+
+* type conversion: skickadTidpunkt should be parsed as ISO 8601 datetime if supported, otherwise keep as string
+* optional/missing handling: entire object may be null or missing if no reminder exists
+* KodKlartext handling: always store both `kod` and `klartext`
+
+Target type:
+{
+"skickadTidpunkt": "string<date-time>",
+"arsredovisningspaminnelsetyp": {
+"kod": "string",
+"klartext": "string"
+}
+}

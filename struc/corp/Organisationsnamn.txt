@@ -1,0 +1,41 @@
+Schema name: Organisationsnamn
+API: organisations/lookup
+Response path: multiple
+
+Raw structure:
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+}
+
+Fields:
+
+* typ: object
+* typ.kod: string
+* typ.klartext: string
+* namn: string
+
+Mapping:
+
+* typ -> type
+* typ.kod -> type.code
+* typ.klartext -> type.text
+* namn -> name
+
+Rules:
+
+* namn: string, preserve exactly as returned
+* typ: KodKlartext object, preserve both code and text
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"type": {
+"code": "string",
+"text": "string"
+},
+"name": "string"
+}

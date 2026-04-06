@@ -1,0 +1,225 @@
+Schema name: Aktiekapitalforandring
+API: Bolagsverket Aktie API
+Response path: AktiekapitalforandringResponse.aktiekapitalforandringar[].aktiekapitalforandring
+
+Raw structure:
+{
+"lopnummer": "string",
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"aktiekapital": {
+"belopp": 0,
+"lagst": 25000,
+"hogst": 100000,
+"betaltInklusiveOverkurs": 100000
+},
+"antalAktier": 0,
+"beslutAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "2019-08-24"
+},
+"nyemission": {
+"betalningssatt": [
+{}
+],
+"belopp": 0,
+"betaltAntalAktier": 0,
+"fullbetalning": true,
+"delregistrering": true
+},
+"minskning": {
+"minskningAvAktiekapitalPagar": true,
+"forfallen": {
+"beslutAvInstans": {
+"instanstyp": {}
+}
+},
+"tillstand": {
+"beviljatAvInstans": {
+"instanstyp": {}
+}
+},
+"belopp": 0
+},
+"genom": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"andamal": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"aktieslag": [
+{
+"namn": "A",
+"antal": 1000,
+"rostvarde": "1"
+}
+],
+"fritext": "string",
+"skuldebrevUtgivetIArendenummer": "string",
+"aktiekapitalEfterAndring": 0
+}
+
+Fields:
+
+* lopnummer: string
+* typ.kod: string
+* typ.klartext: string
+* valuta.kod: string
+* valuta.klartext: string
+* aktiekapital.belopp: number
+* aktiekapital.lagst: number
+* aktiekapital.hogst: number
+* aktiekapital.betaltInklusiveOverkurs: number
+* antalAktier: integer<int64>
+* beslutAvInstans.instanstyp.kod: string
+* beslutAvInstans.instanstyp.klartext: string
+* beslutAvInstans.beslutsdatum: string<date>
+* nyemission.betalningssatt: array<object>
+* nyemission.betalningssatt.kod: string
+* nyemission.betalningssatt.klartext: string
+* nyemission.belopp: number
+* nyemission.betaltAntalAktier: integer<int64>
+* nyemission.fullbetalning: boolean
+* nyemission.delregistrering: boolean
+* minskning.minskningAvAktiekapitalPagar: boolean
+* minskning.forfallen.beslutAvInstans.instanstyp.kod: string
+* minskning.forfallen.beslutAvInstans.instanstyp.klartext: string
+* minskning.forfallen.beslutAvInstans.beslutsdatum: string<date>
+* minskning.tillstand.beviljatAvInstans.instanstyp.kod: string
+* minskning.tillstand.beviljatAvInstans.instanstyp.klartext: string
+* minskning.tillstand.beviljatAvInstans.beslutsdatum: string<date>
+* minskning.belopp: number
+* genom: array<object>
+* genom.kod: string
+* genom.klartext: string
+* andamal: array<object>
+* andamal.kod: string
+* andamal.klartext: string
+* aktieslag: array<object>
+* aktieslag.namn: string
+* aktieslag.antal: integer<int64>
+* aktieslag.rostvarde: string
+* fritext: string
+* skuldebrevUtgivetIArendenummer: string
+* aktiekapitalEfterAndring: number
+
+Mapping:
+
+* lopnummer -> lopnummer
+* typ -> typ
+* valuta -> valuta
+* aktiekapital -> aktiekapital
+* antalAktier -> antalAktier
+* beslutAvInstans -> beslutAvInstans
+* nyemission -> nyemission
+* minskning -> minskning
+* genom -> genom
+* andamal -> andamal
+* aktieslag -> aktieslag
+* fritext -> fritext
+* skuldebrevUtgivetIArendenummer -> skuldebrevUtgivetIArendenummer
+* aktiekapitalEfterAndring -> aktiekapitalEfterAndring
+
+Rules:
+
+* type conversion: convert all string<date> to Date only if internal model requires it; keep integer<int64> as numeric with safe handling; preserve number precision
+* optional/missing handling: nyemission, minskning, genom, andamal, aktieslag, and nested objects may be null or missing depending on change type
+* special parsing: preserve ordering of genom and andamal arrays; preserve aktiekapitalforandring chronological order using lopnummer
+
+Target type:
+{
+"lopnummer": "string",
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"aktiekapital": {
+"belopp": "number",
+"lagst": "number",
+"hogst": "number",
+"betaltInklusiveOverkurs": "number"
+},
+"antalAktier": "integer<int64>",
+"beslutAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+},
+"nyemission": {
+"betalningssatt": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"belopp": "number",
+"betaltAntalAktier": "integer<int64>",
+"fullbetalning": "boolean",
+"delregistrering": "boolean"
+},
+"minskning": {
+"minskningAvAktiekapitalPagar": "boolean",
+"forfallen": {
+"beslutAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+}
+},
+"tillstand": {
+"beviljatAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+}
+},
+"belopp": "number"
+},
+"genom": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"andamal": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"aktieslag": [
+{
+"namn": "string",
+"antal": "integer<int64>",
+"rostvarde": "string"
+}
+],
+"fritext": "string",
+"skuldebrevUtgivetIArendenummer": "string",
+"aktiekapitalEfterAndring": "number"
+}

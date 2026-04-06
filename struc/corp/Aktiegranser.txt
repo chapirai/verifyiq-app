@@ -1,0 +1,57 @@
+Schema name: Aktiegranser
+API: organisations/lookup
+Response path: response.body[].aktieinformation.aktiegranser
+
+Raw structure:
+{
+"aktiekapitalGranser": {
+"lagst": 25000,
+"hogst": 100000
+},
+"antalAktierGranser": {
+"lagst": 1000,
+"hogst": 10000
+},
+"valuta": "SEK"
+}
+
+Fields:
+
+* aktiekapitalGranser: object
+* aktiekapitalGranser.lagst: number
+* aktiekapitalGranser.hogst: number
+* antalAktierGranser: object
+* antalAktierGranser.lagst: integer
+* antalAktierGranser.hogst: integer
+* valuta: string
+
+Mapping:
+
+* aktiekapitalGranser -> capitalLimits
+* aktiekapitalGranser.lagst -> capitalLimits.min
+* aktiekapitalGranser.hogst -> capitalLimits.max
+* antalAktierGranser -> shareCountLimits
+* antalAktierGranser.lagst -> shareCountLimits.min
+* antalAktierGranser.hogst -> shareCountLimits.max
+* valuta -> currency
+
+Rules:
+
+* aktiekapitalGranser.lagst and aktiekapitalGranser.hogst: decimal number, preserve precision
+* antalAktierGranser.lagst and antalAktierGranser.hogst: int64, handle safely without precision loss
+* valuta: required string, allowed values SEK or EUR
+* all nested limit objects are required when Aktiegranser is present
+* missing values should be null or omitted, not defaulted
+
+Target type:
+{
+"capitalLimits": {
+"min": 25000,
+"max": 100000
+},
+"shareCountLimits": {
+"min": 1000,
+"max": 10000
+},
+"currency": "SEK"
+}

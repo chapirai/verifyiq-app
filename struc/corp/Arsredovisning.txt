@@ -1,0 +1,96 @@
+Schema name: Arsredovisning
+API: Bolagsverket Financial API
+Response path: FinansiellaRapporterResponse.finansiellaRapporter[].rakenskapsperioder[].arsredovisningar[]
+
+Raw structure:
+{
+"rapporteringsperiod": {
+"periodFrom": "2024-12-31",
+"periodTom": "2024-12-31"
+},
+"rapporttyp": {
+"kod": "string",
+"klartext": "string"
+},
+"ankomsttidpunkt": "string",
+"registreradTidpunkt": "string",
+"arsredovisningsinnehall": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"brister": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"handlaggningAvslutadDatum": "string"
+}
+
+Fields:
+
+* rapporteringsperiod.periodFrom: string<date>
+* rapporteringsperiod.periodTom: string<date>
+* rapporttyp.kod: string
+* rapporttyp.klartext: string
+* ankomsttidpunkt: string<date-time>
+* registreradTidpunkt: string<date-time>
+* arsredovisningsinnehall: array<KodKlartext>
+* arsredovisningsinnehall.kod: string
+* arsredovisningsinnehall.klartext: string
+* brister: array<KodKlartext>
+* brister.kod: string
+* brister.klartext: string
+* handlaggningAvslutadDatum: string<date>
+
+Mapping:
+
+* rapporteringsperiod -> rapporteringsperiod
+* rapporttyp -> rapporttyp
+* ankomsttidpunkt -> ankomsttidpunkt
+* registreradTidpunkt -> registreradTidpunkt
+* arsredovisningsinnehall -> arsredovisningsinnehall
+* brister -> brister
+* handlaggningAvslutadDatum -> handlaggningAvslutadDatum
+
+Rules:
+
+* type conversion:
+
+  * periodFrom, periodTom, handlaggningAvslutadDatum → parse as date if needed
+  * ankomsttidpunkt, registreradTidpunkt → parse as ISO 8601 datetime
+* optional/missing handling:
+
+  * arsredovisningsinnehall and brister may be empty arrays
+  * all fields should be nullable depending on data availability
+* KodKlartext handling: always store both `kod` and `klartext`
+* array handling: preserve order of arsredovisningsinnehall and brister
+
+Target type:
+{
+"rapporteringsperiod": {
+"periodFrom": "string<date>",
+"periodTom": "string<date>"
+},
+"rapporttyp": {
+"kod": "string",
+"klartext": "string"
+},
+"ankomsttidpunkt": "string<date-time>",
+"registreradTidpunkt": "string<date-time>",
+"arsredovisningsinnehall": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"brister": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"handlaggningAvslutadDatum": "string<date>"
+}

@@ -1,0 +1,87 @@
+Schema name: Funktionar
+API: organisations/lookup
+Response path: response.body[].funktionarer[]
+
+Raw structure:
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+}
+
+Fields:
+
+* personnamn: object
+* personnamn.fornamn: string
+* personnamn.efternamn: string
+* organisationsnamn: object
+* organisationsnamn.typ: object
+* organisationsnamn.typ.kod: string
+* organisationsnamn.typ.klartext: string
+* organisationsnamn.namn: string
+* identitet: object
+* identitet.typ: object
+* identitet.typ.kod: string
+* identitet.typ.klartext: string
+* identitet.identitetsbeteckning: string
+
+Mapping:
+
+* personnamn -> personName
+* personnamn.fornamn -> personName.firstName
+* personnamn.efternamn -> personName.lastName
+* organisationsnamn -> organizationName
+* organisationsnamn.typ -> organizationName.type
+* organisationsnamn.typ.kod -> organizationName.type.code
+* organisationsnamn.typ.klartext -> organizationName.type.text
+* organisationsnamn.namn -> organizationName.name
+* identitet -> identity
+* identitet.typ -> identity.type
+* identitet.typ.kod -> identity.type.code
+* identitet.typ.klartext -> identity.type.text
+* identitet.identitetsbeteckning -> identity.number
+
+Rules:
+
+* personnamn is optional depending on whether the officer is a person
+* organisationsnamn is optional depending on whether the officer is an organization
+* identitet.identitetsbeteckning: preserve as string, do not convert to number
+* typ objects must preserve both code and text
+* missing optional objects should be null or omitted, not defaulted
+
+Target type:
+{
+"personName": {
+"firstName": "string",
+"lastName": "string"
+},
+"organizationName": {
+"type": {
+"code": "string",
+"text": "string"
+},
+"name": "string"
+},
+"identity": {
+"type": {
+"code": "string",
+"text": "string"
+},
+"number": "string"
+}
+}

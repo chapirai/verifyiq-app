@@ -1,0 +1,61 @@
+Schema name: GodkandAvInstans
+API: organisations/lookup
+Response path: response.body[].bestammelser.godkandAvInstanser[]
+
+Raw structure:
+{
+"datum": "2019-08-24",
+"kommunfullmaktigeI": {
+"kod": "string",
+"klartext": "string"
+},
+"instans": {
+"kod": "string",
+"klartext": "string"
+},
+"fritext": "string"
+}
+
+Fields:
+
+* datum: string
+* kommunfullmaktigeI: object
+* kommunfullmaktigeI.kod: string
+* kommunfullmaktigeI.klartext: string
+* instans: object
+* instans.kod: string
+* instans.klartext: string
+* fritext: string
+
+Mapping:
+
+* datum -> date
+* kommunfullmaktigeI -> municipalAuthority
+* kommunfullmaktigeI.kod -> municipalAuthority.code
+* kommunfullmaktigeI.klartext -> municipalAuthority.text
+* instans -> authority
+* instans.kod -> authority.code
+* instans.klartext -> authority.text
+* fritext -> text
+
+Rules:
+
+* datum: date string in YYYY-MM-DD format
+* either kommunfullmaktigeI or instans may be populated depending on approval source
+* KodKlartext objects must preserve both code and text
+* fritext: optional free text, preserve as-is
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"date": "2019-08-24",
+"municipalAuthority": {
+"code": "string",
+"text": "string"
+},
+"authority": {
+"code": "string",
+"text": "string"
+},
+"text": "string"
+}

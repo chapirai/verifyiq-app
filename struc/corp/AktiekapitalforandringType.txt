@@ -1,0 +1,535 @@
+Schema name: AktiekapitalforandringType
+API: Bolagsverket Aktie API
+Response path: AktiekapitalforandringResponse
+
+Raw structure:
+{
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"organisationsstatusar": [
+{
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "2019-08-24"
+}
+],
+"gallandeAktieinformation": {
+"aktiekapital": {
+"belopp": 12000,
+"valuta": "SEK"
+},
+"antalAktier": 1200,
+"aktiegranser": {
+"aktiekapitalGranser": {},
+"antalAktierGranser": {},
+"valuta": "SEK"
+},
+"aktieslag": [
+{
+"aktieslagGranser": {}
+}
+],
+"fritext": "Antalet aktier av respektive slag får motsvara högst hela antalet aktier i bolaget.",
+"kvotvarde": {
+"belopp": 12000,
+"valuta": "SEK"
+},
+"nedsattningPagar": true
+},
+"aktiekapitalforandringar": [
+{
+"arende": {},
+"aktieinformation": {
+"aktiekapital": {},
+"aktiegranser": {},
+"aktieslag": [],
+"kvotvarde": {}
+},
+"aktiekapitalforandring": [
+{}
+]
+}
+],
+"bemyndiganden": [
+{
+"arende": {},
+"bemyndigandegrupper": [
+{}
+]
+}
+],
+"skuldebrev": [
+{
+"arende": {},
+"skuldebrev": {
+"typ": {},
+"beslutAvInstans": {},
+"valuta": {},
+"forandringsbelopp": {},
+"teckningsoptioner": {},
+"konvertibler": {}
+}
+}
+]
+}
+
+Fields:
+
+* identitet.typ.kod: string
+* identitet.typ.klartext: string
+* identitet.identitetsbeteckning: string
+* organisationsnamn.typ.kod: string
+* organisationsnamn.typ.klartext: string
+* organisationsnamn.namn: string
+* organisationsform.kod: string
+* organisationsform.klartext: string
+* organisationsstatusar: array<object>
+* organisationsstatusar.kod: string
+* organisationsstatusar.klartext: string
+* organisationsstatusar.typ: string
+* organisationsstatusar.datum: string<date>
+* gallandeAktieinformation.aktiekapital.belopp: number
+* gallandeAktieinformation.aktiekapital.valuta: string
+* gallandeAktieinformation.antalAktier: integer<int64>
+* gallandeAktieinformation.aktiegranser.aktiekapitalGranser.lagst: number
+* gallandeAktieinformation.aktiegranser.aktiekapitalGranser.hogst: number
+* gallandeAktieinformation.aktiegranser.antalAktierGranser.lagst: integer<int64>
+* gallandeAktieinformation.aktiegranser.antalAktierGranser.hogst: integer<int64>
+* gallandeAktieinformation.aktiegranser.valuta: string
+* gallandeAktieinformation.aktieslag: array<object>
+* gallandeAktieinformation.aktieslag.namn: string
+* gallandeAktieinformation.aktieslag.antal: integer<int64>
+* gallandeAktieinformation.aktieslag.aktieslagGranser.lagst: integer<int64>
+* gallandeAktieinformation.aktieslag.aktieslagGranser.hogst: integer<int64>
+* gallandeAktieinformation.aktieslag.rostvarde: string
+* gallandeAktieinformation.aktieslag.fritext: string
+* gallandeAktieinformation.aktieslag.kvotvarde.belopp: number
+* gallandeAktieinformation.aktieslag.kvotvarde.valuta: string
+* gallandeAktieinformation.nedsattningPagar: boolean
+* aktiekapitalforandringar: array<object>
+* aktiekapitalforandringar.arende.arendenummer: string
+* aktiekapitalforandringar.arende.avslutatTidpunkt: string
+* aktiekapitalforandringar.aktieinformation.aktiekapital.belopp: number
+* aktiekapitalforandringar.aktieinformation.aktiekapital.valuta: string
+* aktiekapitalforandringar.aktieinformation.antalAktier: integer<int64>
+* aktiekapitalforandringar.aktieinformation.aktiegranser.aktiekapitalGranser.lagst: number
+* aktiekapitalforandringar.aktieinformation.aktiegranser.aktiekapitalGranser.hogst: number
+* aktiekapitalforandringar.aktieinformation.aktiegranser.antalAktierGranser.lagst: integer<int64>
+* aktiekapitalforandringar.aktieinformation.aktiegranser.antalAktierGranser.hogst: integer<int64>
+* aktiekapitalforandringar.aktieinformation.aktiegranser.valuta: string
+* aktiekapitalforandringar.aktieinformation.aktieslag: array<object>
+* aktiekapitalforandringar.aktieinformation.aktieslag.namn: string
+* aktiekapitalforandringar.aktieinformation.aktieslag.antal: integer<int64>
+* aktiekapitalforandringar.aktieinformation.aktieslag.aktieslagGranser.lagst: integer<int64>
+* aktiekapitalforandringar.aktieinformation.aktieslag.aktieslagGranser.hogst: integer<int64>
+* aktiekapitalforandringar.aktieinformation.aktieslag.rostvarde: string
+* aktiekapitalforandringar.aktieinformation.aktieslag.fritext: string
+* aktiekapitalforandringar.aktieinformation.aktieslag.kvotvarde.belopp: number
+* aktiekapitalforandringar.aktieinformation.aktieslag.kvotvarde.valuta: string
+* aktiekapitalforandringar.aktieinformation.nedsattningPagar: boolean
+* aktiekapitalforandringar.aktiekapitalforandring: array<object>
+* aktiekapitalforandringar.aktiekapitalforandring.lopnummer: string
+* aktiekapitalforandringar.aktiekapitalforandring.typ.kod: string
+* aktiekapitalforandringar.aktiekapitalforandring.typ.klartext: string
+* aktiekapitalforandringar.aktiekapitalforandring.valuta.kod: string
+* aktiekapitalforandringar.aktiekapitalforandring.valuta.klartext: string
+* aktiekapitalforandringar.aktiekapitalforandring.aktiekapital.belopp: number
+* aktiekapitalforandringar.aktiekapitalforandring.aktiekapital.lagst: number
+* aktiekapitalforandringar.aktiekapitalforandring.aktiekapital.hogst: number
+* aktiekapitalforandringar.aktiekapitalforandring.aktiekapital.betaltInklusiveOverkurs: number
+* aktiekapitalforandringar.aktiekapitalforandring.antalAktier: integer<int64>
+* aktiekapitalforandringar.aktiekapitalforandring.beslutAvInstans.instanstyp.kod: string
+* aktiekapitalforandringar.aktiekapitalforandring.beslutAvInstans.instanstyp.klartext: string
+* aktiekapitalforandringar.aktiekapitalforandring.beslutAvInstans.beslutsdatum: string<date>
+* aktiekapitalforandringar.aktiekapitalforandring.nyemission.betalningssatt: array<object>
+* aktiekapitalforandringar.aktiekapitalforandring.nyemission.betalningssatt.kod: string
+* aktiekapitalforandringar.aktiekapitalforandring.nyemission.betalningssatt.klartext: string
+* aktiekapitalforandringar.aktiekapitalforandring.nyemission.belopp: number
+* aktiekapitalforandringar.aktiekapitalforandring.nyemission.betaltAntalAktier: integer<int64>
+* aktiekapitalforandringar.aktiekapitalforandring.nyemission.fullbetalning: boolean
+* aktiekapitalforandringar.aktiekapitalforandring.nyemission.delregistrering: boolean
+* aktiekapitalforandringar.aktiekapitalforandring.minskning.minskningAvAktiekapitalPagar: boolean
+* aktiekapitalforandringar.aktiekapitalforandring.forfallen.beslutAvInstans.instanstyp.kod: string
+* aktiekapitalforandringar.aktiekapitalforandring.forfallen.beslutAvInstans.instanstyp.klartext: string
+* aktiekapitalforandringar.aktiekapitalforandring.forfallen.beslutAvInstans.beslutsdatum: string<date>
+* aktiekapitalforandringar.aktiekapitalforandring.tillstand.beviljatAvInstans.instanstyp.kod: string
+* aktiekapitalforandringar.aktiekapitalforandring.tillstand.beviljatAvInstans.instanstyp.klartext: string
+* aktiekapitalforandringar.aktiekapitalforandring.tillstand.beviljatAvInstans.beslutsdatum: string<date>
+* aktiekapitalforandringar.aktiekapitalforandring.tillstand.belopp: number
+* aktiekapitalforandringar.aktiekapitalforandring.genom: array<object>
+* aktiekapitalforandringar.aktiekapitalforandring.genom.kod: string
+* aktiekapitalforandringar.aktiekapitalforandring.genom.klartext: string
+* aktiekapitalforandringar.aktiekapitalforandring.andamal: array<object>
+* aktiekapitalforandringar.aktiekapitalforandring.andamal.kod: string
+* aktiekapitalforandringar.aktiekapitalforandring.andamal.klartext: string
+* aktiekapitalforandringar.aktiekapitalforandring.aktieslag: array<object>
+* aktiekapitalforandringar.aktiekapitalforandring.aktieslag.namn: string
+* aktiekapitalforandringar.aktiekapitalforandring.aktieslag.antal: integer<int64>
+* aktiekapitalforandringar.aktiekapitalforandring.aktieslag.rostvarde: string
+* aktiekapitalforandringar.aktiekapitalforandring.aktieslag.fritext: string
+* aktiekapitalforandringar.aktiekapitalforandring.skuldebrevUtgivetIArendenummer: string
+* aktiekapitalforandringar.aktiekapitalforandring.aktiekapitalEfterAndring: number
+* bemyndiganden: array<object>
+* bemyndiganden.arende.arendenummer: string
+* bemyndiganden.arende.avslutatTidpunkt: string
+* bemyndiganden.bemyndigandegrupper: array<object>
+* bemyndiganden.bemyndigandegrupper.lopnummer: string
+* bemyndiganden.bemyndigandegrupper.fritext: string
+* bemyndiganden.bemyndigandegrupper.bemyndiganden: array<object>
+* bemyndiganden.bemyndigandegrupper.bemyndiganden.typ.kod: string
+* bemyndiganden.bemyndigandegrupper.bemyndiganden.typ.klartext: string
+* bemyndiganden.bemyndigandegrupper.bemyndiganden.bemyndigandeDatum: string<date>
+* bemyndiganden.bemyndigandegrupper.bemyndiganden.bemyndigandeAnvandsFore.ordinarieBolagsstammaAr: integer
+* bemyndiganden.bemyndigandegrupper.bemyndiganden.bemyndigandeAnvandsFore.annatDatum: string<date>
+* skuldebrev: array<object>
+* skuldebrev.arende.arendenummer: string
+* skuldebrev.arende.avslutatTidpunkt: string
+* skuldebrev.skuldebrev.lopnummer: string
+* skuldebrev.skuldebrev.typ.kod: string
+* skuldebrev.skuldebrev.typ.klartext: string
+* skuldebrev.skuldebrev.beslutAvInstans.instanstyp.kod: string
+* skuldebrev.skuldebrev.beslutAvInstans.instanstyp.klartext: string
+* skuldebrev.skuldebrev.beslutAvInstans.beslutsdatum: string<date>
+* skuldebrev.skuldebrev.valuta.kod: string
+* skuldebrev.skuldebrev.valuta.klartext: string
+* skuldebrev.skuldebrev.forandringsbelopp.beslutatBelopp: number
+* skuldebrev.skuldebrev.forandringsbelopp.lagst: number
+* skuldebrev.skuldebrev.forandringsbelopp.hogst: number
+* skuldebrev.skuldebrev.forandringsbelopp.tecknatBelopp: number
+* skuldebrev.skuldebrev.aktieslag: string
+* skuldebrev.skuldebrev.aktiekapitalKanOkasMedBelopp: number
+* skuldebrev.skuldebrev.teckningsoptioner.belopp: number
+* skuldebrev.skuldebrev.teckningsoptioner.aktieteckning.from: string<date>
+* skuldebrev.skuldebrev.teckningsoptioner.aktieteckning.tom: string<date>
+* skuldebrev.skuldebrev.teckningsoptioner.antal.faktisktAntal: integer
+* skuldebrev.skuldebrev.teckningsoptioner.antal.lagst: number
+* skuldebrev.skuldebrev.teckningsoptioner.antal.hogst: number
+* skuldebrev.skuldebrev.teckningsoptioner.utanLan: boolean
+* skuldebrev.skuldebrev.teckningsoptioner.medLan: boolean
+* skuldebrev.skuldebrev.teckningsoptioner.tidForNyteckning.from: string<date>
+* skuldebrev.skuldebrev.teckningsoptioner.tidForNyteckning.tom: string<date>
+* skuldebrev.skuldebrev.konvertibler.belopp: number
+* skuldebrev.skuldebrev.konvertibler.utbyte.from: string<date>
+* skuldebrev.skuldebrev.konvertibler.utbyte.tom: string<date>
+* skuldebrev.skuldebrev.fritext: string
+
+Mapping:
+
+* identitet -> identitet
+* organisationsnamn -> organisationsnamn
+* organisationsform -> organisationsform
+* organisationsstatusar -> organisationsstatusar
+* gallandeAktieinformation -> gallandeAktieinformation
+* aktiekapitalforandringar -> aktiekapitalforandringar
+* bemyndiganden -> bemyndiganden
+* skuldebrev -> skuldebrev
+
+Rules:
+
+* type conversion: convert all string<date> fields to Date only if internal model requires it; convert avslutatTidpunkt to DateTime only if internal model requires it; keep number and integer<int64> values numeric
+* optional/missing handling: nested sections and arrays may be missing, null, or empty depending on company data and historical availability
+* special parsing: currencies documented as SEK or EUR should be validated where applicable; integer<int64> fields must be handled with safe integer support; historical arrays must preserve source order
+
+Target type:
+{
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"organisationsstatusar": [
+{
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "string<date>"
+}
+],
+"gallandeAktieinformation": {
+"aktiekapital": {
+"belopp": "number",
+"valuta": "string"
+},
+"antalAktier": "integer<int64>",
+"aktiegranser": {
+"aktiekapitalGranser": {
+"lagst": "number",
+"hogst": "number"
+},
+"antalAktierGranser": {
+"lagst": "integer<int64>",
+"hogst": "integer<int64>"
+},
+"valuta": "string"
+},
+"aktieslag": [
+{
+"namn": "string",
+"antal": "integer<int64>",
+"aktieslagGranser": {
+"lagst": "integer<int64>",
+"hogst": "integer<int64>"
+},
+"rostvarde": "string",
+"fritext": "string",
+"kvotvarde": {
+"belopp": "number",
+"valuta": "string"
+}
+}
+],
+"fritext": "string",
+"kvotvarde": {
+"belopp": "number",
+"valuta": "string"
+},
+"nedsattningPagar": "boolean"
+},
+"aktiekapitalforandringar": [
+{
+"arende": {
+"arendenummer": "string",
+"avslutatTidpunkt": "string"
+},
+"aktieinformation": {
+"aktiekapital": {
+"belopp": "number",
+"valuta": "string"
+},
+"antalAktier": "integer<int64>",
+"aktiegranser": {
+"aktiekapitalGranser": {
+"lagst": "number",
+"hogst": "number"
+},
+"antalAktierGranser": {
+"lagst": "integer<int64>",
+"hogst": "integer<int64>"
+},
+"valuta": "string"
+},
+"aktieslag": [
+{
+"namn": "string",
+"antal": "integer<int64>",
+"aktieslagGranser": {
+"lagst": "integer<int64>",
+"hogst": "integer<int64>"
+},
+"rostvarde": "string",
+"fritext": "string",
+"kvotvarde": {
+"belopp": "number",
+"valuta": "string"
+}
+}
+],
+"kvotvarde": {
+"belopp": "number",
+"valuta": "string"
+},
+"nedsattningPagar": "boolean"
+},
+"aktiekapitalforandring": [
+{
+"lopnummer": "string",
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"aktiekapital": {
+"belopp": "number",
+"lagst": "number",
+"hogst": "number",
+"betaltInklusiveOverkurs": "number"
+},
+"antalAktier": "integer<int64>",
+"beslutAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+},
+"nyemission": {
+"betalningssatt": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"belopp": "number",
+"betaltAntalAktier": "integer<int64>",
+"fullbetalning": "boolean",
+"delregistrering": "boolean"
+},
+"minskning": {
+"minskningAvAktiekapitalPagar": "boolean"
+},
+"forfallen": {
+"beslutAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+}
+},
+"tillstand": {
+"beviljatAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+},
+"belopp": "number"
+},
+"genom": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"andamal": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"aktieslag": [
+{
+"namn": "string",
+"antal": "integer<int64>",
+"rostvarde": "string",
+"fritext": "string"
+}
+],
+"skuldebrevUtgivetIArendenummer": "string",
+"aktiekapitalEfterAndring": "number"
+}
+]
+}
+],
+"bemyndiganden": [
+{
+"arende": {
+"arendenummer": "string",
+"avslutatTidpunkt": "string"
+},
+"bemyndigandegrupper": [
+{
+"lopnummer": "string",
+"fritext": "string",
+"bemyndiganden": [
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"bemyndigandeDatum": "string<date>",
+"bemyndigandeAnvandsFore": {
+"ordinarieBolagsstammaAr": "integer",
+"annatDatum": "string<date>"
+}
+}
+]
+}
+]
+}
+],
+"skuldebrev": [
+{
+"arende": {
+"arendenummer": "string",
+"avslutatTidpunkt": "string"
+},
+"skuldebrev": {
+"lopnummer": "string",
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+},
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"forandringsbelopp": {
+"beslutatBelopp": "number",
+"lagst": "number",
+"hogst": "number",
+"tecknatBelopp": "number"
+},
+"aktieslag": "string",
+"aktiekapitalKanOkasMedBelopp": "number",
+"teckningsoptioner": {
+"belopp": "number",
+"aktieteckning": {
+"from": "string<date>",
+"tom": "string<date>"
+},
+"antal": {
+"faktisktAntal": "integer",
+"lagst": "number",
+"hogst": "number"
+},
+"utanLan": "boolean",
+"medLan": "boolean",
+"tidForNyteckning": {
+"from": "string<date>",
+"tom": "string<date>"
+}
+},
+"konvertibler": {
+"belopp": "number",
+"utbyte": {
+"from": "string<date>",
+"tom": "string<date>"
+}
+},
+"fritext": "string"
+}
+}
+]
+}

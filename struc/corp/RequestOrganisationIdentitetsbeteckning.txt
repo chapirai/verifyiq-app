@@ -1,0 +1,35 @@
+Schema name: RequestOrganisationIdentitetsbeteckning
+API: Bolagsverket Arende API
+Response path: request body
+
+Raw structure:
+{
+"organisationIdentitetsbeteckning": "5560123456",
+"fromdatum": "2024-01-01",
+"tomdatum": "2024-12-31"
+}
+
+Fields:
+
+* organisationIdentitetsbeteckning: string
+* fromdatum: string
+* tomdatum: string
+
+Mapping:
+
+* organisationIdentitetsbeteckning -> organisationId
+* fromdatum -> fromDate
+* tomdatum -> toDate
+
+Rules:
+
+* type conversion: fromdatum and tomdatum string (YYYY-MM-DD) → Date objects if required internally
+* optional/missing handling: fromdatum and tomdatum optional; organisationIdentitetsbeteckning required
+* special parsing: validate date format YYYY-MM-DD; ensure fromdatum ≤ tomdatum if both provided
+
+Target type:
+{
+"organisationId": "string",
+"fromDate": "date",
+"toDate": "date"
+}

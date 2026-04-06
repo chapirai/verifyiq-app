@@ -1,0 +1,27 @@
+Schema name: RequestArendenummer
+API: Bolagsverket Arende API
+Response path: request body
+
+Raw structure:
+{
+"arendenummer": "1234/2024"
+}
+
+Fields:
+
+* arendenummer: string
+
+Mapping:
+
+* arendenummer -> caseNumber
+
+Rules:
+
+* type conversion: none
+* optional/missing handling: arendenummer required, reject if missing or empty
+* special parsing: validate format "<sequenceNumber>/<year>" where year is four digits (YYYY)
+
+Target type:
+{
+"caseNumber": "string"
+}

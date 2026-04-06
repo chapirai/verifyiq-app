@@ -1,0 +1,60 @@
+Schema name: Kodad
+API: organisations/lookup
+Response path: response.body[].firmateckning.kodad
+
+Raw structure:
+[
+[
+{
+"typ": {},
+"ordning": 1,
+"funktionarsroller": [
+{}
+],
+"funktionarer": [
+{}
+]
+}
+]
+]
+
+Fields:
+
+* typ: object
+* ordning: number
+* funktionarsroller: array[object]
+* funktionarer: array[object]
+
+Mapping:
+
+* typ -> type
+* ordning -> order
+* funktionarsroller -> roles
+* funktionarer -> officers
+
+Rules:
+
+* must remain a two-dimensional array (array[array])
+* outer array = combinations
+* inner array = ordered rules within each combination
+* ordning defines order inside each inner array and must be preserved
+* do not flatten structure
+* typ and funktionarsroller must remain objects (KodKlartext)
+* funktionarer contains nested Funktionar objects
+* missing arrays should be [] if present but empty, otherwise null/omitted
+
+Target type:
+[
+[
+{
+"type": {},
+"order": 1,
+"roles": [
+{}
+],
+"officers": [
+{}
+]
+}
+]
+}

@@ -1,0 +1,107 @@
+Schema name: Arendeaktorer
+API: Bolagsverket Arende API
+Response path: ArendeResponse[].arendeaktorer
+
+Raw structure:
+{
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"namn": "string",
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"arenderoll": {
+"kod": "string",
+"klartext": "string"
+},
+"kontaktuppgiftIArende": {
+"adressat": "string",
+"postadress": {
+"coAdress": "string",
+"adress": "string",
+"postnummer": "string",
+"postort": "string",
+"adressrad1": "string",
+"adressrad2": "string",
+"land": {}
+},
+"epostadress": "string"
+}
+}
+
+Fields:
+
+* identitet.typ.kod: string
+* identitet.typ.klartext: string
+* identitet.identitetsbeteckning: string
+* namn: string
+* organisationsform.kod: string
+* organisationsform.klartext: string
+* arenderoll.kod: string
+* arenderoll.klartext: string
+* kontaktuppgiftIArende.adressat: string
+* kontaktuppgiftIArende.postadress.coAdress: string
+* kontaktuppgiftIArende.postadress.adress: string
+* kontaktuppgiftIArende.postadress.postnummer: string
+* kontaktuppgiftIArende.postadress.postort: string
+* kontaktuppgiftIArende.postadress.adressrad1: string
+* kontaktuppgiftIArende.postadress.adressrad2: string
+* kontaktuppgiftIArende.postadress.land.kod: string
+* kontaktuppgiftIArende.postadress.land.klartext: string
+* kontaktuppgiftIArende.epostadress: string
+
+Mapping:
+
+* identitet -> identitet
+* namn -> name
+* organisationsform -> organisationForm
+* arenderoll -> caseRole
+* kontaktuppgiftIArende -> contactDetails
+
+Rules:
+
+* type conversion: none
+* optional/missing handling: kontaktuppgiftIArende and nested postadress/epostadress may be missing or null
+* special parsing: none
+
+Target type:
+{
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"name": "string",
+"organisationForm": {
+"kod": "string",
+"klartext": "string"
+},
+"caseRole": {
+"kod": "string",
+"klartext": "string"
+},
+"contactDetails": {
+"adressat": "string",
+"postadress": {
+"coAdress": "string",
+"adress": "string",
+"postnummer": "string",
+"postort": "string",
+"adressrad1": "string",
+"adressrad2": "string",
+"land": {
+"kod": "string",
+"klartext": "string"
+}
+},
+"epostadress": "string"
+}
+}

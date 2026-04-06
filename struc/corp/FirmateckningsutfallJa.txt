@@ -1,0 +1,139 @@
+Schema name: FirmateckningsutfallJa
+API: Bolagsverket Person API
+Response path: firmateckningssvar.firmateckningsutfallJaSvar
+
+Raw structure:
+{
+"alternativ": "TILLSAMMANS",
+"firmateckningsutfallOrsak": {
+"firmateckningskombination": [
+{
+"typ": {},
+"funktionarsroller": [],
+"funktionarer": []
+}
+]
+},
+"namnKanEjListas": false,
+"firmateckningsutfallJatillsammansAlternativ": [
+[
+{
+"personnamn": {},
+"organisationsnamn": {},
+"identitet": {}
+}
+]
+]
+}
+
+Fields:
+
+* alternativ: string
+* firmateckningsutfallOrsak.firmateckningskombination: array<object>
+* firmateckningsutfallOrsak.firmateckningskombination.typ.kod: string
+* firmateckningsutfallOrsak.firmateckningskombination.typ.klartext: string
+* firmateckningsutfallOrsak.firmateckningskombination.ordning: number
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarsroller: array<object>
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarsroller.kod: string
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarsroller.klartext: string
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarer: array<object>
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarer.personnamn.fornamn: string
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarer.personnamn.efternamn: string
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.typ.kod: string
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.typ.klartext: string
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.namn: string
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.typ.kod: string
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.typ.klartext: string
+* firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.identitetsbeteckning: string
+* namnKanEjListas: boolean
+* firmateckningsutfallJatillsammansAlternativ: array<array<object>>
+* firmateckningsutfallJatillsammansAlternativ.personnamn.fornamn: string
+* firmateckningsutfallJatillsammansAlternativ.personnamn.efternamn: string
+* firmateckningsutfallJatillsammansAlternativ.organisationsnamn.typ.kod: string
+* firmateckningsutfallJatillsammansAlternativ.organisationsnamn.typ.klartext: string
+* firmateckningsutfallJatillsammansAlternativ.organisationsnamn.namn: string
+* firmateckningsutfallJatillsammansAlternativ.identitet.typ.kod: string
+* firmateckningsutfallJatillsammansAlternativ.identitet.typ.klartext: string
+* firmateckningsutfallJatillsammansAlternativ.identitet.identitetsbeteckning: string
+
+Mapping:
+
+* alternativ -> alternativ
+* firmateckningsutfallOrsak -> firmateckningsutfallOrsak
+* namnKanEjListas -> namnKanEjListas
+* firmateckningsutfallJatillsammansAlternativ -> firmateckningsutfallJatillsammansAlternativ
+
+Rules:
+
+* type conversion: none
+* optional/missing handling: firmateckningsutfallOrsak, namnKanEjListas, and firmateckningsutfallJatillsammansAlternativ may be missing or empty depending on alternativ
+* special parsing: validate alternativ enum values as ENSAM, LOPANDE, TILLSAMMANS, FULLMAKT; firmateckningsutfallJatillsammansAlternativ is an array of valid signer combinations; TILLSAMMANS may have namnKanEjListas = true when exact names cannot be listed
+
+Target type:
+{
+"alternativ": "string",
+"firmateckningsutfallOrsak": {
+"firmateckningskombination": [
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"ordning": "number",
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"funktionarer": [
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+}
+]
+}
+]
+},
+"namnKanEjListas": "boolean",
+"firmateckningsutfallJatillsammansAlternativ": [
+[
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+}
+]
+]
+}

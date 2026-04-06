@@ -1,0 +1,156 @@
+Schema name: Firmateckningssvar
+API: Bolagsverket Person API
+Response path: firmateckningInformation.firmateckningssvar
+
+Raw structure:
+{
+"utfall": "JA",
+"firmateckningsutfallJaSvar": [
+{
+"alternativ": "TILLSAMMANS",
+"firmateckningsutfallOrsak": {
+"firmateckningskombination": []
+},
+"namnKanEjListas": false,
+"firmateckningsutfallJatillsammansAlternativ": [
+[]
+]
+}
+],
+"firmateckningsutfallNejSvar": "EJ_AKTIV_ORGANISATION"
+}
+
+Fields:
+
+* utfall: string
+* firmateckningsutfallJaSvar: array<object>
+* firmateckningsutfallJaSvar.alternativ: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak: object
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination: array<object>
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.typ: object
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.typ.kod: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.typ.klartext: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.ordning: number
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarsroller: array<object>
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarsroller.kod: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarsroller.klartext: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer: array<object>
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.personnamn: object
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.personnamn.fornamn: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.personnamn.efternamn: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn: object
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.typ: object
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.typ.kod: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.typ.klartext: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.organisationsnamn.namn: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet: object
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.typ: object
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.typ.kod: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.typ.klartext: string
+* firmateckningsutfallJaSvar.firmateckningsutfallOrsak.firmateckningskombination.funktionarer.identitet.identitetsbeteckning: string
+* firmateckningsutfallJaSvar.namnKanEjListas: boolean
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ: array<array<object>>
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.personnamn: object
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.personnamn.fornamn: string
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.personnamn.efternamn: string
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn: object
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn.typ: object
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn.typ.kod: string
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn.typ.klartext: string
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.organisationsnamn.namn: string
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.identitet: object
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.identitet.typ: object
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.identitet.typ.kod: string
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.identitet.typ.klartext: string
+* firmateckningsutfallJaSvar.firmateckningsutfallJatillsammansAlternativ.identitet.identitetsbeteckning: string
+* firmateckningsutfallNejSvar: object
+* firmateckningsutfallNejSvar.alternativ: string
+
+Mapping:
+
+* utfall -> utfall
+* firmateckningsutfallJaSvar -> firmateckningsutfallJaSvar
+* firmateckningsutfallNejSvar -> firmateckningsutfallNejSvar
+
+Rules:
+
+* type conversion: none
+* optional/missing handling: firmateckningsutfallJaSvar is populated when utfall = JA; firmateckningsutfallNejSvar is populated when utfall = NEJ; nested objects and arrays may be empty or omitted
+* special parsing: validate utfall enum values as JA or NEJ; validate firmateckningsutfallJaSvar.alternativ enum values as ENSAM, LOPANDE, TILLSAMMANS, FULLMAKT; validate firmateckningsutfallNejSvar.alternativ enum values as EJ_AKTIV_ORGANISATION, EJ_FUNKTIONAR, EJ_FIRMATECKNARE; firmateckningsutfallJatillsammansAlternativ is an array of alternative valid signer combinations
+
+Target type:
+{
+"utfall": "string",
+"firmateckningsutfallJaSvar": [
+{
+"alternativ": "string",
+"firmateckningsutfallOrsak": {
+"firmateckningskombination": [
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"ordning": "number",
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"funktionarer": [
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+}
+]
+}
+]
+},
+"namnKanEjListas": "boolean",
+"firmateckningsutfallJatillsammansAlternativ": [
+[
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+}
+]
+]
+}
+],
+"firmateckningsutfallNejSvar": {
+"alternativ": "string"
+}
+}

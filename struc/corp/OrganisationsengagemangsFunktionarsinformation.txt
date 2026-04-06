@@ -1,0 +1,94 @@
+Schema name: OrganisationsengagemangsFunktionarsinformation
+API: Bolagsverket Person API
+Response path: Organisationsengagemangsinformation.funktionarsOrganisationsengagemang.funktionar
+
+Raw structure:
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"arFirmatecknare": "JA",
+"anteckning": "string"
+}
+
+Fields:
+
+* personnamn.fornamn: string
+* personnamn.efternamn: string
+* organisationsnamn.typ.kod: string
+* organisationsnamn.typ.klartext: string
+* organisationsnamn.namn: string
+* identitet.typ.kod: string
+* identitet.typ.klartext: string
+* identitet.identitetsbeteckning: string
+* funktionarsroller: array<object>
+* funktionarsroller.kod: string
+* funktionarsroller.klartext: string
+* arFirmatecknare: string
+* anteckning: string
+
+Mapping:
+
+* personnamn -> personnamn
+* organisationsnamn -> organisationsnamn
+* identitet -> identitet
+* funktionarsroller -> funktionarsroller
+* arFirmatecknare -> arFirmatecknare
+* anteckning -> anteckning
+
+Rules:
+
+* type conversion: ensure all fields remain string except arrays; convert nothing unless internal model requires
+* optional/missing handling: personnamn, organisationsnamn, funktionarsroller, anteckning may be null depending on entity type (person vs legal entity)
+* special parsing: validate arFirmatecknare against allowed enum values (JA, NEJ)
+
+Target type:
+{
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"arFirmatecknare": "string",
+"anteckning": "string"
+}

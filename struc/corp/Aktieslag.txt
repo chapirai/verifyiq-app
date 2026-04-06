@@ -1,0 +1,51 @@
+Schema name: Aktieslag
+API: organisations/lookup
+Response path: response.body[].aktieinformation.aktieslag[]
+
+Raw structure:
+{
+"namn": "A",
+"antal": 1000,
+"aktieslagGranser": {
+"lagst": 1000,
+"hogst": 10000
+},
+"rostvarde": "1"
+}
+
+Fields:
+
+* namn: string
+* antal: integer
+* aktieslagGranser: object
+* aktieslagGranser.lagst: integer
+* aktieslagGranser.hogst: integer
+* rostvarde: string
+
+Mapping:
+
+* namn -> name
+* antal -> shareCount
+* aktieslagGranser -> shareLimits
+* aktieslagGranser.lagst -> shareLimits.min
+* aktieslagGranser.hogst -> shareLimits.max
+* rostvarde -> votingValue
+
+Rules:
+
+* antal: int64, must be handled without precision loss
+* aktieslagGranser.lagst and hogst: int64, same constraint as above
+* rostvarde: string (not numeric), preserve as-is (can contain non-integer formats)
+* aktieslagGranser is optional and may be missing
+* missing fields should be null or omitted, not defaulted
+
+Target type:
+{
+"name": "A",
+"shareCount": 1000,
+"shareLimits": {
+"min": 1000,
+"max": 10000
+},
+"votingValue": "1"
+}

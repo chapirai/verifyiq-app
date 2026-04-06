@@ -1,0 +1,229 @@
+Schema name: ArendeType
+API: Bolagsverket Arende API
+Response path: ArendeResponse[]
+
+Raw structure:
+{
+"ankommetDatum": "2024-01-01",
+"skapatTidpunkt": "2008-05-02T13:48:03.580+02:00",
+"avslutatTidpunkt": "2008-10-20T11:13:26.020+02:00",
+"korrigeratDatum": "2024-01-01",
+"arendenummer": "210347/2008",
+"atagandeid": "string",
+"konsumentreferens": "string",
+"inskicksidentitet": "string",
+"uppladdningsid": "string",
+"samladInskicksidentitet": "string",
+"aktid": "UppladdningsidBI=123;UppladdningsidFI=789",
+"arendeslag": {
+"kod": "string",
+"klartext": "string"
+},
+"arendetyp": {
+"kod": "string",
+"klartext": "string"
+},
+"arendeaktorer": [
+{
+"identitet": {
+"typ": {}
+},
+"namn": "string",
+"organisationsform": {},
+"arenderoll": {},
+"kontaktuppgiftIArende": {
+"postadress": {}
+}
+}
+],
+"sakfragor": [
+{
+"sakfraga": {},
+"avslutsorsak": {}
+}
+],
+"arendestatus": {
+"kod": "string",
+"klartext": "string"
+},
+"handlaggningsstatus": {
+"kod": "string",
+"klartext": "string"
+},
+"arendesamband": [
+{
+"utgarFranArendenummer": "string",
+"fortsatterIArendenummer": "string",
+"arendesambandstyp": {}
+}
+],
+"totalAvgift": 0,
+"betaltBelopp": 0,
+"ocrNummer": "string",
+"arendeinitiativ": {
+"kod": "string",
+"klartext": "string"
+},
+"arendekanal": {
+"kod": "string",
+"klartext": "string"
+},
+"arendekanalUndertyp": {
+"kod": "string",
+"klartext": "string"
+}
+}
+
+Fields:
+
+* ankommetDatum: string
+* skapatTidpunkt: string
+* avslutatTidpunkt: string
+* korrigeratDatum: string
+* arendenummer: string
+* atagandeid: string
+* konsumentreferens: string
+* inskicksidentitet: string
+* uppladdningsid: string
+* samladInskicksidentitet: string
+* aktid: string
+* arendeslag.kod: string
+* arendeslag.klartext: string
+* arendetyp.kod: string
+* arendetyp.klartext: string
+* arendeaktorer: array<object>
+* arendeaktorer.identitet.typ.kod: string
+* arendeaktorer.identitet.typ.klartext: string
+* arendeaktorer.identitet.identitetsbeteckning: string
+* arendeaktorer.namn: string
+* arendeaktorer.organisationsform.kod: string
+* arendeaktorer.organisationsform.klartext: string
+* arendeaktorer.arenderoll.kod: string
+* arendeaktorer.arenderoll.klartext: string
+* arendeaktorer.kontaktuppgiftIArende.postadress.adress: string
+* arendeaktorer.kontaktuppgiftIArende.postadress.postnummer: string
+* arendeaktorer.kontaktuppgiftIArende.postadress.postort: string
+* sakfragor: array<object>
+* sakfragor.sakfraga.kod: string
+* sakfragor.sakfraga.klartext: string
+* sakfragor.avslutsorsak.kod: string
+* sakfragor.avslutsorsak.klartext: string
+* arendestatus.kod: string
+* arendestatus.klartext: string
+* handlaggningsstatus.kod: string
+* handlaggningsstatus.klartext: string
+* arendesamband: array<object>
+* arendesamband.utgarFranArendenummer: string
+* arendesamband.fortsatterIArendenummer: string
+* arendesamband.arendesambandstyp.kod: string
+* arendesamband.arendesambandstyp.klartext: string
+* totalAvgift: number
+* betaltBelopp: number
+* ocrNummer: string
+* arendeinitiativ.kod: string
+* arendeinitiativ.klartext: string
+* arendekanal.kod: string
+* arendekanal.klartext: string
+* arendekanalUndertyp.kod: string
+* arendekanalUndertyp.klartext: string
+
+Mapping:
+
+* ankommetDatum -> receivedDate
+* skapatTidpunkt -> createdAt
+* avslutatTidpunkt -> completedAt
+* korrigeratDatum -> correctedDate
+* arendenummer -> caseNumber
+* arendeslag -> caseCategory
+* arendetyp -> caseType
+* arendestatus -> caseStatus
+* handlaggningsstatus -> processingStatus
+* arendeaktorer -> caseActors
+* sakfragor -> subjectMatters
+* arendesamband -> caseRelations
+* totalAvgift -> totalFee
+* betaltBelopp -> paidAmount
+* ocrNummer -> ocrNumber
+
+Rules:
+
+* type conversion: ankommetDatum and korrigeratDatum (YYYY-MM-DD) → Date; skapatTidpunkt and avslutatTidpunkt (ISO datetime) → DateTime
+* optional/missing handling: avslutatTidpunkt, korrigeratDatum, arendeaktorer, sakfragor, arendesamband, ocrNummer may be missing depending on case lifecycle
+* special parsing: aktid may contain multiple values separated by semicolon; arendeaktorer must always be treated as array even if single element
+
+Target type:
+{
+"receivedDate": "date",
+"createdAt": "datetime",
+"completedAt": "datetime",
+"correctedDate": "date",
+"caseNumber": "string",
+"caseCategory": {
+"kod": "string",
+"klartext": "string"
+},
+"caseType": {
+"kod": "string",
+"klartext": "string"
+},
+"caseStatus": {
+"kod": "string",
+"klartext": "string"
+},
+"processingStatus": {
+"kod": "string",
+"klartext": "string"
+},
+"caseActors": [
+{
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"namn": "string",
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"arenderoll": {
+"kod": "string",
+"klartext": "string"
+},
+"kontaktuppgiftIArende": {
+"postadress": {
+"adress": "string",
+"postnummer": "string",
+"postort": "string"
+}
+}
+}
+],
+"subjectMatters": [
+{
+"sakfraga": {
+"kod": "string",
+"klartext": "string"
+},
+"avslutsorsak": {
+"kod": "string",
+"klartext": "string"
+}
+}
+],
+"caseRelations": [
+{
+"utgarFranArendenummer": "string",
+"fortsatterIArendenummer": "string",
+"arendesambandstyp": {
+"kod": "string",
+"klartext": "string"
+}
+}
+],
+"totalFee": "number",
+"paidAmount": "number",
+"ocrNumber": "string"
+}

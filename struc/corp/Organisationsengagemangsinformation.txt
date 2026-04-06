@@ -1,0 +1,143 @@
+Schema name: Organisationsengagemangsinformation
+API: Bolagsverket Person API
+Response path: response body
+
+Raw structure:
+{
+"totaltAntalTraffar": 79,
+"sida": 0,
+"antalPerSida": 10,
+"funktionarsOrganisationsengagemang": [
+{
+"organisation": {
+"identitet": {},
+"organisationsnamn": {},
+"organisationsform": {},
+"organisationsstatusar": []
+},
+"funktionar": {
+"personnamn": {},
+"organisationsnamn": {},
+"identitet": {},
+"funktionarsroller": []
+}
+}
+]
+}
+
+Fields:
+
+* totaltAntalTraffar: integer<int32>
+* sida: integer<int32>
+* antalPerSida: integer<int32>
+* funktionarsOrganisationsengagemang: array<object>
+* funktionarsOrganisationsengagemang.organisation.identitet.typ.kod: string
+* funktionarsOrganisationsengagemang.organisation.identitet.typ.klartext: string
+* funktionarsOrganisationsengagemang.organisation.identitetsbeteckning: string
+* funktionarsOrganisationsengagemang.organisation.namnskyddslopnummer: integer
+* funktionarsOrganisationsengagemang.organisation.organisationsnamn.typ.kod: string
+* funktionarsOrganisationsengagemang.organisation.organisationsnamn.typ.klartext: string
+* funktionarsOrganisationsengagemang.organisation.organisationsnamn.namn: string
+* funktionarsOrganisationsengagemang.organisation.organisationsform.kod: string
+* funktionarsOrganisationsengagemang.organisation.organisationsform.klartext: string
+* funktionarsOrganisationsengagemang.organisation.organisationsstatusar: array<object>
+* funktionarsOrganisationsengagemang.organisation.organisationsstatusar.kod: string
+* funktionarsOrganisationsengagemang.organisation.organisationsstatusar.klartext: string
+* funktionarsOrganisationsengagemang.organisation.organisationsstatusar.typ: string
+* funktionarsOrganisationsengagemang.organisation.organisationsstatusar.datum: string<date>
+* funktionarsOrganisationsengagemang.funktionar.personnamn.fornamn: string
+* funktionarsOrganisationsengagemang.funktionar.personnamn.efternamn: string
+* funktionarsOrganisationsengagemang.funktionar.organisationsnamn.typ.kod: string
+* funktionarsOrganisationsengagemang.funktionar.organisationsnamn.typ.klartext: string
+* funktionarsOrganisationsengagemang.funktionar.organisationsnamn.namn: string
+* funktionarsOrganisationsengagemang.funktionar.identitet.typ.kod: string
+* funktionarsOrganisationsengagemang.funktionar.identitet.typ.klartext: string
+* funktionarsOrganisationsengagemang.funktionar.identitet.identitetsbeteckning: string
+* funktionarsOrganisationsengagemang.funktionar.funktionarsroller: array<object>
+* funktionarsOrganisationsengagemang.funktionar.funktionarsroller.kod: string
+* funktionarsOrganisationsengagemang.funktionar.funktionarsroller.klartext: string
+* funktionarsOrganisationsengagemang.funktionar.arFirmatecknare: string
+* funktionarsOrganisationsengagemang.funktionar.anteckning: string
+
+Mapping:
+
+* totaltAntalTraffar -> totalHits
+* sida -> page
+* antalPerSida -> pageSize
+* funktionarsOrganisationsengagemang -> engagements
+* funktionarsOrganisationsengagemang.organisation -> engagements.organisation
+* funktionarsOrganisationsengagemang.funktionar -> engagements.funktionar
+
+Rules:
+
+* type conversion: convert organisationsstatusar.datum to Date only if internal model requires it; keep integer<int32> values numeric
+* optional/missing handling: funktionarsOrganisationsengagemang may be empty; namnskyddslopnummer, organisationsstatusar, personnamn, organisationsnamn, arFirmatecknare, and anteckning may be missing or null depending on entity type and response payload
+* special parsing: validate funktionar.arFirmatecknare against allowed enum values (JA, NEJ)
+
+Target type:
+{
+"totalHits": "integer<int32>",
+"page": "integer<int32>",
+"pageSize": "integer<int32>",
+"engagements": [
+{
+"organisation": {
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"namnskyddslopnummer": "integer",
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"organisationsstatusar": [
+{
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "string<date>"
+}
+]
+},
+"funktionar": {
+"personnamn": {
+"fornamn": "string",
+"efternamn": "string"
+},
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"funktionarsroller": [
+{
+"kod": "string",
+"klartext": "string"
+}
+],
+"arFirmatecknare": "string",
+"anteckning": "string"
+}
+}
+]
+}

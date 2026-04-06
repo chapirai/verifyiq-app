@@ -1,0 +1,31 @@
+Schema name: Personnamn
+API: organisations/lookup
+Response path: multiple
+
+Raw structure:
+{
+"fornamn": "string",
+"efternamn": "string"
+}
+
+Fields:
+
+* fornamn: string
+* efternamn: string
+
+Mapping:
+
+* fornamn -> firstName
+* efternamn -> lastName
+
+Rules:
+
+* both fields are strings and should be preserved as-is
+* values may contain special characters and must not be altered
+* missing fields should be null or omitted, not defaulted
+
+Target type:
+{
+"firstName": "string",
+"lastName": "string"
+}

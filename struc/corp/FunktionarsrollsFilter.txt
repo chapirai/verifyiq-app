@@ -1,0 +1,31 @@
+Schema name: FunktionarsrollsFilter
+API: Bolagsverket Person API
+Response path: OrganisationsengagemangRequest.filtrering.*
+
+Raw structure:
+{
+"attribut": "string",
+"varde": "AK"
+}
+
+Fields:
+
+* attribut: string
+* varde: string
+
+Mapping:
+
+* attribut -> attribut
+* varde -> varde
+
+Rules:
+
+* type conversion: ensure attribut and varde are strings
+* optional/missing handling: both attribut and varde are required; object should be rejected if either is missing
+* special parsing: validate varde against allowed enum values (AK, ARB, BO, DELG, EFT, EVD, EVVD, FO, FTR, FV, HREV, HREVH, HREVS, IN, KD, KP, LE, LI, LS, OF, PO, REP, REV, REVH, REVL, REVS, REVSL, REVST, REVT, SU, SVD, VD, VLE, VOF, VVD)
+
+Target type:
+{
+"attribut": "string",
+"varde": "string"
+}

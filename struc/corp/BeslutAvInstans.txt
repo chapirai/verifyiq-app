@@ -1,0 +1,38 @@
+Schema name: BeslutAvInstans
+API: Bolagsverket Aktie API
+Response path: *.beslutAvInstans
+
+Raw structure:
+{
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "2019-08-24"
+}
+
+Fields:
+
+* instanstyp.kod: string
+* instanstyp.klartext: string
+* beslutsdatum: string<date>
+
+Mapping:
+
+* instanstyp -> instanstyp
+* beslutsdatum -> beslutsdatum
+
+Rules:
+
+* type conversion: convert beslutsdatum to Date only if internal model requires it
+* optional/missing handling: instanstyp may be null or partially populated; beslutsdatum may be missing in edge cases
+* special parsing: none
+
+Target type:
+{
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+}

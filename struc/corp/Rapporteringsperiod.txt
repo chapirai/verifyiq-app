@@ -1,0 +1,31 @@
+Schema name: Rapporteringsperiod
+API: Bolagsverket Financial API
+Response path: Arsredovisning.rapporteringsperiod
+
+Raw structure:
+{
+"periodFrom": "2024-12-31",
+"periodTom": "2024-12-31"
+}
+
+Fields:
+
+* periodFrom: string<date>
+* periodTom: string<date>
+
+Mapping:
+
+* periodFrom -> periodFrom
+* periodTom -> periodTom
+
+Rules:
+
+* type conversion: both fields should be parsed as date (ISO 8601) if your internal model supports date types, otherwise keep as string
+* optional/missing handling: both fields may be null or missing depending on report completeness
+* validation: periodFrom should be ≤ periodTom when both exist
+
+Target type:
+{
+"periodFrom": "string<date>",
+"periodTom": "string<date>"
+}

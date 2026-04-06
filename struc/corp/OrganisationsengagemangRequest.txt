@@ -1,0 +1,84 @@
+Schema name: OrganisationsengagemangRequest
+API: Bolagsverket Person API
+Response path: request body
+
+Raw structure:
+{
+"identitetsbeteckning": "string",
+"paginering": {
+"sida": 0,
+"antalPerSida": 10
+},
+"sortering": {
+"attribut": "ORGANISATIONSFORM",
+"sorteringsordning": "ASC"
+},
+"filtrering": {
+"must": [
+{}
+],
+"mustNot": [
+{}
+],
+"should": [
+{}
+]
+}
+}
+
+Fields:
+
+* identitetsbeteckning: string
+* paginering.sida: integer<int32>
+* paginering.antalPerSida: integer<int32>
+* sortering.attribut: string
+* sortering.sorteringsordning: string
+* filtrering.must: array<object>
+* filtrering.must.attribut: string
+* filtrering.mustNot: array<object>
+* filtrering.mustNot.attribut: string
+* filtrering.should: array<object>
+* filtrering.should.attribut: string
+
+Mapping:
+
+* identitetsbeteckning -> identitetsbeteckning
+* paginering -> paginering
+* sortering -> sortering
+* filtrering -> filtrering
+
+Rules:
+
+* type conversion: ensure sida and antalPerSida are integers; enforce enum validation for sortering.attribut and sortering.sorteringsordning
+* optional/missing handling: paginering, sortering, and filtrering are optional; defaults apply (sida=0, antalPerSida=1000, sorting by REGISTRERINGSTIDPUNKT DESC)
+* special parsing: validate allowed values for sortering.attribut (ORGANISATIONSFORM, REGISTRERINGSTIDPUNKT) and sorteringsordning (ASC, DESC)
+
+Target type:
+{
+"identitetsbeteckning": "string",
+"paginering": {
+"sida": "integer<int32>",
+"antalPerSida": "integer<int32>"
+},
+"sortering": {
+"attribut": "string",
+"sorteringsordning": "string"
+},
+"filtrering": {
+"must": [
+{
+"attribut": "string"
+}
+],
+"mustNot": [
+{
+"attribut": "string"
+}
+],
+"should": [
+{
+"attribut": "string"
+}
+]
+}
+}

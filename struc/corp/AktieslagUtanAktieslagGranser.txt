@@ -1,0 +1,36 @@
+Schema name: AktieslagUtanAktieslagGranser
+API: organisations/lookup
+Response path: response.body[].aktieinformation.aktieslag[]
+
+Raw structure:
+{
+"namn": "A",
+"antal": 1000,
+"rostvarde": "1"
+}
+
+Fields:
+
+* namn: string
+* antal: integer
+* rostvarde: string
+
+Mapping:
+
+* namn -> name
+* antal -> shareCount
+* rostvarde -> votingValue
+
+Rules:
+
+* antal: int64, must be handled without precision loss
+* rostvarde: string, preserve as-is (can contain non-integer formats)
+* this schema variant excludes aktieslagGranser entirely
+* missing fields should be null or omitted, not defaulted
+
+Target type:
+{
+"name": "A",
+"shareCount": 1000,
+"votingValue": "1"
+}

@@ -1,0 +1,27 @@
+Schema name: Filter
+API: Bolagsverket Person API
+Response path: OrganisationsengagemangRequest.filtrering.*
+
+Raw structure:
+{
+"attribut": "string"
+}
+
+Fields:
+
+* attribut: string
+
+Mapping:
+
+* attribut -> attribut
+
+Rules:
+
+* type conversion: ensure attribut is string
+* optional/missing handling: attribut is required; object should be rejected if missing
+* special parsing: none
+
+Target type:
+{
+"attribut": "string"
+}

@@ -1,0 +1,143 @@
+Schema name: Organisationsengagemang
+API: organisations/lookup
+Response path: response.body[].organisationsengagemang[]
+
+Raw structure:
+[
+{
+"organisation": {
+"identitet": {
+"typ": {}
+},
+"namnskyddslopnummer": 2,
+"personnamn": {},
+"organisationsnamn": {
+"typ": {}
+},
+"organisationsform": {},
+"organisationsstatusar": [
+{}
+]
+},
+"funktionar": {
+"personnamn": {},
+"organisationsnamn": {
+"typ": {}
+},
+"identitet": {
+"typ": {}
+},
+"funktionarsroller": [
+{}
+],
+"postadress": {
+"land": {}
+},
+"representerasAv": {
+"personnamn": {},
+"identitet": {}
+},
+"insats": "string",
+"anteckning": "string"
+}
+}
+]
+
+Fields:
+
+* organisation: object
+* organisation.identitet: object
+* organisation.identitet.typ: object
+* organisation.namnskyddslopnummer: integer
+* organisation.personnamn: object
+* organisation.organisationsnamn: object
+* organisation.organisationsnamn.typ: object
+* organisation.organisationsform: object
+* organisation.organisationsstatusar: array[object]
+* funktionar: object
+* funktionar.personnamn: object
+* funktionar.organisationsnamn: object
+* funktionar.organisationsnamn.typ: object
+* funktionar.identitet: object
+* funktionar.identitet.typ: object
+* funktionar.funktionarsroller: array[object]
+* funktionar.postadress: object
+* funktionar.postadress.land: object
+* funktionar.representerasAv: object
+* funktionar.representerasAv.personnamn: object
+* funktionar.representerasAv.identitet: object
+* funktionar.insats: string
+* funktionar.anteckning: string
+
+Mapping:
+
+* organisation -> organization
+* organisation.identitet -> organization.identity
+* organisation.namnskyddslopnummer -> organization.sequenceNumber
+* organisation.personnamn -> organization.personName
+* organisation.organisationsnamn -> organization.organizationName
+* organisation.organisationsform -> organization.organizationForm
+* organisation.organisationsstatusar -> organization.statuses
+* funktionar -> officer
+* funktionar.personnamn -> officer.personName
+* funktionar.organisationsnamn -> officer.organizationName
+* funktionar.identitet -> officer.identity
+* funktionar.funktionarsroller -> officer.roles
+* funktionar.postadress -> officer.address
+* funktionar.representerasAv -> officer.representedBy
+* funktionar.insats -> officer.contribution
+* funktionar.anteckning -> officer.note
+
+Rules:
+
+* array of engagements, must preserve order
+* organisation and funktionar are separate nested objects and must not be merged
+* namnskyddslopnummer: integer, preserve as-is
+* organisationsstatusar: array of KodKlartextDatum objects
+* funktionarsroller: array of KodKlartext objects
+* personnamn vs organisationsnamn: may vary depending on entity type
+* representerasAv only present when applicable
+* insats only relevant for Kommanditbolag
+* nested structures must not be flattened
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+[
+{
+"organization": {
+"identity": {
+"typ": {}
+},
+"sequenceNumber": 2,
+"personName": {},
+"organizationName": {
+"typ": {}
+},
+"organizationForm": {},
+"statuses": [
+{}
+]
+},
+"officer": {
+"personName": {},
+"organizationName": {
+"typ": {}
+},
+"identity": {
+"typ": {}
+},
+"roles": [
+{}
+],
+"address": {
+"land": {}
+},
+"representedBy": {
+"personName": {},
+"identity": {}
+},
+"contribution": "string",
+"note": "string"
+}
+}
+]

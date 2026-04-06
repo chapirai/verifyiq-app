@@ -1,0 +1,102 @@
+Schema name: Rapporter
+API: organisations/lookup
+Response path: response.body[].finansiellaRapporter[].rapporter[]
+
+Raw structure:
+{
+"rapporteringsperiod": {
+"periodFrom": "string",
+"periodTom": "string"
+},
+"rapportTyp": {
+"kod": "string",
+"klartext": "string"
+},
+"ankomDatum": "string",
+"handlaggningAvslutadDatum": "string",
+"registreradDatum": "string",
+"bolagsstammansForlangningDatum": "string",
+"innehallerKoncernredovisning": true,
+"vinstutdelning": {
+"beslutadDatum": "string",
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"belopp": 0
+}
+}
+
+Fields:
+
+* rapporteringsperiod: object
+* rapporteringsperiod.periodFrom: string
+* rapporteringsperiod.periodTom: string
+* rapportTyp: object
+* rapportTyp.kod: string
+* rapportTyp.klartext: string
+* ankomDatum: string
+* handlaggningAvslutadDatum: string
+* registreradDatum: string
+* bolagsstammansForlangningDatum: string
+* innehallerKoncernredovisning: boolean
+* vinstutdelning: object
+* vinstutdelning.beslutadDatum: string
+* vinstutdelning.valuta: object
+* vinstutdelning.valuta.kod: string
+* vinstutdelning.valuta.klartext: string
+* vinstutdelning.belopp: number
+
+Mapping:
+
+* rapporteringsperiod -> reportingPeriod
+* rapporteringsperiod.periodFrom -> reportingPeriod.from
+* rapporteringsperiod.periodTom -> reportingPeriod.to
+* rapportTyp -> reportType
+* rapportTyp.kod -> reportType.code
+* rapportTyp.klartext -> reportType.text
+* ankomDatum -> receivedDate
+* handlaggningAvslutadDatum -> processingCompletedDate
+* registreradDatum -> registrationDate
+* bolagsstammansForlangningDatum -> meetingExtensionDate
+* innehallerKoncernredovisning -> containsConsolidatedAccounts
+* vinstutdelning -> dividend
+* vinstutdelning.beslutadDatum -> dividend.decisionDate
+* vinstutdelning.valuta -> dividend.currency
+* vinstutdelning.valuta.kod -> dividend.currency.code
+* vinstutdelning.valuta.klartext -> dividend.currency.text
+* vinstutdelning.belopp -> dividend.amount
+
+Rules:
+
+* all date fields are strings and should be preserved as-is
+* rapportTyp and valuta are KodKlartext objects and must retain both code and text
+* vinstutdelning is optional and may be missing
+* belopp: numeric, preserve precision
+* innehallerKoncernredovisning: boolean, do not default if missing
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"reportingPeriod": {
+"from": "string",
+"to": "string"
+},
+"reportType": {
+"code": "string",
+"text": "string"
+},
+"receivedDate": "string",
+"processingCompletedDate": "string",
+"registrationDate": "string",
+"meetingExtensionDate": "string",
+"containsConsolidatedAccounts": true,
+"dividend": {
+"decisionDate": "string",
+"currency": {
+"code": "string",
+"text": "string"
+},
+"amount": 0
+}
+}

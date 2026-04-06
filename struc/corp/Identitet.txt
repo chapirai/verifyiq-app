@@ -1,0 +1,41 @@
+Schema name: Identitet
+API: organisations/lookup
+Response path: response.body[].identitet
+
+Raw structure:
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+}
+
+Fields:
+
+* typ: object
+* typ.kod: string
+* typ.klartext: string
+* identitetsbeteckning: string
+
+Mapping:
+
+* typ -> type
+* typ.kod -> type.code
+* typ.klartext -> type.text
+* identitetsbeteckning -> number
+
+Rules:
+
+* identitetsbeteckning: string, must not be converted to numeric type
+* typ: KodKlartext object, preserve both code and text
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"type": {
+"code": "string",
+"text": "string"
+},
+"number": "string"
+}

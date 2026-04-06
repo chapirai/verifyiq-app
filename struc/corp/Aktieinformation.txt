@@ -1,0 +1,138 @@
+Schema name: Aktieinformation
+API: organisations/lookup
+Response path: response.body[].aktieinformation
+
+Raw structure:
+{
+"aktiekapital": {
+"belopp": 12000,
+"valuta": "SEK"
+},
+"antalAktier": 1200,
+"aktiegranser": {
+"aktiekapitalGranser": {
+"lagst": 25000,
+"hogst": 100000
+},
+"antalAktierGranser": {
+"lagst": 1000,
+"hogst": 10000
+},
+"valuta": "SEK"
+},
+"aktieslag": [
+{
+"namn": "A",
+"antal": 1000,
+"aktieslagGranser": {},
+"rostvarde": "1"
+}
+],
+"fritext": "Antalet aktier av respektive slag får motsvara högst hela antalet aktier i bolaget.",
+"kvotvarde": {
+"belopp": 12000,
+"valuta": "SEK"
+},
+"nedsattningPagar": true
+}
+
+Fields:
+
+* aktiekapital: object
+* aktiekapital.belopp: number
+* aktiekapital.valuta: string
+* antalAktier: integer
+* aktiegranser: object
+* aktiegranser.aktiekapitalGranser: object
+* aktiegranser.aktiekapitalGranser.lagst: number
+* aktiegranser.aktiekapitalGranser.hogst: number
+* aktiegranser.antalAktierGranser: object
+* aktiegranser.antalAktierGranser.lagst: integer
+* aktiegranser.antalAktierGranser.hogst: integer
+* aktiegranser.valuta: string
+* aktieslag: array[object]
+* aktieslag.namn: string
+* aktieslag.antal: integer
+* aktieslag.aktieslagGranser: object
+* aktieslag.aktieslagGranser.lagst: integer
+* aktieslag.aktieslagGranser.hogst: integer
+* aktieslag.rostvarde: string
+* fritext: string
+* kvotvarde: object
+* kvotvarde.belopp: number
+* kvotvarde.valuta: string
+* nedsattningPagar: boolean
+
+Mapping:
+
+* aktiekapital -> shareCapital
+* aktiekapital.belopp -> shareCapital.amount
+* aktiekapital.valuta -> shareCapital.currency
+* antalAktier -> totalShares
+* aktiegranser -> shareLimits
+* aktiegranser.aktiekapitalGranser -> shareLimits.capitalLimits
+* aktiegranser.aktiekapitalGranser.lagst -> shareLimits.capitalLimits.min
+* aktiegranser.aktiekapitalGranser.hogst -> shareLimits.capitalLimits.max
+* aktiegranser.antalAktierGranser -> shareLimits.shareCountLimits
+* aktiegranser.antalAktierGranser.lagst -> shareLimits.shareCountLimits.min
+* aktiegranser.antalAktierGranser.hogst -> shareLimits.shareCountLimits.max
+* aktiegranser.valuta -> shareLimits.currency
+* aktieslag -> shareClasses
+* aktieslag.namn -> shareClasses[].name
+* aktieslag.antal -> shareClasses[].count
+* aktieslag.aktieslagGranser -> shareClasses[].limits
+* aktieslag.aktieslagGranser.lagst -> shareClasses[].limits.min
+* aktieslag.aktieslagGranser.hogst -> shareClasses[].limits.max
+* aktieslag.rostvarde -> shareClasses[].voteValue
+* fritext -> text
+* kvotvarde -> quotaValue
+* kvotvarde.belopp -> quotaValue.amount
+* kvotvarde.valuta -> quotaValue.currency
+* nedsattningPagar -> reductionInProgress
+
+Rules:
+
+* aktiekapital.belopp and kvotvarde.belopp: decimal number, preserve precision
+* antalAktier and aktieslag.antal: int64, must be handled without precision loss
+* aktieslagGranser may be missing or empty
+* valuta fields: allowed values SEK or EUR
+* rostvarde: string, preserve as-is
+* fritext: free text, do not trim or parse
+* optional/missing nested objects should be null or omitted, not defaulted
+
+Target type:
+{
+"shareCapital": {
+"amount": 12000,
+"currency": "SEK"
+},
+"totalShares": 1200,
+"shareLimits": {
+"capitalLimits": {
+"min": 25000,
+"max": 100000
+},
+"shareCountLimits": {
+"min": 1000,
+"max": 10000
+},
+"currency": "SEK"
+},
+"shareClasses": [
+{
+"name": "A",
+"count": 1000,
+"limits": {
+"min": 1000,
+"max": 10000
+},
+"voteValue": "1"
+}
+],
+"text": "Antalet aktier av respektive slag får motsvara högst hela antalet aktier i bolaget.",
+"quotaValue": {
+"amount": 12000,
+"currency": "SEK"
+},
+"reductionInProgress": true
+}

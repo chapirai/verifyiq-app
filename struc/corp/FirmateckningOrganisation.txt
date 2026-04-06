@@ -1,0 +1,104 @@
+Schema name: FirmateckningOrganisation
+API: Bolagsverket Person API
+Response path: firmateckningInformation.firmateckningOrganisation
+
+Raw structure:
+{
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"namnskyddslopnummer": 1,
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"organisationsstatusar": [
+{
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "2019-08-24"
+}
+],
+"inneliggandeArenden": {
+"antal": 0
+}
+}
+
+Fields:
+
+* identitet.typ.kod: string
+* identitet.typ.klartext: string
+* identitet.identitetsbeteckning: string
+* namnskyddslopnummer: integer
+* organisationsnamn.typ.kod: string
+* organisationsnamn.typ.klartext: string
+* organisationsnamn.namn: string
+* organisationsform.kod: string
+* organisationsform.klartext: string
+* organisationsstatusar: array<object>
+* organisationsstatusar.kod: string
+* organisationsstatusar.klartext: string
+* organisationsstatusar.typ: string
+* organisationsstatusar.datum: string<date>
+* inneliggandeArenden.antal: integer
+
+Mapping:
+
+* identitet -> identitet
+* namnskyddslopnummer -> namnskyddslopnummer
+* organisationsnamn -> organisationsnamn
+* organisationsform -> organisationsform
+* organisationsstatusar -> organisationsstatusar
+* inneliggandeArenden -> inneliggandeArenden
+
+Rules:
+
+* type conversion: convert organisationsstatusar.datum to internal date type only if internal model requires it
+* optional/missing handling: namnskyddslopnummer and inneliggandeArenden may be missing or null depending on organisation type and response payload
+* special parsing: none
+
+Target type:
+{
+"identitet": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"identitetsbeteckning": "string"
+},
+"namnskyddslopnummer": "integer",
+"organisationsnamn": {
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"namn": "string"
+},
+"organisationsform": {
+"kod": "string",
+"klartext": "string"
+},
+"organisationsstatusar": [
+{
+"kod": "string",
+"klartext": "string",
+"typ": "string",
+"datum": "string<date>"
+}
+],
+"inneliggandeArenden": {
+"antal": "integer"
+}
+}

@@ -1,0 +1,59 @@
+Schema name: ApiError
+API: Bolagsverket Common Error Schema
+Response path: error response body
+
+Raw structure:
+{
+"type": "urn:bolagsverket:error:validation",
+"instance": "validation.client",
+"status": 400,
+"timestamp": "2021-02-03T13:45:16.953149+02:00",
+"requestId": "d120654c-0d09-481a-8956-940a76474e6b",
+"title": "Fel format",
+"detail": "Identitetsbeteckning måste vara 10 eller 12 siffror: A7696151111",
+"code": "FM003",
+"source": "identitetsbeteckning.identitet.id"
+}
+
+Fields:
+
+* type: string
+* instance: string
+* status: integer
+* timestamp: string<date-time>
+* requestId: string
+* title: string
+* detail: string
+* code: string
+* source: string
+
+Mapping:
+
+* type -> type
+* instance -> instance
+* status -> status
+* timestamp -> timestamp
+* requestId -> requestId
+* title -> title
+* detail -> detail
+* code -> code
+* source -> source
+
+Rules:
+
+* type conversion: convert timestamp to DateTime only if internal model requires it; keep status as integer
+* optional/missing handling: type, instance, status, title required; detail, code, source, requestId, timestamp may be missing depending on error type
+* special parsing: validate type against known values (about:blank, urn:bolagsverket:error:auth, urn:bolagsverket:error:network, urn:bolagsverket:error:validation)
+
+Target type:
+{
+"type": "string",
+"instance": "string",
+"status": "integer",
+"timestamp": "string<date-time>",
+"requestId": "string",
+"title": "string",
+"detail": "string",
+"code": "string",
+"source": "string"
+}

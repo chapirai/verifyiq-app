@@ -1,0 +1,46 @@
+Schema name: Vinstutdelning
+API: organisations/lookup
+Response path: response.body[].finansiellaRapporter[].rapporter[].vinstutdelning
+
+Raw structure:
+{
+"beslutadDatum": "string",
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"belopp": 0
+}
+
+Fields:
+
+* beslutadDatum: string
+* valuta: object
+* valuta.kod: string
+* valuta.klartext: string
+* belopp: number
+
+Mapping:
+
+* beslutadDatum -> decisionDate
+* valuta -> currency
+* valuta.kod -> currency.code
+* valuta.klartext -> currency.text
+* belopp -> amount
+
+Rules:
+
+* beslutadDatum: date string, preserve as-is
+* valuta: KodKlartext object, must retain both code and text
+* belopp: numeric value, preserve precision
+* missing optional fields should be null or omitted, not defaulted
+
+Target type:
+{
+"decisionDate": "string",
+"currency": {
+"code": "string",
+"text": "string"
+},
+"amount": 0
+}

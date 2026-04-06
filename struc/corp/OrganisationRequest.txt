@@ -1,0 +1,45 @@
+Schema name: OrganisationRequest
+API: organisations/lookup
+Response path: request.body
+
+Raw structure:
+{
+"identitetsbeteckning": "string",
+"namnskyddslopnummer": "1",
+"organisationInformationsmangd": [
+"AKTIEINFORMATION"
+],
+"tidpunkt": "string"
+}
+
+Fields:
+
+* identitetsbeteckning: string
+* namnskyddslopnummer: string
+* organisationInformationsmangd: array[string]
+* tidpunkt: string
+
+Mapping:
+
+* identitetsbeteckning -> organizationId
+* namnskyddslopnummer -> sequenceNumber
+* organisationInformationsmangd -> requestedDataTypes
+* tidpunkt -> timestamp
+
+Rules:
+
+* identitetsbeteckning: required, must be valid organization number format
+* namnskyddslopnummer: optional, may require left-padding (e.g. "1" -> "001")
+* organisationInformationsmangd: optional, default set returned if missing
+* tidpunkt: optional, must be full timestamp (no milliseconds), round up to nearest second if needed
+
+Target type:
+{
+"organizationId": "string",
+"sequenceNumber": "string",
+"requestedDataTypes": [
+"string"
+],
+"timestamp": "string"
+}
+

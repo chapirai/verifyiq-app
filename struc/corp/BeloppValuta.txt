@@ -1,0 +1,24 @@
+BeloppValuta
+Information about amount and currency.
+
+belopp
+number
+Amount.
+
+Example:
+12000
+Multiple of:
+0.000001
+valuta
+string
+The currency can have the following value:
+
+SEK: Swedish Krona
+EUR: Euro
+Allowed values:
+SEK
+EUR
+{
+  "belopp": 12000,
+  "valuta": "SEK"
+}

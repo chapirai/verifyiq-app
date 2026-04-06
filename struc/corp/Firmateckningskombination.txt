@@ -1,0 +1,79 @@
+Schema name: Firmateckningskombination
+API: organisations/lookup
+Response path: response.body[].firmateckning.kodad[]
+
+Raw structure:
+[
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"ordning": 1,
+"funktionarsroller": [
+{}
+],
+"funktionarer": [
+{
+"personnamn": {},
+"organisationsnamn": {},
+"identitet": {}
+}
+]
+}
+]
+
+Fields:
+
+* typ: object
+* typ.kod: string
+* typ.klartext: string
+* ordning: number
+* funktionarsroller: array[object]
+* funktionarer: array[object]
+* funktionarer[].personnamn: object
+* funktionarer[].organisationsnamn: object
+* funktionarer[].identitet: object
+
+Mapping:
+
+* typ -> type
+* typ.kod -> type.code
+* typ.klartext -> type.text
+* ordning -> order
+* funktionarsroller -> roles
+* funktionarer -> officers
+* funktionarer[].personnamn -> officers[].personName
+* funktionarer[].organisationsnamn -> officers[].organizationName
+* funktionarer[].identitet -> officers[].identity
+
+Rules:
+
+* array order must be preserved exactly as provided (signatory rules depend on sequence)
+* ordning: numeric ordering field, must not be re-indexed or recalculated
+* funktionarsroller: array of KodKlartext objects, structure must be preserved
+* funktionarer: array of officer references, nested identity objects must not be flattened
+* empty objects in example indicate full nested schema defined elsewhere
+* missing arrays should be [] if present but empty, otherwise null/omitted
+* this structure is part of a nested array (firmateckning.kodad is array[array]) and must remain nested
+
+Target type:
+[
+{
+"type": {
+"code": "string",
+"text": "string"
+},
+"order": 1,
+"roles": [
+{}
+],
+"officers": [
+{
+"personName": {},
+"organizationName": {},
+"identity": {}
+}
+]
+}
+]

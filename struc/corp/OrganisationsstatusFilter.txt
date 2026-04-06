@@ -1,0 +1,31 @@
+Schema name: OrganisationsstatusFilter
+API: Bolagsverket Person API
+Response path: OrganisationsengagemangRequest.filtrering.*
+
+Raw structure:
+{
+"attribut": "string",
+"varde": "AVREGISTRERAD_ORGANISATION"
+}
+
+Fields:
+
+* attribut: string
+* varde: string
+
+Mapping:
+
+* attribut -> attribut
+* varde -> varde
+
+Rules:
+
+* type conversion: ensure attribut and varde are strings
+* optional/missing handling: both attribut and varde are required; object should be rejected if either is missing
+* special parsing: validate varde against allowed enum values (AVREGISTRERAD_ORGANISATION, AVVECKLINGS_OMSTRUKTURERINGSFORFARANDE)
+
+Target type:
+{
+"attribut": "string",
+"varde": "string"
+}

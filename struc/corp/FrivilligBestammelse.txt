@@ -1,0 +1,42 @@
+Schema name: FrivilligBestammelse
+API: organisations/lookup
+Response path: response.body[].bestammelser.frivilligaBestammelser[]
+
+Raw structure:
+{
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"datum": "2019-08-24"
+}
+
+Fields:
+
+* typ: object
+* typ.kod: string
+* typ.klartext: string
+* datum: string
+
+Mapping:
+
+* typ -> type
+* typ.kod -> type.code
+* typ.klartext -> type.text
+* datum -> date
+
+Rules:
+
+* datum: date string in YYYY-MM-DD format
+* typ: required KodKlartext object, preserve both code and text
+* missing fields should be null or omitted, not defaulted
+* array order should be preserved if multiple voluntary regulations are returned
+
+Target type:
+{
+"type": {
+"code": "string",
+"text": "string"
+},
+"date": "2019-08-24"
+}

@@ -1,0 +1,32 @@
+Schema name: LagstHogstAntal
+API: organisations/lookup
+Response path: multiple
+
+Raw structure:
+{
+"lagst": 1000,
+"hogst": 10000
+}
+
+Fields:
+
+* lagst: integer
+* hogst: integer
+
+Mapping:
+
+* lagst -> min
+* hogst -> max
+
+Rules:
+
+* lagst and hogst: int64, must be handled without precision loss
+* values can be large, avoid casting to floating point
+* both fields may be required depending on context
+* missing fields should be null or omitted, not defaulted
+
+Target type:
+{
+"min": 1000,
+"max": 10000
+}

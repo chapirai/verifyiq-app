@@ -1,0 +1,32 @@
+Schema name: rakenskapsar
+API: organisations/lookup
+Response path: multiple
+
+Raw structure:
+{
+"rakenskapsarInleds": "string",
+"rakenskapsarAvslutas": "string"
+}
+
+Fields:
+
+* rakenskapsarInleds: string
+* rakenskapsarAvslutas: string
+
+Mapping:
+
+* rakenskapsarInleds -> start
+* rakenskapsarAvslutas -> end
+
+Rules:
+
+* both fields are strings and should be preserved as-is
+* values use month-day codes like JAN01, JAN31, DEC16, DEC15
+* do not convert to full dates unless internal parser explicitly requires it
+* missing fields should be null or omitted, not defaulted
+
+Target type:
+{
+"start": "string",
+"end": "string"
+}

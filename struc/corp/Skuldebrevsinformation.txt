@@ -1,0 +1,151 @@
+Schema name: Skuldebrevsinformation
+API: Bolagsverket Aktie API
+Response path: AktiekapitalforandringResponse.skuldebrev
+
+Raw structure:
+{
+"arende": {
+"arendenummer": "1234/2024",
+"avslutatTidpunkt": "2000-01-01T00:00:00.000+02:00"
+},
+"skuldebrev": {
+"lopnummer": "string",
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutAvInstans": {
+"instanstyp": {},
+"beslutsdatum": "2019-08-24"
+},
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"forandringsbelopp": {
+"beslutatBelopp": 0,
+"lagst": 25000,
+"hogst": 100000
+},
+"tecknatBelopp": 0,
+"aktieslag": "string",
+"aktiekapitalKanOkasMedBelopp": 0,
+"teckningsoptioner": {
+"belopp": 0,
+"aktieteckning": {},
+"antal": {},
+"utanLan": true,
+"medLan": true,
+"tidForNyteckning": {}
+},
+"konvertibler": {
+"belopp": 0,
+"utbyte": {}
+},
+"fritext": "string"
+}
+}
+
+Fields:
+
+* arende.arendenummer: string
+* arende.avslutatTidpunkt: string
+* skuldebrev.lopnummer: string
+* skuldebrev.typ.kod: string
+* skuldebrev.typ.klartext: string
+* skuldebrev.beslutAvInstans.instanstyp.kod: string
+* skuldebrev.beslutAvInstans.instanstyp.klartext: string
+* skuldebrev.beslutAvInstans.beslutsdatum: string<date>
+* skuldebrev.valuta.kod: string
+* skuldebrev.valuta.klartext: string
+* skuldebrev.forandringsbelopp.beslutatBelopp: number
+* skuldebrev.forandringsbelopp.lagst: number
+* skuldebrev.forandringsbelopp.hogst: number
+* skuldebrev.tecknatBelopp: number
+* skuldebrev.aktieslag: string
+* skuldebrev.aktiekapitalKanOkasMedBelopp: number
+* skuldebrev.teckningsoptioner.belopp: number
+* skuldebrev.teckningsoptioner.aktieteckning.from: string<date>
+* skuldebrev.teckningsoptioner.aktieteckning.tom: string<date>
+* skuldebrev.teckningsoptioner.antal.faktisktAntal: integer
+* skuldebrev.teckningsoptioner.antal.lagst: number
+* skuldebrev.teckningsoptioner.antal.hogst: number
+* skuldebrev.teckningsoptioner.utanLan: boolean
+* skuldebrev.teckningsoptioner.medLan: boolean
+* skuldebrev.teckningsoptioner.tidForNyteckning.from: string<date>
+* skuldebrev.teckningsoptioner.tidForNyteckning.tom: string<date>
+* skuldebrev.konvertibler.belopp: number
+* skuldebrev.konvertibler.utbyte.from: string<date>
+* skuldebrev.konvertibler.utbyte.tom: string<date>
+* skuldebrev.fritext: string
+
+Mapping:
+
+* arende -> arende
+* skuldebrev -> skuldebrev
+
+Rules:
+
+* type conversion: convert arende.avslutatTidpunkt to DateTime only if internal model requires it; convert all string<date> fields to Date only if internal model requires it; keep number and integer values numeric
+* optional/missing handling: nested objects such as beslutAvInstans, forandringsbelopp, teckningsoptioner, konvertibler, and their subfields may be missing or null depending on debt instrument type
+* special parsing: preserve numeric precision for amount fields; preserve source structure for teckningsoptioner and konvertibler
+
+Target type:
+{
+"arende": {
+"arendenummer": "string",
+"avslutatTidpunkt": "string"
+},
+"skuldebrev": {
+"lopnummer": "string",
+"typ": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutAvInstans": {
+"instanstyp": {
+"kod": "string",
+"klartext": "string"
+},
+"beslutsdatum": "string<date>"
+},
+"valuta": {
+"kod": "string",
+"klartext": "string"
+},
+"forandringsbelopp": {
+"beslutatBelopp": "number",
+"lagst": "number",
+"hogst": "number"
+},
+"tecknatBelopp": "number",
+"aktieslag": "string",
+"aktiekapitalKanOkasMedBelopp": "number",
+"teckningsoptioner": {
+"belopp": "number",
+"aktieteckning": {
+"from": "string<date>",
+"tom": "string<date>"
+},
+"antal": {
+"faktisktAntal": "integer",
+"lagst": "number",
+"hogst": "number"
+},
+"utanLan": "boolean",
+"medLan": "boolean",
+"tidForNyteckning": {
+"from": "string<date>",
+"tom": "string<date>"
+}
+},
+"konvertibler": {
+"belopp": "number",
+"utbyte": {
+"from": "string<date>",
+"tom": "string<date>"
+}
+},
+"fritext": "string"
+}
+}
