@@ -565,12 +565,8 @@ export default function CompanyProfilePage() {
   const documentList = (company?.documentList ?? null) as BvDokument[] | null;
 
   // Resolve display name: skip DEFAULT_COMPANY_NAME fallback and try section names
-  const primaryName =
-    company?.legalName && company.legalName !== DEFAULT_COMPANY_NAME
-      ? company.legalName
-      : null;
   const displayName =
-    primaryName ??
+    (company?.legalName && company.legalName !== DEFAULT_COMPANY_NAME ? company.legalName : null) ??
     hvdSection?.namn ??
     hvdSection?.names?.[0]?.namn ??
     v4Section?.organisationsnamn ??
