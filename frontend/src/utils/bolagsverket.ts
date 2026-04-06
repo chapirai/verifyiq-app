@@ -6,7 +6,7 @@
 export type KodKlartext = { kod?: string; klartext?: string };
 
 /**
- * Convert a `string | KodKlartext | null` value to a plain display string.
+ * Convert a `string | KodKlartext | null | undefined` value to a plain display string.
  * Preference order: klartext → kod → null.
  * Plain strings are returned as-is, keeping output identical for existing data.
  */

@@ -35,10 +35,10 @@ interface HvdStructuredSection {
   juridiskForm: string | KodKlartext | null; organisationsform: string | KodKlartext | null; organisationsdatum: string | null; registreringsdatum: string | null;
   verksamhetsbeskrivning: string | null; naringsgren: MappedIndustryCode[]; statusar: MappedStatus[];
   adresser: MappedAddress[]; postadressOrganisation: MappedAddress | null;
-  reklamsparr: string | null; avregistreradOrganisation: string | null;
-  avregistreringsorsak: string | null; avregistreringsdatum: string | null;
+  reklamsparr: string | KodKlartext | null; avregistreradOrganisation: string | null;
+  avregistreringsorsak: string | KodKlartext | null; avregistreringsdatum: string | null;
   pagaendeAvvecklingsEllerOmstruktureringsforfarande: string | null;
-  verksamOrganisation: string | null; registreringsland: string | null; organisationsidentitet: string | null;
+  verksamOrganisation: string | KodKlartext | null; registreringsland: string | KodKlartext | null; organisationsidentitet: string | null;
   rekonstruktionsstatus: string | KodKlartext | null; rekonstruktionsdatum: string | null;
 }
 
@@ -135,15 +135,15 @@ function HvdDataSection({ hvd }: { hvd: HvdStructuredSection }) {
           <Row label="Company form" value={toText(hvd.organisationsform)} />
           <Row label="Organisation date" value={fmt(hvd.organisationsdatum)} />
           <Row label="Registered" value={fmt(hvd.registreringsdatum)} />
-          <Row label="Country" value={hvd.registreringsland} />
+          <Row label="Country" value={toText(hvd.registreringsland)} />
           <Row label="External identity" value={hvd.organisationsidentitet} />
-          <Row label="Active (Verksam)" value={hvd.verksamOrganisation} />
-          <Row label="Marketing opt-out" value={hvd.reklamsparr} />
+          <Row label="Active (Verksam)" value={toText(hvd.verksamOrganisation)} />
+          <Row label="Marketing opt-out" value={toText(hvd.reklamsparr)} />
           <Row label="Deregistered" value={hvd.avregistreradOrganisation} />
           {(hvd.avregistreringsdatum || hvd.avregistreringsorsak) && (
             <>
               <Row label="Deregistration date" value={fmt(hvd.avregistreringsdatum)} />
-              <Row label="Deregistration reason" value={hvd.avregistreringsorsak} />
+              <Row label="Deregistration reason" value={toText(hvd.avregistreringsorsak)} />
             </>
           )}
           {hvd.pagaendeAvvecklingsEllerOmstruktureringsforfarande && (

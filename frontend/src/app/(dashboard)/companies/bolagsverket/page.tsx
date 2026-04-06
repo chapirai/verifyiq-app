@@ -22,7 +22,7 @@ interface HvdAddress {
 }
 interface HvdOrganisationStatus { status?: string | KodKlartext; statusdatum?: string }
 interface HvdIndustryCode { snikod?: string; snikodText?: string; fel?: BvFel }
-interface HvdDeregistrationInfo { avregistreringsdatum?: string; avregistreringsorsak?: string }
+interface HvdDeregistrationInfo { avregistreringsdatum?: string; avregistreringsorsak?: string | KodKlartext }
 interface HvdRestructuringStatus { rekonstruktionsstatus?: string | KodKlartext; rekonstruktionsdatum?: string }
 interface HvdOrganisation {
   identitetsbeteckning?: string; namn?: string; organisationsform?: string | KodKlartext;
@@ -236,7 +236,7 @@ function HvdSection({ hvd }: { hvd: HighValueDatasetResponse }) {
           {dereg && (
             <>
               <Row label="Deregistered" value={fmt(dereg.avregistreringsdatum)} />
-              <Row label="Deregistration reason" value={dereg.avregistreringsorsak} />
+              <Row label="Deregistration reason" value={toText(dereg.avregistreringsorsak)} />
             </>
           )}
           {rekon?.rekonstruktionsstatus && (

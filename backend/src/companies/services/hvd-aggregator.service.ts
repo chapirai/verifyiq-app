@@ -5,6 +5,7 @@ import {
   HvdOrganisation,
   HvdOrganisationStatus,
 } from '../integrations/bolagsverket.types';
+import { extractKodKlartext } from '../integrations/bolagsverket.mapper';
 import { DataIngestionLogService } from './data-ingestion-log.service';
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -126,7 +127,9 @@ export class HvdAggregatorService {
     const legalForm = this.safeField(primary.organisationsform, 'organisationsform', errorSources);
 
     const statusList: HvdOrganisationStatus[] = primary.organisationsstatusar ?? [];
-    const status = statusList[0]?.status ?? null;
+    const status: string | null = statusList.length > 0
+      ? extractKodKlartext(statusList[0].status) ?? null
+      : null;
 
     const registeredAt = this.safeField(primary.registreringsdatum, 'registreringsdatum', errorSources);
 
@@ -164,7 +167,7 @@ export class HvdAggregatorService {
     // ── Flags (liquidation, bankruptcy, etc.) ────────────────────────────────
     const flags: Record<string, boolean> = {};
     for (const st of statusList) {
-      const s = (st.status ?? '').toLowerCase();
+      const s = (extractKodKlartext(st.status) ?? '').toLowerCase();
       if (s.includes('likvidation')) flags['inLiquidation'] = true;
       if (s.includes('konkurs')) flags['bankrupt'] = true;
       if (s.includes('avregistrerad')) flags['deregistered'] = true;

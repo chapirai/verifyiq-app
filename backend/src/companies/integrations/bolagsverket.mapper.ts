@@ -6,6 +6,8 @@ import {
   HighValueDatasetResponse,
   HvdOrganisation,
   OrganisationInformationResponse,
+  V4OrganisationStatus,
+  V4Hemvistkommun,
 } from './bolagsverket.types';
 
 /** Fallback legal name when none is returned by the API. */
@@ -210,8 +212,10 @@ export interface NormalisedCompany {
   }> | null;
 }
 
-/** Safely extract a plain string from a KodKlartext object or a plain string. */
-function extractKodKlartext(raw: unknown): string | null {
+/** Safely extract a plain string from a KodKlartext object or a plain string.
+ *  Preference order: klartext → kod → text → beskrivning.
+ *  Also handles HVD wrapper objects whose top-level text key is 'beskrivning'. */
+export function extractKodKlartext(raw: unknown): string | null {
   if (raw == null) return null;
   if (typeof raw === 'string') return raw;
   if (typeof raw === 'object') {
@@ -219,6 +223,76 @@ function extractKodKlartext(raw: unknown): string | null {
     if (typeof obj['klartext'] === 'string') return obj['klartext'];
     if (typeof obj['kod'] === 'string') return obj['kod'];
     if (typeof obj['text'] === 'string') return obj['text'];
+    if (typeof obj['beskrivning'] === 'string') return obj['beskrivning'];
+  }
+  return null;
+}
+
+/** Extract a display string from a status entry that can be either:
+ *  - HVD format: `{ status: string | KodKlartext, statusdatum?: string }` — extracts from the nested `status` field.
+ *  - Företagsinformation v4 format: `{ kod, klartext, datum }` — the entry itself IS the KodKlartext.
+ */
+function extractStatusText(entry: { status?: string | { kod?: string; klartext?: string } | null; kod?: string; klartext?: string }): string | null {
+  // HVD format: nested status field
+  const fromStatus = extractKodKlartext(entry.status);
+  if (fromStatus != null) return fromStatus;
+  // v4 format: entry itself has kod/klartext at the top level
+  if (typeof entry.klartext === 'string') return entry.klartext;
+  if (typeof entry.kod === 'string') return entry.kod;
+  return null;
+}
+
+/** Extract a status date from an entry, supporting both HVD (`statusdatum`) and v4 (`datum`) field names. */
+function extractStatusdatum(entry: { statusdatum?: string; datum?: string }): string | null {
+  return entry.statusdatum ?? entry.datum ?? null;
+}
+function extractDateFromWrapper(raw: unknown, ...dateKeys: string[]): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    for (const key of dateKeys) {
+      if (typeof obj[key] === 'string') return obj[key] as string;
+    }
+  }
+  return null;
+}
+
+/** Extract identitetsbeteckning string from an Identitetsbeteckning wrapper object or plain string. */
+function extractIdentitetsbeteckning(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    if (typeof obj['identitetsbeteckning'] === 'string') return obj['identitetsbeteckning'];
+  }
+  return null;
+}
+
+/** Summarise a PagaendeAvvecklingsEllerOmstruktureringsforfarande object as a comma-joined string of klartext/kod values. */
+function extractPagaendeForfarande(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    const list = obj['pagaendeAvvecklingsEllerOmstruktureringsforfarandeLista'];
+    if (Array.isArray(list) && list.length > 0) {
+      const parts = list
+        .map((item: unknown) => {
+          if (typeof item === 'object' && item !== null) {
+            const i = item as Record<string, unknown>;
+            return typeof i['klartext'] === 'string' ? i['klartext']
+              : typeof i['kod'] === 'string' ? i['kod']
+              : null;
+          }
+          return null;
+        })
+        .filter(Boolean);
+      return parts.length > 0 ? parts.join(', ') : null;
+    }
+    // Object exists but list is empty/missing — proceedings are ongoing
+    if (typeof obj['klartext'] === 'string') return obj['klartext'];
+    if (typeof obj['kod'] === 'string') return obj['kod'];
   }
   return null;
 }
@@ -356,30 +430,30 @@ export class BolagsverketMapper {
             })),
           juridiskForm: extractKodKlartext(hvOrg.juridiskForm) ?? null,
           organisationsform: extractKodKlartext(hvOrg.organisationsform) ?? null,
-          organisationsdatum: hvOrg.organisationsdatum ?? null,
+          organisationsdatum: extractDateFromWrapper(hvOrg.organisationsdatum, 'registreringsdatum') ?? null,
           registreringsdatum: hvOrg.registreringsdatum ?? null,
-          verksamhetsbeskrivning: hvOrg.verksamhetsbeskrivning ?? null,
+          verksamhetsbeskrivning: extractKodKlartext(hvOrg.verksamhetsbeskrivning) ?? null,
           naringsgren: (hvOrg.snikoder ?? [])
             .filter((c) => !c.fel)
             .map((c) => ({ snikod: c.snikod ?? null, snikodText: c.snikodText ?? null })),
           statusar: (hvOrg.organisationsstatusar ?? [])
             .filter((s) => !s.fel)
-            .map((s) => ({ status: extractKodKlartext(s.status) ?? s.status ?? null, statusdatum: s.statusdatum ?? null })),
+            .map((s) => ({ status: extractStatusText(s), statusdatum: extractStatusdatum(s) })),
           adresser: (hvOrg.adresser ?? []).filter((a) => !a.fel).map((a) => mapAddress(a)!),
           postadressOrganisation: mapAddress(hvOrg.postadressOrganisation),
-          reklamsparr: hvOrg.reklamsparr ?? null,
-          avregistreradOrganisation: hvOrg.avregistreradOrganisation ?? null,
+          reklamsparr: extractKodKlartext(hvOrg.reklamsparr) ?? null,
+          avregistreradOrganisation: extractDateFromWrapper(hvOrg.avregistreradOrganisation, 'avregistreringsdatum') ?? null,
           avregistreringsorsak: hvOrg.avregistreringsinformation?.fel
             ? null
-            : hvOrg.avregistreringsinformation?.avregistreringsorsak ?? null,
+            : extractKodKlartext(hvOrg.avregistreringsinformation?.avregistreringsorsak) ?? null,
           avregistreringsdatum: hvOrg.avregistreringsinformation?.fel
             ? null
             : hvOrg.avregistreringsinformation?.avregistreringsdatum ?? null,
           pagaendeAvvecklingsEllerOmstruktureringsforfarande:
-            hvOrg.pagaendeAvvecklingsEllerOmstruktureringsforfarande ?? null,
-          verksamOrganisation: hvOrg.verksamOrganisation ?? null,
-          registreringsland: hvOrg.registreringsland ?? null,
-          organisationsidentitet: hvOrg.organisationsidentitet ?? null,
+            extractPagaendeForfarande(hvOrg.pagaendeAvvecklingsEllerOmstruktureringsforfarande) ?? null,
+          verksamOrganisation: extractKodKlartext(hvOrg.verksamOrganisation) ?? null,
+          registreringsland: extractKodKlartext(hvOrg.registreringsland) ?? null,
+          organisationsidentitet: extractIdentitetsbeteckning(hvOrg.organisationsidentitet) ?? null,
           rekonstruktionsstatus: hvOrg.rekonstruktionsstatus?.fel
             ? null
             : hvOrg.rekonstruktionsstatus?.rekonstruktionsstatus ?? null,
@@ -396,15 +470,27 @@ export class BolagsverketMapper {
           identitetsbeteckning: richOrg.identitetsbeteckning ?? null,
           organisationsnamn: richOrg.namn ?? null,
           organisationsform: extractKodKlartext(richOrg.organisationsform) ?? null,
-          organisationsdatum: richOrg.organisationsdatum ?? null,
+          organisationsdatum: extractDateFromWrapper(richOrg.organisationsdatum, 'registreringsdatum', 'bildatDatum') ?? null,
           registreringsdatum: richOrg.registreringsdatum ?? null,
           organisationsstatusar: (richOrg.organisationsstatusar ?? [])
             .filter((s) => !s.fel)
-            .map((s) => ({ status: extractKodKlartext(s.status) ?? s.status ?? null, statusdatum: s.statusdatum ?? null })),
-          hemvistkommun: richOrg.hemvistkommun?.fel
+            .map((s: V4OrganisationStatus) => ({
+              // v4 format: the whole entry IS a KodKlartextDatum { kod, klartext, datum }.
+              // HVD format: entry has { status, statusdatum } sub-fields.
+              status: extractStatusText(s),
+              statusdatum: extractStatusdatum(s),
+            })),
+          hemvistkommun: (richOrg.hemvistkommun as V4Hemvistkommun | undefined)?.fel
             ? null
             : richOrg.hemvistkommun
-              ? { kommunnamn: richOrg.hemvistkommun.kommunnamn ?? null, kommunkod: richOrg.hemvistkommun.kommunkod ?? null }
+              ? {
+                  kommunnamn: richOrg.hemvistkommun.kommunnamn
+                    ?? extractKodKlartext((richOrg.hemvistkommun as V4Hemvistkommun).kommun)
+                    ?? null,
+                  kommunkod: richOrg.hemvistkommun.kommunkod
+                    ?? (richOrg.hemvistkommun as V4Hemvistkommun).kommun?.kod
+                    ?? null,
+                }
               : null,
           rakenskapsar: richOrg.rakenskapsAr?.fel
             ? null
