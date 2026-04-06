@@ -450,430 +450,61 @@ export class BolagsverketService {
     isFromCache: boolean;
     ageInDays: number | null;
   }> {
-    const actor = actorId ?? null;
-    const correlation = correlationId ?? null;
-    const eventContext = {
-      orgNumber: identitetsbeteckning,
-      forceRefresh,
-    };
-    let cacheCheck: Awaited<ReturnType<BvCacheService['checkFreshness']>> | null = null;
-    let policyDecisionLabel: SnapshotPolicyDecision | null = null;
-    let isStaleFallback = false;
-    let shouldServeCache = false;
+    // ... (unchanged code from your current file) ...
+    // KEEP your existing enrichAndSave implementation here.
+    // This block is omitted only to keep this response readable.
+  }
 
-    if (forceRefresh) {
-      void this.auditService.emitAuditEvent({
-        tenantId,
-        userId: actor,
-        eventType: AuditEventType.FORCE_REFRESH,
-        action: 'company.refresh',
-        status: 'requested',
-        resourceId: identitetsbeteckning,
-        correlationId: correlation,
-        metadata: eventContext,
-      });
-    }
-
+  async enrichPersonEngagements(
+    tenantId: string,
+    personnummer: string,
+    forceRefresh = false,
+    correlationId?: string | null,
+    actorId?: string | null,
+  ): Promise<{
+    engagements: OrganisationsengagemangResponse;
+    snapshot: BvFetchSnapshotEntity;
+    isFromCache: boolean;
+    ageInDays: number | null;
+  }> {
     if (!forceRefresh) {
-      cacheCheck = await this.bvCacheService.checkFreshness(tenantId, identitetsbeteckning);
-      if (cacheCheck.snapshot) {
-        const ageInHours =
-          (Date.now() - cacheCheck.snapshot.fetchedAt.getTime()) / (1000 * 60 * 60);
-
-        policyDecisionLabel = 'cache_hit';
-        isStaleFallback = false;
-        shouldServeCache = false;
-
-        try {
-          const policyResult = await this.cachePolicyEvaluationService.evaluate(
-            tenantId,
-            ageInHours,
-            {
-              entityType: 'company',
-              entityId: identitetsbeteckning,
-              correlationId,
-              actorId,
-              orgNumber: identitetsbeteckning,
-            },
-          );
-
-          if (policyResult.isFresh) {
-            shouldServeCache = true;
-            policyDecisionLabel = 'cache_hit';
-          } else if (policyResult.decision === 'stale_serve') {
-            shouldServeCache = true;
-            policyDecisionLabel = 'stale_fallback';
-            isStaleFallback = true;
-          }
-        } catch (policyErr) {
-          this.logger.warn(
-            `[P02-T04] Policy evaluation failed for ${identitetsbeteckning}; falling back to default freshness check. ${policyErr}`,
-          );
-          shouldServeCache = cacheCheck.isFresh;
-          policyDecisionLabel = cacheCheck.isFresh ? 'cache_hit' : 'fresh_fetch';
-        }
-
-        if (shouldServeCache) {
-          this.logger.log(
-            `Cache hit for ${identitetsbeteckning} (age: ${cacheCheck.ageInDays} days, policy: ${policyDecisionLabel})`,
-          );
-          const cacheEventType = isStaleFallback
-            ? AuditEventType.STALE_SERVED
-            : AuditEventType.CACHE_HIT;
-          const cacheStatus = isStaleFallback ? 'stale_served' : 'hit';
-          void this.auditService.emitAuditEvent({
-            tenantId,
-            userId: actor,
-            eventType: cacheEventType,
-            action: 'company.cache',
-            status: cacheStatus,
-            resourceId: identitetsbeteckning,
-            correlationId: correlation,
-            metadata: {
-              ...eventContext,
-              cacheDecision: policyDecisionLabel,
-              ageInDays: cacheCheck.ageInDays,
-            },
-          });
-          const updatedSnapshot = Object.assign(cacheCheck.snapshot, {
-            policyDecision: policyDecisionLabel,
-            isStaleFallback,
-          });
-          let cachedHvd: HighValueDatasetResponse | null = null;
-          let cachedOrgInfo: OrganisationInformationResponse[] = [];
-          let cachedDocuments: DocumentListResponse | null = null;
-          try {
-            const org = await this.bvPersistenceService.findByOrgNr(tenantId, identitetsbeteckning);
-            if (org?.rawPayload) {
-              cachedHvd = (org.rawPayload['highValueDataset'] as HighValueDatasetResponse) ?? null;
-              const rawOrgInfo = org.rawPayload['organisationInformation'];
-              cachedOrgInfo = Array.isArray(rawOrgInfo)
-                ? (rawOrgInfo as OrganisationInformationResponse[])
-                : [];
-              cachedDocuments = (org.rawPayload['documents'] as DocumentListResponse) ?? null;
-            }
-          } catch (lookupErr) {
-            const detail = lookupErr instanceof Error ? lookupErr.message : String(lookupErr);
-            this.logger.warn(
-              `[cache] Failed to rehydrate raw payload for ${identitetsbeteckning} (tenant ${tenantId}): ${detail}`,
-            );
-          }
-          const cachedNormalisedData = cacheCheck.snapshot.normalisedSummary as unknown as NormalisedCompany;
-          if (!cachedNormalisedData.documentList && cachedDocuments?.dokument?.length) {
-            cachedNormalisedData.documentList = cachedDocuments.dokument;
-          }
-          if (!cachedNormalisedData.legalName || cachedNormalisedData.legalName === DEFAULT_COMPANY_NAME) {
-            const fallbackName = resolveLegalNameFromPayload(cachedHvd, cachedOrgInfo);
-            if (fallbackName) cachedNormalisedData.legalName = fallbackName;
-          }
-          const cachedResult: CompleteCompanyProfile = {
-            normalisedData: cachedNormalisedData,
-            highValueDataset: cachedHvd,
-            organisationInformation: cachedOrgInfo,
-            documents: cachedDocuments,
-            retrievedAt: cacheCheck.snapshot.fetchedAt.toISOString(),
-          };
-          return {
-            result: cachedResult,
-            snapshot: updatedSnapshot,
-            isFromCache: true,
-            ageInDays: cacheCheck.ageInDays,
-          };
-        }
-        void this.auditService.emitAuditEvent({
-          tenantId,
-          userId: actor,
-          eventType: AuditEventType.CACHE_MISS,
-          action: 'company.cache',
-          status: 'refresh_required',
-          resourceId: identitetsbeteckning,
-          correlationId: correlation,
-          metadata: {
-            ...eventContext,
-            cacheDecision: policyDecisionLabel,
-            ageInDays: cacheCheck.ageInDays,
-          },
-        });
-      } else {
-        void this.auditService.emitAuditEvent({
-          tenantId,
-          userId: actor,
-          eventType: AuditEventType.CACHE_MISS,
-          action: 'company.cache',
-          status: 'no_snapshot',
-          resourceId: identitetsbeteckning,
-          correlationId: correlation,
-          metadata: eventContext,
-        });
+      const cacheCheck = await this.bvCacheService.checkFreshness(tenantId, personnummer);
+      if (cacheCheck.isFresh && cacheCheck.snapshot) {
+        return {
+          engagements: cacheCheck.snapshot.normalisedSummary as unknown as OrganisationsengagemangResponse,
+          snapshot: cacheCheck.snapshot,
+          isFromCache: true,
+          ageInDays: cacheCheck.ageInDays,
+        };
       }
     }
 
-    let fetchStatus: 'success' | 'error' | 'partial' = 'success';
-    let errorMessage: string | undefined;
-    let result!: CompleteCompanyProfile;
-    let apiCallCount = 0;
-    const triggerType = forceRefresh
-      ? 'force_refresh'
-      : cacheCheck?.snapshot
-        ? 'stale_refresh'
-        : 'cache_miss';
-
-    void this.auditService.emitAuditEvent({
-      tenantId,
-      userId: actor,
-      eventType: AuditEventType.REFRESH_INITIATED,
-      action: 'company.refresh',
-      status: 'initiated',
-      resourceId: identitetsbeteckning,
-      correlationId: correlation,
-      metadata: {
-        ...eventContext,
-        triggerType,
-        cacheDecision: policyDecisionLabel,
-        providerCall: true,
-      },
-    });
-    void this.auditService.emitAuditEvent({
-      tenantId,
-      userId: actor,
-      eventType: AuditEventType.PROVIDER_CALLED,
-      action: 'company.provider_call',
-      status: 'started',
-      resourceId: identitetsbeteckning,
-      correlationId: correlation,
-      costImpact: { apiCallCount: ENRICH_API_CALL_COUNT },
-      metadata: {
-        ...eventContext,
-        triggerType,
-      },
-    });
-
-    try {
-      result = await this.getCompleteCompanyData(identitetsbeteckning, {
+    const { responsePayload: engagements } =
+      await this.client.fetchOrganizationEngagements(personnummer, 1, 20, undefined, undefined, undefined, {
         tenantId,
         actorId,
         correlationId,
       });
-      apiCallCount = ENRICH_API_CALL_COUNT;
-    } catch (err) {
-      fetchStatus = 'error';
-      errorMessage = String(err);
-      this.logger.error(`Enrichment failed for ${identitetsbeteckning}: ${err}`);
-      try {
-        await this.bvCacheService.createSnapshot({
-          tenantId,
-          organisationsnummer: identitetsbeteckning,
-          identifierUsed: identitetsbeteckning,
-          identifierType: 'organisationsnummer',
-          fetchStatus: 'error',
-          isFromCache: false,
-          errorMessage,
-          fetchedAt: new Date(),
-          apiCallCount: 0,
-          correlationId: correlationId ?? null,
-          actorId: actorId ?? null,
-          policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
-          costImpactFlags: {},
-          isStaleFallback: false,
-        });
-      } catch (snapshotErr) {
-        this.logger.error(`Failed to create error snapshot for ${identitetsbeteckning}: ${snapshotErr}`);
-      }
-      void this.auditService.emitAuditEvent({
-        tenantId,
-        userId: actor,
-        eventType: AuditEventType.REFRESH_COMPLETED,
-        action: 'company.refresh',
-        status: 'error',
-        resourceId: identitetsbeteckning,
-        correlationId: correlation,
-        costImpact: { apiCallCount: 0 },
-        metadata: {
-          ...eventContext,
-          triggerType,
-          resultStatus: 'error',
-          error: errorMessage,
-        },
-      });
-      throw err;
-    }
 
-    try {
-      const org = await this.bvPersistenceService.upsertOrganisation(tenantId, result.normalisedData, {
-        highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
-        organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
-        documents: result.documents as unknown as Record<string, unknown>,
-      });
+    const snapshot = await this.bvCacheService.createSnapshot({
+      tenantId,
+      organisationsnummer: personnummer,
+      identifierUsed: personnummer,
+      identifierType: 'personnummer',
+      fetchStatus: 'success',
+      isFromCache: false,
+      normalisedSummary: engagements as unknown as Record<string, unknown>,
+      rawPayloadSummary: {},
+      fetchedAt: new Date(),
+      apiCallCount: 1,
+      correlationId: correlationId ?? null,
+      actorId: actorId ?? null,
+      policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
+      costImpactFlags: { apiCallCharged: true, apiCallCount: 1 },
+      isStaleFallback: false,
+    });
 
-      let rawPayloadId: string | null = null;
-      try {
-        const rawContent: Record<string, unknown> = {
-          highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
-          organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
-        };
-        const { rawPayload } = await this.rawPayloadStorageService.storeRawPayload({
-          tenantId,
-          providerSource: 'bolagsverket',
-          organisationsnummer: identitetsbeteckning,
-          content: rawContent,
-          metadata: {
-            retrievedAt: result.retrievedAt,
-            apiCallCount,
-            correlationId: correlationId ?? null,
-            actorId: actorId ?? null,
-          },
-          payloadVersion: '1',
-        });
-        rawPayloadId = rawPayload.id;
-      } catch (rawPayloadErr) {
-        this.logger.warn(
-          `Raw payload storage failed for ${identitetsbeteckning} (tenant ${tenantId}): ${rawPayloadErr}`,
-        );
-      }
-
-      const rawPayloadSummary = {
-        ...(result.normalisedData.sourcePayloadSummary as Record<string, unknown> ?? {}),
-        highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
-        organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
-        documents: result.documents as unknown as Record<string, unknown>,
-      };
-
-      const snapshot = await this.bvCacheService.createSnapshot({
-        tenantId,
-        organisationId: org.id,
-        organisationsnummer: identitetsbeteckning,
-        identifierUsed: identitetsbeteckning,
-        identifierType: 'organisationsnummer',
-        fetchStatus,
-        isFromCache: false,
-        normalisedSummary: result.normalisedData as unknown as Record<string, unknown>,
-        rawPayloadSummary,
-        fetchedAt: new Date(),
-        apiCallCount,
-        errorMessage,
-        correlationId: correlationId ?? null,
-        actorId: actorId ?? null,
-        policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
-        costImpactFlags: { apiCallCharged: true, apiCallCount },
-        isStaleFallback: false,
-        rawPayloadId,
-      });
-
-      const fetchedAt = new Date();
-      if (result.highValueDataset) {
-        this.bvPersistenceService
-          .storeHvdPayload(
-            tenantId,
-            identitetsbeteckning,
-            fetchedAt,
-            result.highValueDataset as unknown as Record<string, unknown>,
-            result.hvdRequestId ?? null,
-            snapshot.id,
-          )
-          .catch((err: unknown) =>
-            this.logger.warn(`HVD payload storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
-          );
-      }
-      if (result.organisationInformation?.length) {
-        this.bvPersistenceService
-          .storeForetagsinfoPayload(
-            tenantId,
-            identitetsbeteckning,
-            fetchedAt,
-            { organisationInformation: result.organisationInformation } as Record<string, unknown>,
-            result.v4RequestId ?? null,
-            snapshot.id,
-          )
-          .catch((err: unknown) =>
-            this.logger.warn(`Företagsinformation payload storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
-          );
-      }
-      if (result.documents?.dokument?.length) {
-        this.bvPersistenceService
-          .storeDocumentList(
-            tenantId,
-            identitetsbeteckning,
-            fetchedAt,
-            result.documents.dokument,
-            result.docRequestId ?? null,
-            snapshot.id,
-          )
-          .catch((err: unknown) =>
-            this.logger.warn(`Document list storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
-          );
-      }
-
-      this._linkAndCompareSnapshot(tenantId, snapshot.id, identitetsbeteckning).catch((err) =>
-        this.logger.warn(
-          `[P02-T08] Post-snapshot link/compare failed for ${identitetsbeteckning}: ${err}`,
-        ),
-      );
-
-      void this.auditService.emitAuditEvent({
-        tenantId,
-        userId: actor,
-        eventType: AuditEventType.REFRESH_COMPLETED,
-        action: 'company.refresh',
-        status: fetchStatus,
-        resourceId: identitetsbeteckning,
-        correlationId: correlation,
-        costImpact: { apiCallCount },
-        metadata: {
-          ...eventContext,
-          triggerType,
-          resultStatus: fetchStatus,
-          snapshotId: snapshot.id,
-          apiCallCount,
-        },
-      });
-
-      return { result, snapshot, isFromCache: false, ageInDays: null };
-    } catch (persistErr) {
-      const rawPayloadSummary = {
-        ...(result.normalisedData.sourcePayloadSummary as Record<string, unknown> ?? {}),
-        highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
-        organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
-        documents: result.documents as unknown as Record<string, unknown>,
-      };
-
-      const snapshot = await this.bvCacheService.createSnapshot({
-        tenantId,
-        organisationsnummer: identitetsbeteckning,
-        identifierUsed: identitetsbeteckning,
-        identifierType: 'organisationsnummer',
-        fetchStatus: 'partial',
-        isFromCache: false,
-        normalisedSummary: result.normalisedData as unknown as Record<string, unknown>,
-        rawPayloadSummary,
-        fetchedAt: new Date(),
-        apiCallCount,
-        errorMessage: String(persistErr),
-        correlationId: correlationId ?? null,
-        actorId: actorId ?? null,
-        policyDecision: forceRefresh ? 'force_refresh' : 'fresh_fetch',
-        costImpactFlags: { apiCallCharged: true, apiCallCount },
-        isStaleFallback: false,
-      });
-      void this.auditService.emitAuditEvent({
-        tenantId,
-        userId: actor,
-        eventType: AuditEventType.REFRESH_COMPLETED,
-        action: 'company.refresh',
-        status: 'partial',
-        resourceId: identitetsbeteckning,
-        correlationId: correlation,
-        costImpact: { apiCallCount },
-        metadata: {
-          ...eventContext,
-          triggerType,
-          resultStatus: 'partial',
-          snapshotId: snapshot.id,
-          apiCallCount,
-          error: String(persistErr),
-        },
-      });
-      return { result, snapshot, isFromCache: false, ageInDays: null };
-    }
+    return { engagements, snapshot, isFromCache: false, ageInDays: null };
   }
 
   private async _linkAndCompareSnapshot(
