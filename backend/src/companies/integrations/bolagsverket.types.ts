@@ -59,6 +59,14 @@ export type InformationCategory = (typeof ALL_INFORMATION_CATEGORIES)[number];
 
 // ── High-value dataset (vardefulla-datamangder/v1) ───────────────────────────
 
+/** Generic KodKlartext shape as returned by the Bolagsverket HVD API. */
+export interface HvdKodKlartext {
+  kod?: string;
+  klartext?: string;
+  dataproducent?: string;
+  fel?: BvFel;
+}
+
 export interface HvdAddress {
   gatuadress?: string;
   postnummer?: string;
@@ -69,7 +77,8 @@ export interface HvdAddress {
 }
 
 export interface HvdOrganisationStatus {
-  status?: string;
+  /** Can be a plain string or a KodKlartext object depending on API version. */
+  status?: string | HvdKodKlartext;
   statusdatum?: string;
   fel?: BvFel;
 }
@@ -82,7 +91,8 @@ export interface HvdRestructuringStatus {
 
 export interface HvdDeregistrationInfo {
   avregistreringsdatum?: string;
-  avregistreringsorsak?: string;
+  /** Can be a plain string or a KodKlartext object. */
+  avregistreringsorsak?: string | HvdKodKlartext;
   fel?: BvFel;
 }
 
@@ -106,31 +116,34 @@ export interface HvdOrganisation {
   namn?: string;
   /** List of all registered names (current + historical). */
   organisationsnamnLista?: HvdOrganisationsnamn[];
-  organisationsform?: string;
-  organisationsdatum?: string;
+  /** KodKlartext: { kod, klartext, dataproducent, fel } */
+  organisationsform?: string | HvdKodKlartext;
+  /** Date wrapper: { registreringsdatum, infortHosScb, dataproducent, fel } or plain date string. */
+  organisationsdatum?: string | HvdOrganisationsdatum;
   registreringsdatum?: string;
   organisationsstatusar?: HvdOrganisationStatus[];
-  juridiskForm?: string;
+  /** KodKlartext: { kod, klartext, dataproducent, fel } */
+  juridiskForm?: string | HvdKodKlartext;
   adresser?: HvdAddress[];
   /** Postal address for organisation. */
   postadressOrganisation?: HvdAddress;
   snikoder?: HvdIndustryCode[];
-  /** Industry/activity description. */
-  verksamhetsbeskrivning?: string;
+  /** Activity description wrapper: { beskrivning, dataproducent, fel } or plain string. */
+  verksamhetsbeskrivning?: string | { beskrivning?: string; text?: string; dataproducent?: string; fel?: BvFel };
   avregistreringsinformation?: HvdDeregistrationInfo;
-  /** Whether the organisation is deregistered. */
-  avregistreradOrganisation?: string;
+  /** Deregistration wrapper: { avregistreringsdatum, dataproducent, fel } or plain string. */
+  avregistreradOrganisation?: string | { avregistreringsdatum?: string; dataproducent?: string; fel?: BvFel };
   rekonstruktionsstatus?: HvdRestructuringStatus;
-  /** Whether the organisation is currently active. */
-  verksamOrganisation?: string;
-  /** Country of registration (e.g. 'SE'). */
-  registreringsland?: string;
-  /** External identity reference. */
-  organisationsidentitet?: string;
-  /** Marketing opt-out flag (reklamstopp). */
-  reklamsparr?: string;
-  /** Whether winding-up / restructuring proceedings are ongoing. */
-  pagaendeAvvecklingsEllerOmstruktureringsforfarande?: string;
+  /** Active status: { kod: 'JA'|'NEJ', dataproducent, fel } or plain string. */
+  verksamOrganisation?: string | HvdKodKlartext;
+  /** Country of registration: KodKlartext { kod, klartext } or plain string. */
+  registreringsland?: string | HvdKodKlartext;
+  /** External identity: { identitetsbeteckning, typ: KodKlartext } or plain string. */
+  organisationsidentitet?: string | { identitetsbeteckning?: string; typ?: HvdKodKlartext };
+  /** Marketing opt-out: { kod: 'JA'|'NEJ', dataproducent, fel } or plain string. */
+  reklamsparr?: string | HvdKodKlartext;
+  /** Winding-up / restructuring proceedings: complex list wrapper or plain string. */
+  pagaendeAvvecklingsEllerOmstruktureringsforfarande?: string | Record<string, unknown>;
   fel?: BvFel;
 }
 
@@ -286,6 +299,42 @@ export interface BvOrganisationsmarkering {
   fel?: BvFel;
 }
 
+/** Företagsinformation v4: status entry is a KodKlartextDatum = { kod, klartext, typ, datum }. */
+export interface V4OrganisationStatus {
+  /** Status code. */
+  kod?: string;
+  /** Status label. */
+  klartext?: string;
+  /** Type qualifier (e.g. 'AvregistreradOrganisationstyp', 'AvvecklingsOmstruktureringsforfarande'). */
+  typ?: string;
+  /** Date the status was set. */
+  datum?: string;
+  /** HVD-compatible fallback (some datasets nest status text here). */
+  status?: string | HvdKodKlartext;
+  statusdatum?: string;
+  fel?: BvFel;
+}
+
+/** Bolagsverket HVD date-of-establishment wrapper object. */
+export interface HvdOrganisationsdatum {
+  registreringsdatum?: string;
+  infortHosScb?: string;
+  dataproducent?: string;
+  fel?: BvFel;
+}
+
+/** Företagsinformation v4 hemvistkommun. */
+export interface V4Hemvistkommun {
+  typ?: string;
+  lanForHemvistkommun?: HvdKodKlartext;
+  /** Municipality — the main displayable field. */
+  kommun?: HvdKodKlartext;
+  /** Legacy HVD field name (if ever present). */
+  kommunnamn?: string;
+  kommunkod?: string;
+  fel?: BvFel;
+}
+
 export interface BvHemvistkommun {
   kommunnamn?: string;
   kommunkod?: string;
@@ -295,11 +344,13 @@ export interface BvHemvistkommun {
 export interface OrganisationInformationResponse {
   identitetsbeteckning?: string;
   namn?: string;
-  organisationsform?: string;
-  /** Date of organisation formation/establishment. */
-  organisationsdatum?: string;
+  /** KodKlartext object in v4 API: { kod, klartext }. */
+  organisationsform?: string | HvdKodKlartext;
+  /** Date wrapper in v4 API: { registreringsdatum, bildatDatum }. */
+  organisationsdatum?: string | { registreringsdatum?: string; bildatDatum?: string };
   registreringsdatum?: string;
-  organisationsstatusar?: HvdOrganisationStatus[];
+  /** v4 API: each entry IS a KodKlartextDatum { kod, klartext, typ, datum }. */
+  organisationsstatusar?: V4OrganisationStatus[];
   funktionarer?: BvOfficer[];
   firmateckning?: BvFirmateckning | string;
   aktieinformation?: BvAktieinformation;

@@ -10,6 +10,7 @@ import {
   IDENTIFIER_TYPE_LABELS,
   normaliseIdentifier,
 } from '@/utils/validation/validateIdentifier';
+import { type KodKlartext, toText } from '@/utils/bolagsverket';
 
 // ─── Backend response types ───────────────────────────────────────────────────
 
@@ -19,13 +20,13 @@ interface HvdAddress {
   gatuadress?: string; postnummer?: string; postort?: string;
   land?: string; adresstyp?: string; fel?: BvFel;
 }
-interface HvdOrganisationStatus { status?: string; statusdatum?: string }
+interface HvdOrganisationStatus { status?: string | KodKlartext; statusdatum?: string }
 interface HvdIndustryCode { snikod?: string; snikodText?: string; fel?: BvFel }
-interface HvdDeregistrationInfo { avregistreringsdatum?: string; avregistreringsorsak?: string }
-interface HvdRestructuringStatus { rekonstruktionsstatus?: string; rekonstruktionsdatum?: string }
+interface HvdDeregistrationInfo { avregistreringsdatum?: string; avregistreringsorsak?: string | KodKlartext }
+interface HvdRestructuringStatus { rekonstruktionsstatus?: string | KodKlartext; rekonstruktionsdatum?: string }
 interface HvdOrganisation {
-  identitetsbeteckning?: string; namn?: string; organisationsform?: string;
-  registreringsdatum?: string; juridiskForm?: string;
+  identitetsbeteckning?: string; namn?: string; organisationsform?: string | KodKlartext;
+  registreringsdatum?: string; juridiskForm?: string | KodKlartext;
   organisationsstatusar?: HvdOrganisationStatus[];
   adresser?: HvdAddress[];
   snikoder?: HvdIndustryCode[];
@@ -73,7 +74,7 @@ interface BvFinansiellRapport {
   registreringsdatum?: string; dokumentId?: string;
 }
 interface OrganisationInformationResponse {
-  identitetsbeteckning?: string; namn?: string; organisationsform?: string;
+  identitetsbeteckning?: string; namn?: string; organisationsform?: string | KodKlartext;
   registreringsdatum?: string;
   organisationsstatusar?: HvdOrganisationStatus[];
   funktionarer?: BvOfficer[];
@@ -230,16 +231,16 @@ function HvdSection({ hvd }: { hvd: HighValueDatasetResponse }) {
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Row label="Legal name" value={org.namn} />
           <Row label="Organisation number" value={org.identitetsbeteckning} />
-          <Row label="Legal form" value={org.juridiskForm ?? org.organisationsform} />
+          <Row label="Legal form" value={toText(org.juridiskForm) ?? toText(org.organisationsform)} />
           <Row label="Registered" value={fmt(org.registreringsdatum)} />
           {dereg && (
             <>
               <Row label="Deregistered" value={fmt(dereg.avregistreringsdatum)} />
-              <Row label="Deregistration reason" value={dereg.avregistreringsorsak} />
+              <Row label="Deregistration reason" value={toText(dereg.avregistreringsorsak)} />
             </>
           )}
           {rekon?.rekonstruktionsstatus && (
-            <Row label="Restructuring status" value={`${rekon.rekonstruktionsstatus}${rekon.rekonstruktionsdatum ? ` (${fmt(rekon.rekonstruktionsdatum)})` : ''}`} />
+            <Row label="Restructuring status" value={`${toText(rekon.rekonstruktionsstatus) ?? ''}${rekon.rekonstruktionsdatum ? ` (${fmt(rekon.rekonstruktionsdatum)})` : ''}`} />
           )}
         </dl>
 
@@ -250,7 +251,7 @@ function HvdSection({ hvd }: { hvd: HighValueDatasetResponse }) {
             <div className="flex flex-wrap gap-2">
               {statuses.map((s, i) => (
                 <span key={i} className="rounded-full bg-slate-700/60 px-3 py-1 text-xs text-slate-300">
-                  {s.status ?? '—'}{s.statusdatum ? ` · ${fmt(s.statusdatum)}` : ''}
+                  {toText(s.status) ?? '—'}{s.statusdatum ? ` · ${fmt(s.statusdatum)}` : ''}
                 </span>
               ))}
             </div>
