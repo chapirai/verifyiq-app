@@ -69,6 +69,8 @@ export interface HvdKodKlartext {
 
 export interface HvdAddress {
   gatuadress?: string;
+  /** Delivery/postal box address line, used instead of gatuadress for postal addresses. */
+  utdelningsadress?: string;
   postnummer?: string;
   postort?: string;
   land?: string;

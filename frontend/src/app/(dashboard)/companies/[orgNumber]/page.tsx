@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { useCompanyFreshness } from '@/hooks/use-company-freshness';
@@ -22,7 +22,12 @@ import { type KodKlartext, toText } from '@/utils/bolagsverket';
 
 // ─── Structured section types (mirrors backend NormalisedCompany sections) ───
 interface MappedName { namn: string | null; namnstyp: string | null; sprak: string | null; registreringsdatum: string | null; avregistreringsdatum: string | null }
-interface MappedAddress { adresstyp: string | null; gatuadress: string | null; postnummer: string | null; postort: string | null; land: string | null }
+interface MappedAddress {
+  adresstyp: string | null; gatuadress: string | null;
+  /** Delivery/postal box address line, used instead of gatuadress for some address types. */
+  utdelningsadress: string | null;
+  postnummer: string | null; postort: string | null; land: string | null;
+}
 interface MappedStatus { status: string | KodKlartext | null; statusdatum: string | null }
 interface MappedIndustryCode { snikod: string | null; snikodText: string | null }
 interface MappedOfficer {
@@ -70,6 +75,10 @@ interface BvDokument {
   dokumenttyp?: string;
 }
 
+// ─── Default fallback name constant ───────────────────────────────────────────
+
+const DEFAULT_COMPANY_NAME = 'Unknown company';
+
 // ─── Shared display helpers ───────────────────────────────────────────────────
 
 function fmt(dateStr: string | null | undefined): string {
@@ -77,9 +86,22 @@ function fmt(dateStr: string | null | undefined): string {
   try { return new Date(dateStr).toLocaleDateString('sv-SE'); } catch { return dateStr; }
 }
 
+function fmtTs(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  try { return new Date(dateStr).toLocaleString('sv-SE'); } catch { return dateStr; }
+}
+
 function fmtNum(n: number | null | undefined): string {
   if (n == null) return '—';
   return n.toLocaleString('sv-SE');
+}
+
+function triggerDownload(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
 function Row({ label, value }: { label: string; value?: string | number | null }) {
@@ -111,18 +133,400 @@ function SourceBadge({ label, color }: { label: string; color: 'violet' | 'teal'
 }
 
 function AddressCard({ addr }: { addr: MappedAddress }) {
+  const streetLine = addr.gatuadress ?? addr.utdelningsadress ?? null;
   return (
     <div className="rounded-xl bg-slate-800/40 px-4 py-3 text-sm">
       {addr.adresstyp && (
         <span className="mb-1 inline-block rounded bg-slate-700 px-1.5 py-0.5 text-xs text-slate-300">{addr.adresstyp}</span>
       )}
-      <p className="text-white">{addr.gatuadress ?? '—'}</p>
+      <p className="text-white">{streetLine ?? '—'}</p>
       <p className="text-slate-400">{[addr.postnummer, addr.postort, addr.land].filter(Boolean).join(', ') || '—'}</p>
     </div>
   );
 }
 
-// [UNCHANGED: HvdDataSection, V4DataSection, AnnualReportsSection, etc.]
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-start gap-4">
+          <div className="h-14 w-14 rounded-xl bg-slate-800" />
+          <div className="flex-1 space-y-2">
+            <div className="h-6 w-48 rounded bg-slate-800" />
+            <div className="h-4 w-32 rounded bg-slate-800" />
+          </div>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="h-4 w-32 rounded bg-slate-800 mb-4" />
+        <div className="grid grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="space-y-1">
+              <div className="h-3 w-24 rounded bg-slate-800" />
+              <div className="h-4 w-32 rounded bg-slate-800" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Download button ──────────────────────────────────────────────────────────
+
+function DownloadButton({ dokumentId, downloadingId, onDownload }: {
+  dokumentId: string | null | undefined;
+  downloadingId: string | null;
+  onDownload: (dokumentId: string) => void;
+}) {
+  if (!dokumentId) return <span className="text-slate-500">—</span>;
+  const busy = downloadingId === dokumentId;
+  return (
+    <button
+      onClick={() => onDownload(dokumentId)}
+      disabled={busy}
+      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600/80 px-3 py-1 text-xs font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {busy ? (
+        <><span className="h-3 w-3 animate-spin rounded-full border border-white/30 border-t-white" />Downloading…</>
+      ) : '↓ Download'}
+    </button>
+  );
+}
+
+// ─── HVD Data Section ─────────────────────────────────────────────────────────
+
+function HvdDataSection({ hvd }: { hvd: HvdStructuredSection }) {
+  const allAddresses = [
+    ...(hvd.postadressOrganisation ? [hvd.postadressOrganisation] : []),
+    ...hvd.adresser.filter((a) => a !== hvd.postadressOrganisation),
+  ];
+
+  return (
+    <SectionCard title="Värdefulla Datamängder (HVD)" badge={<SourceBadge label="HVD API" color="violet" />}>
+      <div className="space-y-6">
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Row label="Organisation Number" value={hvd.identitetsbeteckning} />
+          <Row label="Legal Name" value={hvd.namn} />
+          <Row label="Legal Form (Juridisk Form)" value={toText(hvd.juridiskForm)} />
+          <Row label="Company Form" value={toText(hvd.organisationsform)} />
+          <Row label="Organisation Date" value={fmt(hvd.organisationsdatum)} />
+          <Row label="Registered" value={fmt(hvd.registreringsdatum)} />
+          <Row label="Country" value={toText(hvd.registreringsland)} />
+          <Row label="External Identity" value={hvd.organisationsidentitet} />
+          <Row label="Active (Verksam)" value={toText(hvd.verksamOrganisation)} />
+          <Row label="Marketing Opt-out" value={toText(hvd.reklamsparr)} />
+          <Row label="Deregistered" value={fmt(hvd.avregistreradOrganisation)} />
+          <Row label="Deregistration Reason" value={toText(hvd.avregistreringsorsak)} />
+          {hvd.rekonstruktionsstatus && (
+            <Row label="Restructuring Status" value={toText(hvd.rekonstruktionsstatus)} />
+          )}
+        </dl>
+
+        {hvd.statusar.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Statuses</h3>
+            <div className="flex flex-wrap gap-2">
+              {hvd.statusar.map((s, i) => (
+                <span key={i} className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                  {toText(s.status) ?? '—'}{s.statusdatum ? ` (${fmt(s.statusdatum)})` : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {hvd.verksamhetsbeskrivning && (
+          <div>
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-500">Business Description</h3>
+            <p className="text-sm text-slate-300">{hvd.verksamhetsbeskrivning}</p>
+          </div>
+        )}
+
+        {allAddresses.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Addresses</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {allAddresses.map((addr, i) => (
+                <AddressCard key={i} addr={addr} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {hvd.names.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Registered Names</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-widest text-slate-500">
+                    <th className="pb-2 pr-4">Name</th>
+                    <th className="pb-2 pr-4">Type</th>
+                    <th className="pb-2 pr-4">Registered</th>
+                    <th className="pb-2">Deregistered</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {hvd.names.map((n, i) => (
+                    <tr key={i}>
+                      <td className="py-2 pr-4 text-white">{n.namn ?? '—'}</td>
+                      <td className="py-2 pr-4 text-slate-400">{n.namnstyp ?? '—'}</td>
+                      <td className="py-2 pr-4 text-slate-400">{fmt(n.registreringsdatum)}</td>
+                      <td className="py-2 text-slate-400">{fmt(n.avregistreringsdatum)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ─── V4 Data Section ──────────────────────────────────────────────────────────
+
+function V4DataSection({ v4 }: { v4: V4StructuredSection }) {
+  return (
+    <SectionCard title="Företagsinformation (v4)" badge={<SourceBadge label="Företagsinformation" color="teal" />}>
+      <div className="space-y-6">
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Row label="Organisation Number" value={v4.identitetsbeteckning} />
+          <Row label="Organisation Name" value={v4.organisationsnamn} />
+          <Row label="Company Form" value={toText(v4.organisationsform)} />
+          <Row label="Organisation Date" value={fmt(v4.organisationsdatum)} />
+          <Row label="Registration Date" value={fmt(v4.registreringsdatum)} />
+          <Row label="Municipality" value={v4.hemvistkommun?.kommunnamn} />
+          {v4.rakenskapsar && (
+            <Row label="Financial Year" value={v4.rakenskapsar.rakenskapsarInleds ? `${fmt(v4.rakenskapsar.rakenskapsarInleds)} – ${fmt(v4.rakenskapsar.rakenskapsarAvslutas)}` : null} />
+          )}
+          {v4.firmateckning && (
+            <div className="sm:col-span-2 lg:col-span-3">
+              <dt className="text-xs font-medium uppercase tracking-widest text-slate-500">Signatory Power</dt>
+              <dd className="mt-0.5 text-sm text-white">{v4.firmateckning}</dd>
+            </div>
+          )}
+        </dl>
+
+        {v4.organisationsstatusar.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Statuses</h3>
+            <div className="flex flex-wrap gap-2">
+              {v4.organisationsstatusar.map((s, i) => (
+                <span key={i} className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                  {toText(s.status) ?? '—'}{s.statusdatum ? ` (${fmt(s.statusdatum)})` : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {v4.verksamhetsbeskrivning && (
+          <div>
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-500">Business Description</h3>
+            <p className="text-sm text-slate-300">{v4.verksamhetsbeskrivning}</p>
+          </div>
+        )}
+
+        {v4.adresser.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Addresses</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {v4.adresser.map((addr, i) => (
+                <AddressCard key={i} addr={addr} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {v4.funktionarer.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Officers (Funktionärer)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-widest text-slate-500">
+                    <th className="pb-2 pr-4">Name</th>
+                    <th className="pb-2 pr-4">Roles</th>
+                    <th className="pb-2">Birth Year</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {v4.funktionarer.map((f, i) => (
+                    <tr key={i}>
+                      <td className="py-2 pr-4 text-white">{f.namn ?? '—'}</td>
+                      <td className="py-2 pr-4 text-slate-300">
+                        {f.roller.length > 0
+                          ? f.roller.map((r) => r.rollbeskrivning ?? r.rollkod ?? '—').join(', ')
+                          : '—'}
+                      </td>
+                      <td className="py-2 text-slate-400">{f.fodelseAr ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {v4.aktieinformation && (
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Share Information</h3>
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <Row label="Share Capital" value={fmtNum(v4.aktieinformation.aktiekapital)} />
+              <Row label="Number of Shares" value={fmtNum(v4.aktieinformation.antalAktier)} />
+              <Row label="Quota Value" value={fmtNum(v4.aktieinformation.kvotvarde)} />
+              <Row label="Registered" value={fmt(v4.aktieinformation.registreringsdatum)} />
+            </dl>
+          </div>
+        )}
+
+        {v4.samtligaOrganisationsnamn.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">All Registered Names</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-widest text-slate-500">
+                    <th className="pb-2 pr-4">Name</th>
+                    <th className="pb-2 pr-4">Type</th>
+                    <th className="pb-2">Registered</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {v4.samtligaOrganisationsnamn.map((n, i) => (
+                    <tr key={i}>
+                      <td className="py-2 pr-4 text-white">{n.namn ?? '—'}</td>
+                      <td className="py-2 pr-4 text-slate-400">{n.namnstyp ?? '—'}</td>
+                      <td className="py-2 text-slate-400">{fmt(n.registreringsdatum)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ─── Annual Reports Section ───────────────────────────────────────────────────
+
+function AnnualReportsSection({ documents, reports, downloadingId, onDownload }: {
+  documents: BvDokument[];
+  reports: Array<{ rapporttyp: string | null; rapporteringsperiodFran: string | null; rapporteringsperiodTom: string | null; registreringsdatum: string | null; dokumentId: string | null }>;
+  downloadingId: string | null;
+  onDownload: (dokumentId: string) => void;
+}) {
+  // Merge: reports from v4 (have period info + maybe dokumentId) plus any HVD docs
+  // not already covered by a report
+  const reportDocIds = new Set(reports.map((r) => r.dokumentId).filter(Boolean));
+  const extraDocs = documents.filter((d) => d.dokumentId && !reportDocIds.has(d.dokumentId));
+
+  return (
+    <SectionCard title="Annual Reports">
+      <div className="space-y-6">
+        {reports.length > 0 && (
+          <div>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+              Report List
+              <SourceBadge label="Företagsinformation" color="teal" />
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-widest text-slate-500">
+                    <th className="pb-2 pr-4">Report Type</th>
+                    <th className="pb-2 pr-4">Period</th>
+                    <th className="pb-2 pr-4">Registered</th>
+                    <th className="pb-2">Download</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {reports.map((r, i) => (
+                    <tr key={i}>
+                      <td className="py-2 pr-4 text-white">{r.rapporttyp ?? '—'}</td>
+                      <td className="py-2 pr-4 text-slate-300">
+                        {r.rapporteringsperiodFran
+                          ? `${fmt(r.rapporteringsperiodFran)} – ${fmt(r.rapporteringsperiodTom)}`
+                          : fmt(r.rapporteringsperiodTom)}
+                      </td>
+                      <td className="py-2 pr-4 text-slate-400 text-xs">{fmt(r.registreringsdatum)}</td>
+                      <td className="py-2">
+                        <DownloadButton
+                          dokumentId={r.dokumentId}
+                          downloadingId={downloadingId}
+                          onDownload={onDownload}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {(documents.length > 0) && (
+          <div>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+              Downloadable Files
+              <SourceBadge label="HVD" color="violet" />
+              {extraDocs.length < documents.length && (
+                <span className="text-slate-600">({documents.length} total, {extraDocs.length} additional)</span>
+              )}
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-widest text-slate-500">
+                    <th className="pb-2 pr-4">Document Type</th>
+                    <th className="pb-2 pr-4">Reporting Period End</th>
+                    <th className="pb-2 pr-4">Registered</th>
+                    <th className="pb-2 pr-4">Format</th>
+                    <th className="pb-2">Download</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {documents.map((doc, i) => (
+                    <tr key={doc.dokumentId ?? i}>
+                      <td className="py-2 pr-4 text-white">{doc.dokumenttyp ?? '—'}</td>
+                      <td className="py-2 pr-4 text-slate-300">{fmt(doc.rapporteringsperiodTom)}</td>
+                      <td className="py-2 pr-4 text-slate-400 text-xs">{fmtTs(doc.registreringstidpunkt)}</td>
+                      <td className="py-2 pr-4">
+                        {doc.filformat
+                          ? <span className="rounded bg-slate-700 px-1.5 py-0.5 text-xs font-mono text-slate-300">{doc.filformat.toUpperCase()}</span>
+                          : <span className="text-slate-500">—</span>}
+                      </td>
+                      <td className="py-2">
+                        <DownloadButton
+                          dokumentId={doc.dokumentId}
+                          downloadingId={downloadingId}
+                          onDownload={onDownload}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {reports.length === 0 && documents.length === 0 && (
+          <p className="text-sm text-slate-400">No annual reports available.</p>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function CompanyProfilePage() {
   const params = useParams();
@@ -131,6 +535,8 @@ export default function CompanyProfilePage() {
   const { user } = useAuth();
   const canViewSensitive = ['admin', 'audit', 'evidence', 'compliance'].includes(user?.role ?? '');
   const [snapshotLimit, setSnapshotLimit] = useState(10);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const { data, loading, error, refreshing, cooldownRemaining, refresh } = useCompanyLookup(orgNumber);
   const {
@@ -158,11 +564,41 @@ export default function CompanyProfilePage() {
   const v4Section = (company?.v4Section ?? null) as V4StructuredSection | null;
   const documentList = (company?.documentList ?? null) as BvDokument[] | null;
 
+  // Resolve display name: skip DEFAULT_COMPANY_NAME fallback and try section names
   const displayName =
-    company?.legalName ??
+    (company?.legalName && company.legalName !== DEFAULT_COMPANY_NAME ? company.legalName : null) ??
     hvdSection?.namn ??
+    hvdSection?.names?.[0]?.namn ??
     v4Section?.organisationsnamn ??
-    'Unknown Company';
+    v4Section?.samtligaOrganisationsnamn?.[0]?.namn ??
+    DEFAULT_COMPANY_NAME;
+
+  // Resolve registration date: try company.registeredAt first, then hvdSection fallbacks
+  const registeredAt =
+    (company?.registeredAt as string | null | undefined) ??
+    hvdSection?.organisationsdatum ??
+    hvdSection?.registreringsdatum ??
+    v4Section?.organisationsdatum ??
+    v4Section?.registreringsdatum ??
+    null;
+
+  // Annual report data sources
+  const v4Reports = v4Section?.finansiellaRapporter ?? [];
+  const hvdDocs = documentList ?? [];
+  const hasAnnualReports = v4Reports.length > 0 || hvdDocs.length > 0;
+
+  const handleDownload = useCallback(async (dokumentId: string) => {
+    setDownloadingId(dokumentId);
+    setDownloadError(null);
+    try {
+      const { blob, fileName } = await api.bolagsverket.downloadDocument(dokumentId);
+      triggerDownload(blob, fileName);
+    } catch {
+      setDownloadError('Download failed. Please try again.');
+    } finally {
+      setDownloadingId(null);
+    }
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -210,14 +646,102 @@ export default function CompanyProfilePage() {
             countryCode={company.countryCode}
           />
 
-          {/* ... rest of file unchanged ... */}
+          {/* Freshness indicator + data source badge + refresh button */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <DataSourceBadge
+                source={metadata.source}
+                degraded={metadata.degraded}
+                failureState={metadata.failure_state}
+              />
+              <FreshnessIndicator
+                fetchedAt={metadata.fetched_at}
+                ageDays={metadata.age_days}
+                freshness={metadata.freshness}
+              />
+            </div>
+            <button
+              onClick={() => refresh()}
+              disabled={refreshing || cooldownRemaining > 0}
+              className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {refreshing ? (
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border border-slate-400 border-t-white" />
+              ) : (
+                <span>↻</span>
+              )}
+              {cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Refresh'}
+            </button>
+          </div>
 
-          {/* Annual reports (HVD dokumentlista) */}
-          {documentList && documentList.length > 0 && (
-            <AnnualReportsSection documents={documentList} />
+          {/* Tab navigation */}
+          <TabNavigation />
+
+          {/* Download error */}
+          {downloadError && (
+            <div className="rounded-xl border border-red-700 bg-red-900/30 p-4 text-sm text-red-300">
+              {downloadError}
+            </div>
           )}
 
-          {/* ... rest unchanged ... */}
+          {/* Company details */}
+          <CompanyDetailsGrid
+            orgNumber={company.organisationNumber ?? orgNumber}
+            registeredAt={registeredAt}
+            companyForm={company.companyForm}
+            countryCode={company.countryCode}
+            businessDescription={company.businessDescription}
+          />
+
+          {/* HVD structured section */}
+          {hvdSection && <HvdDataSection hvd={hvdSection} />}
+
+          {/* V4 structured section */}
+          {v4Section && <V4DataSection v4={v4Section} />}
+
+          {/* Annual reports */}
+          {hasAnnualReports && (
+            <AnnualReportsSection
+              documents={hvdDocs}
+              reports={v4Reports}
+              downloadingId={downloadingId}
+              onDownload={handleDownload}
+            />
+          )}
+
+          {/* Freshness / Source / Changes */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <FreshnessPanel
+              data={freshnessData}
+              loading={freshnessLoading}
+              error={freshnessError}
+              onRetry={retryFreshness}
+            />
+            <SourcePanel
+              data={freshnessData}
+              loading={freshnessLoading}
+              error={freshnessError}
+              onRetry={retryFreshness}
+            />
+            <ChangeSummaryPanel
+              events={changeEvents ?? []}
+              loading={changeLoading}
+              error={changeError}
+              onRetry={retryChanges}
+              canViewSensitive={canViewSensitive}
+            />
+          </div>
+
+          {/* Snapshot history */}
+          <SnapshotHistoryPanel
+            snapshots={snapshotHistory ?? []}
+            loading={snapshotLoading}
+            error={snapshotError}
+            onRetry={retrySnapshots}
+            pageSize={snapshotLimit}
+            onPageSizeChange={setSnapshotLimit}
+            canViewSensitive={canViewSensitive}
+          />
         </>
       )}
     </div>
