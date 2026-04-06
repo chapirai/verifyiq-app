@@ -32,6 +32,8 @@ export interface MappedName {
 export interface MappedAddress {
   adresstyp: string | null;
   gatuadress: string | null;
+  /** Delivery/postal box address line returned by some HVD addresses. */
+  utdelningsadress: string | null;
   postnummer: string | null;
   postort: string | null;
   land: string | null;
@@ -298,11 +300,12 @@ function extractPagaendeForfarande(raw: unknown): string | null {
 }
 
 /** Map a raw HvdAddress (or similar) into a flat MappedAddress. */
-function mapAddress(a: { gatuadress?: string; postnummer?: string; postort?: string; land?: string; adresstyp?: string } | null | undefined): MappedAddress | null {
+function mapAddress(a: { gatuadress?: string; utdelningsadress?: string; postnummer?: string; postort?: string; land?: string; adresstyp?: string } | null | undefined): MappedAddress | null {
   if (!a) return null;
   return {
     adresstyp: a.adresstyp ?? null,
     gatuadress: a.gatuadress ?? null,
+    utdelningsadress: a.utdelningsadress ?? null,
     postnummer: a.postnummer ?? null,
     postort: a.postort ?? null,
     land: a.land ?? null,
@@ -657,7 +660,11 @@ export class BolagsverketMapper {
       companyForm,
       status,
       registeredAt:
-        hvOrg.registreringsdatum ?? richOrg.registreringsdatum ?? null,
+        hvOrg.registreringsdatum ??
+        extractDateFromWrapper(hvOrg.organisationsdatum, 'registreringsdatum') ??
+        richOrg.registreringsdatum ??
+        extractDateFromWrapper(richOrg.organisationsdatum, 'registreringsdatum') ??
+        null,
       countryCode: 'SE',
       businessDescription,
       signatoryText,
