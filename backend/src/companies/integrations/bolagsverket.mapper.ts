@@ -309,6 +309,23 @@ function mapAddress(a: { gatuadress?: string; postnummer?: string; postort?: str
   };
 }
 
+/** Resolve legal name using multiple fallbacks from HVD and v4 payloads. */
+function resolveLegalName(
+  hvOrg: HvdOrganisation | null | undefined,
+  richOrg: OrganisationInformationResponse | null | undefined,
+): string {
+  const hvdPrimary = hvOrg?.namn ?? null;
+  const v4Primary = richOrg?.namn ?? null;
+
+  const hvdAlt =
+    (hvOrg?.organisationsnamnLista ?? []).find((n) => !n.fel && n.namn)?.namn ?? null;
+
+  const v4Alt =
+    (richOrg?.samtligaOrganisationsnamn ?? []).find((n) => !n.fel && n.namn)?.namn ?? null;
+
+  return hvdPrimary ?? v4Primary ?? hvdAlt ?? v4Alt ?? DEFAULT_COMPANY_NAME;
+}
+
 @Injectable()
 export class BolagsverketMapper {
   /**
@@ -631,11 +648,12 @@ export class BolagsverketMapper {
         }
       : null;
 
+    const legalName = resolveLegalName(hvOrg, richOrg);
+
     return {
       organisationNumber:
         hvOrg.identitetsbeteckning ?? richOrg.identitetsbeteckning ?? fallbackIdentifier ?? '',
-      legalName:
-        hvOrg.namn ?? richOrg.namn ?? DEFAULT_COMPANY_NAME,
+      legalName,
       companyForm,
       status,
       registeredAt:
