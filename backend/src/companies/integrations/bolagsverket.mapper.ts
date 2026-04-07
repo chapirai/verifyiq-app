@@ -126,7 +126,8 @@ export interface V4StructuredSection {
       antalAktier: number | null;
       aktiekapital: number | null;
       kvotvarde: number | null;
-      rostvarde: number | null;
+      /** Schema: rostvarde is a string (e.g. '1' or '0.1'). */
+      rostvarde: string | null;
     }>;
   } | null;
   adresser: MappedAddress[];
@@ -567,21 +568,23 @@ export class BolagsverketMapper {
             ? null
             : richOrg.aktieinformation
               ? {
-                  aktiekapital: richOrg.aktieinformation.aktiekapital ?? null,
+                  aktiekapital: (typeof richOrg.aktieinformation.aktiekapital === 'object'
+                    ? (richOrg.aktieinformation.aktiekapital as { belopp?: number })?.belopp
+                    : richOrg.aktieinformation.aktiekapital) ?? null,
                   antalAktier: richOrg.aktieinformation.antalAktier ?? null,
                   kvotvarde: richOrg.aktieinformation.kvotvarde ?? null,
-                  aktiekapitalMin: richOrg.aktieinformation.aktiekapitalMin ?? null,
-                  aktiekapitalMax: richOrg.aktieinformation.aktiekapitalMax ?? null,
-                  antalAktierMin: richOrg.aktieinformation.antalAktierMin ?? null,
-                  antalAktierMax: richOrg.aktieinformation.antalAktierMax ?? null,
+                  aktiekapitalMin: richOrg.aktieinformation.aktiekapitalMin ?? (richOrg.aktieinformation.aktiegranser?.aktiekapitalGranser?.lagst ?? null),
+                  aktiekapitalMax: richOrg.aktieinformation.aktiekapitalMax ?? (richOrg.aktieinformation.aktiegranser?.aktiekapitalGranser?.hogst ?? null),
+                  antalAktierMin: richOrg.aktieinformation.antalAktierMin ?? (richOrg.aktieinformation.aktiegranser?.antalAktierGranser?.lagst ?? null),
+                  antalAktierMax: richOrg.aktieinformation.antalAktierMax ?? (richOrg.aktieinformation.aktiegranser?.antalAktierGranser?.hogst ?? null),
                   registreringsdatum: richOrg.aktieinformation.registreringsdatum ?? null,
                   aktieslag: (richOrg.aktieinformation.aktieslag ?? [])
                     .filter((s) => !s.fel)
                     .map((s) => ({
-                      aktieslagsnamn: s.aktieslagsnamn ?? null,
-                      antalAktier: s.antalAktier ?? null,
+                      aktieslagsnamn: s.aktieslagsnamn ?? s.namn ?? null,
+                      antalAktier: s.antalAktier ?? s.antal ?? null,
                       aktiekapital: s.aktiekapital ?? null,
-                      kvotvarde: s.kvotvarde ?? null,
+                      kvotvarde: typeof s.kvotvarde === 'object' ? ((s.kvotvarde as { belopp?: number })?.belopp ?? null) : (s.kvotvarde ?? null),
                       rostvarde: s.rostvarde ?? null,
                     })),
                 }

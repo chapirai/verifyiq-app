@@ -200,23 +200,54 @@ export interface BvFirmateckning {
   fel?: BvFel;
 }
 
+/** Schema: aktieslag entry inside BvAktieinformation. */
 export interface BvAktieslag {
+  /** Schema: namn (was aktieslagsnamn). */
+  namn?: string;
+  /** Schema: antal (was antalAktier). */
+  antal?: number;
+  /** Schema: aktieslagGranser. */
+  aktieslagGranser?: { lagst?: number; hogst?: number };
+  /** Schema: kvotvarde as { belopp, valuta } object (was plain number). */
+  kvotvarde?: { belopp?: number; valuta?: string } | number;
+  /** Schema: rostvarde. */
+  rostvarde?: string;
+  /** Schema: fritext. */
+  fritext?: string;
+  /** Kept for backward compatibility. */
   aktieslagsnamn?: string;
+  /** Kept for backward compatibility. */
   antalAktier?: number;
-  kvotvarde?: number;
+  /** Kept for backward compatibility. */
   aktiekapital?: number;
-  rostvarde?: number;
   fel?: BvFel;
 }
 
+/** Schema: aktieinformation block in OrganisationResponse and AktiekapitalforandringResponse. */
 export interface BvAktieinformation {
-  aktiekapital?: number;
+  /** Schema: aktiekapital as { belopp, valuta } object. Plain number kept for backward compat. */
+  aktiekapital?: { belopp?: number; valuta?: string } | number;
+  /** Schema: antalAktier. */
   antalAktier?: number;
-  kvotvarde?: number;
+  /** Schema: aktiegranser — capital and share count limits. */
+  aktiegranser?: {
+    aktiekapitalGranser?: { lagst?: number; hogst?: number };
+    antalAktierGranser?: { lagst?: number; hogst?: number };
+    valuta?: string;
+  };
+  /** Schema: aktieslag array. */
   aktieslag?: BvAktieslag[];
+  /** Schema: nedsattningPagar — capital reduction in progress. */
+  nedsattningPagar?: boolean;
+  /** Kept for backward compatibility. */
+  kvotvarde?: number;
+  /** Kept for backward compatibility. */
   aktiekapitalMax?: number;
+  /** Kept for backward compatibility. */
   aktiekapitalMin?: number;
+  /** Kept for backward compatibility. */
   antalAktierMax?: number;
+  /** Kept for backward compatibility. */
   antalAktierMin?: number;
   registreringsdatum?: string;
   fel?: BvFel;
@@ -285,12 +316,53 @@ export interface BvUtlandskFilial {
   fel?: BvFel;
 }
 
+/** Schema: arsredovisning entry inside finansiellaRapporter[].rakenskapsperioder[]. */
+export interface BvArsredovisning {
+  rapporteringsperiod?: { periodFrom?: string; periodTom?: string };
+  rapporttyp?: HvdKodKlartext;
+  ankomsttidpunkt?: string;
+  registreradTidpunkt?: string;
+  arsredovisningsinnehall?: HvdKodKlartext[];
+  brister?: HvdKodKlartext[];
+  handlaggningAvslutadDatum?: string;
+  arsredovisningspaminnelse?: {
+    skickadTidpunkt?: string;
+    arsredovisningspaminnelsetyp?: HvdKodKlartext;
+  };
+  vinstutdelning?: {
+    beslutadDatum?: string;
+    valuta?: HvdKodKlartext;
+    belopp?: number;
+    vinstutdelningstyp?: HvdKodKlartext;
+  };
+  fortsattStamma?: { stammodatum?: string; fritext?: string };
+}
+
+/** Schema: rakenskapsperiod entry inside finansiellaRapporter[]. */
+export interface BvRakenskapsperiod {
+  start?: string;
+  slut?: string;
+  arsredovisningar?: BvArsredovisning[];
+}
+
+/** Schema: finansiellaRapporter item in FinansiellaRapporterResponse. */
+export interface BvFinansiellaRapportItem {
+  arende?: { arendenummer?: string; avslutatTidpunkt?: string };
+  rakenskapsperioder?: BvRakenskapsperiod[];
+}
+
+/**
+ * Legacy BvFinansiellRapport — used in OrganisationInformationResponse.finansiellaRapporter.
+ * These fields come from the organisation summary, not the dedicated /finansiellarapporter endpoint.
+ */
 export interface BvFinansiellRapport {
   rapporttyp?: string;
   rapporteringsperiodFran?: string;
   rapporteringsperiodTom?: string;
   registreringsdatum?: string;
   dokumentId?: string;
+  /** arende link in the summary view. */
+  arende?: { arendenummer?: string; avslutatTidpunkt?: string };
   fel?: BvFel;
 }
 
@@ -529,27 +601,62 @@ export interface BvFirmateckningsutfallJaSvar {
   ingaendeFunktionarer?: BvOfficer[];
 }
 
+/** Schema: firmateckningssvar inside firmateckningInformation[]. */
+export interface BvFirmateckningssvar {
+  /** JA-svar — list of signing rules that allow the person to sign. */
+  firmateckningsutfallJaSvar?: BvFirmateckningsutfallJaSvar[];
+  /** NEJ-svar — reason why signing authority was denied. */
+  firmateckningsutfallNejSvar?: { anledning?: string };
+}
+
+/** Schema: firmateckningOrganisation inside firmateckningInformation[]. */
+export interface BvFirmateckningOrganisation {
+  identitet?: { typ?: HvdKodKlartext; identitetsbeteckning?: string };
+  organisationsnamn?: { typ?: HvdKodKlartext; namn?: string };
+  organisationsform?: HvdKodKlartext;
+  organisationsstatusar?: V4OrganisationStatus[];
+  /** Pending cases that may affect signing authority. */
+  inneliggandeArenden?: Record<string, unknown>;
+}
+
+/** Schema: single firmateckningInformation entry. */
+export interface BvFirmateckningInformation {
+  funktionar?: BvEngagemangFunktionar;
+  firmateckningOrganisation?: BvFirmateckningOrganisation;
+  firmateckningssvar?: BvFirmateckningssvar;
+}
+
 export interface FirmateckningsalternativResponse {
+  /** Schema: firmateckningInformation — the primary response array. */
+  firmateckningInformation?: BvFirmateckningInformation[];
+  /** Kept for backward compatibility. */
   firmateckningsutfall?: JaNej;
+  /** Kept for backward compatibility. */
   firmateckningsalternativ?: Firmateckningsalternativ;
+  /** Kept for backward compatibility. */
   firmateckningsutfallJaSvar?: BvFirmateckningsutfallJaSvar;
   fel?: BvFel;
 }
 
 // ── Share capital history (aktiekapitalforandringar) ─────────────────────────
 
+/** Schema: single aktiekapitalforandringar entry. */
 export interface BvAktiekapitalforandring {
-  arende?: { arendenummer?: string; arendetyp?: string };
+  /** Schema: arende — linked case (arendenummer + avslutatTidpunkt per schema). */
+  arende?: { arendenummer?: string; avslutatTidpunkt?: string };
   aktieinformation?: BvAktieinformation;
-  aktiekapitalforandring?: {
-    forandringstyp?: string;
-    belopp?: number;
-    registreringsdatum?: string;
-  };
   fel?: BvFel;
 }
 
 export interface AktiekapitalforandringResponse {
+  /** Schema: identitet — organisation identity at the top level. */
+  identitet?: { typ?: HvdKodKlartext; identitetsbeteckning?: string };
+  /** Schema: organisationsnamn — name of the organisation. */
+  organisationsnamn?: { typ?: HvdKodKlartext; namn?: string };
+  /** Schema: organisationsform — legal form. */
+  organisationsform?: HvdKodKlartext;
+  /** Schema: organisationsstatusar — statuses. */
+  organisationsstatusar?: V4OrganisationStatus[];
   gallandeAktieinformation?: BvAktieinformation;
   aktiekapitalforandringar?: BvAktiekapitalforandring[];
   fel?: BvFel;
@@ -590,6 +697,8 @@ export interface BvEngagemangFunktionar {
   };
   insats?: string;
   anteckning?: string;
+  /** Schema: arFirmatecknare — whether this person has signatory authority (JA/NEJ). */
+  arFirmatecknare?: string;
 }
 
 export interface BvEngagemang {
@@ -600,16 +709,21 @@ export interface BvEngagemang {
 
 export interface OrganisationsengagemangResponse {
   totaltAntalTraffar?: number;
+  /** Schema: sida — current page number in paginated response. */
+  sida?: number;
+  /** Schema: antalPerSida — page size in paginated response. */
+  antalPerSida?: number;
   funktionarsOrganisationsengagemang?: BvEngagemang[];
   fel?: BvFel;
 }
 
 // ── Financial reports ─────────────────────────────────────────────────────────
 
-/** Schema: FinansiellaRapporterResponse — top-level identitetsbeteckning added. */
+/** Schema: FinansiellaRapporterResponse from the dedicated /finansiellarapporter endpoint. */
 export interface FinansiellaRapporterResponse {
   identitetsbeteckning?: string;
-  finansiellaRapporter?: BvFinansiellRapport[];
+  /** Schema: finansiellaRapporter — uses arende + rakenskapsperioder structure. */
+  finansiellaRapporter?: BvFinansiellaRapportItem[];
   fel?: BvFel;
 }
 
