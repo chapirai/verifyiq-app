@@ -242,7 +242,7 @@ describe('BolagsverketClient', () => {
   // ── Företagsinformation auth ───────────────────────────────────────────────
 
   describe('fetchOrganisationInformation (Företagsinformation auth)', () => {
-    const orgUrl = 'https://gw.api.bolagsverket.se/foretagsinformation/v4/organisationsinformation';
+    const orgUrl = 'https://gw.api.bolagsverket.se/foretagsinformation/v4/organisationer';
 
     it('uses BV_FORETAGSINFO_BEARER_TOKEN as Authorization header', async () => {
       const getMock = jest.fn();
