@@ -619,7 +619,7 @@ export class BolagsverketClient {
   }
 
   /**
-   * POST /foretagsinformation/v4/organisationsinformation
+   * POST /foretagsinformation/v4/organisationer
    * Retrieves organisation information for the specified categories.
    * Defaults to ALL available categories when none are specified.
    */
@@ -628,6 +628,7 @@ export class BolagsverketClient {
     informationCategories: string[] = [...ALL_INFORMATION_CATEGORIES],
     tidpunkt?: string,
     context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+    namnskyddslopnummer?: string,
   ): Promise<{
     requestPayload: Record<string, unknown>;
     responsePayload: OrganisationInformationResponse[];
@@ -635,9 +636,14 @@ export class BolagsverketClient {
   }> {
     const payload: Record<string, unknown> = {
       identitetsbeteckning,
-      organisationInformationsmangd: informationCategories,
     };
-    if (tidpunkt) {
+    if (namnskyddslopnummer !== undefined) {
+      payload['namnskyddslopnummer'] = namnskyddslopnummer;
+    }
+    if (Array.isArray(informationCategories) && informationCategories.length > 0) {
+      payload['organisationInformationsmangd'] = informationCategories;
+    }
+    if (tidpunkt !== undefined) {
       payload['tidpunkt'] = tidpunkt;
     }
     const { responseData, requestId } = await this.requestWithRetry<OrganisationInformationResponse[]>(
@@ -751,7 +757,8 @@ export class BolagsverketClient {
     const paginering: BvPaginering = { sida: pageNumber, antalPerSida: pageSize };
     const payload: Record<string, unknown> = { identitetsbeteckning, paginering };
     if (sortAttribute && sortOrder) {
-      const sortering: BvSortering = { sorteringsattribut: sortAttribute, sorteringsordning: sortOrder };
+      // Schema: OrganisationsengagemangRequest uses `attribut` (not sorteringsattribut).
+      const sortering: BvSortering = { attribut: sortAttribute, sorteringsordning: sortOrder };
       payload['sortering'] = sortering;
     }
     if (filters) {
@@ -801,12 +808,16 @@ export class BolagsverketClient {
   async fetchPersonInformation(
     identitetsbeteckning: string,
     context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+    personInformationsmangd?: string[],
   ): Promise<{
     requestPayload: Record<string, unknown>;
     responsePayload: PersonResponse;
     requestId: string;
   }> {
     const payload: Record<string, unknown> = { identitetsbeteckning };
+    if (Array.isArray(personInformationsmangd) && personInformationsmangd.length > 0) {
+      payload['personInformationsmangd'] = personInformationsmangd;
+    }
     const { responseData, requestId } = await this.requestWithRetry<PersonResponse>(
       'post',
       this.buildUrl(this.getOrganisationBaseUrl(), '/personer'),

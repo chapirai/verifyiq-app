@@ -211,12 +211,14 @@ export class BolagsverketService {
     informationCategories?: string[],
     tidpunkt?: string,
     context?: BvRequestContext,
+    namnskyddslopnummer?: string,
   ): Promise<OrganisationInformationResponse[]> {
     const { responsePayload } = await this.client.fetchOrganisationInformation(
       identitetsbeteckning,
       informationCategories,
       tidpunkt,
       context,
+      namnskyddslopnummer,
     );
     return responsePayload;
   }
@@ -224,10 +226,12 @@ export class BolagsverketService {
   async getPersonInformation(
     identitetsbeteckning: string,
     context?: BvRequestContext,
+    personInformationsmangd?: string[],
   ): Promise<PersonResponse> {
     const { responsePayload } = await this.client.fetchPersonInformation(
       identitetsbeteckning,
       context,
+      personInformationsmangd,
     );
     return responsePayload;
   }

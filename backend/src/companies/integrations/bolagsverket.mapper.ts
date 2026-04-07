@@ -412,8 +412,9 @@ export class BolagsverketMapper {
     if (richOrg.aktieinformation?.fel) {
       fieldErrors.push({ field: 'aktieinformation', errorType: richOrg.aktieinformation.fel.typ ?? 'UNKNOWN' });
     }
-    if (richOrg.rakenskapsAr?.fel) {
-      fieldErrors.push({ field: 'rakenskapsAr', errorType: richOrg.rakenskapsAr.fel.typ ?? 'UNKNOWN' });
+    if ((richOrg.rakenskapsar ?? richOrg.rakenskapsAr)?.fel) {
+      const rakField = richOrg.rakenskapsar ?? richOrg.rakenskapsAr;
+      fieldErrors.push({ field: 'rakenskapsar', errorType: rakField?.fel?.typ ?? 'UNKNOWN' });
     }
     if (hvOrg.rekonstruktionsstatus?.fel) {
       fieldErrors.push({
@@ -487,8 +488,8 @@ export class BolagsverketMapper {
     const hasRichOrg = !!(richInfoArray?.length);
     const v4Section: V4StructuredSection | null = hasRichOrg
       ? {
-          identitetsbeteckning: richOrg.identitetsbeteckning ?? null,
-          organisationsnamn: richOrg.namn ?? null,
+          identitetsbeteckning: richOrg.identitet?.identitetsbeteckning ?? richOrg.identitetsbeteckning ?? null,
+          organisationsnamn: richOrg.organisationsnamn?.namn ?? richOrg.namn ?? null,
           organisationsform: extractKodKlartext(richOrg.organisationsform) ?? null,
           organisationsdatum: extractDateFromWrapper(richOrg.organisationsdatum, 'registreringsdatum', 'bildatDatum') ?? null,
           registreringsdatum: richOrg.registreringsdatum ?? null,
@@ -512,14 +513,14 @@ export class BolagsverketMapper {
                     ?? null,
                 }
               : null,
-          rakenskapsar: richOrg.rakenskapsAr?.fel
+          rakenskapsar: (richOrg.rakenskapsar ?? richOrg.rakenskapsAr)?.fel
             ? null
-            : richOrg.rakenskapsAr
+            : (richOrg.rakenskapsar ?? richOrg.rakenskapsAr)
               ? {
-                  rakenskapsarInleds: richOrg.rakenskapsAr.rakenskapsarInleds ?? null,
-                  rakenskapsarAvslutas: richOrg.rakenskapsAr.rakenskapsarAvslutas ?? null,
-                  forstaRakenskapsarInleds: richOrg.rakenskapsAr.forstaRakenskapsarInleds ?? null,
-                  forstaRakenskapsarAvslutas: richOrg.rakenskapsAr.forstaRakenskapsarAvslutas ?? null,
+                  rakenskapsarInleds: (richOrg.rakenskapsar ?? richOrg.rakenskapsAr)!.rakenskapsarInleds ?? null,
+                  rakenskapsarAvslutas: (richOrg.rakenskapsar ?? richOrg.rakenskapsAr)!.rakenskapsarAvslutas ?? null,
+                  forstaRakenskapsarInleds: (richOrg.rakenskapsar ?? richOrg.rakenskapsAr)!.forstaRakenskapsarInleds ?? null,
+                  forstaRakenskapsarAvslutas: (richOrg.rakenskapsar ?? richOrg.rakenskapsAr)!.forstaRakenskapsarAvslutas ?? null,
                 }
               : null,
           verksamhetsbeskrivning:
@@ -647,7 +648,9 @@ export class BolagsverketMapper {
               dokumentId: r.dokumentId ?? null,
             })),
           ovrigOrganisationsinformation:
-            (richOrg.ovrigOrganisationsinformation as Record<string, unknown> | null | undefined) ?? null,
+            (richOrg.ovrigOrganisationinformation as Record<string, unknown> | null | undefined)
+            ?? (richOrg.ovrigOrganisationsinformation as Record<string, unknown> | null | undefined)
+            ?? null,
         }
       : null;
 
@@ -655,7 +658,7 @@ export class BolagsverketMapper {
 
     return {
       organisationNumber:
-        hvOrg.identitetsbeteckning ?? richOrg.identitetsbeteckning ?? fallbackIdentifier ?? '',
+        hvOrg.identitetsbeteckning ?? richOrg.identitet?.identitetsbeteckning ?? richOrg.identitetsbeteckning ?? fallbackIdentifier ?? '',
       legalName,
       companyForm,
       status,
@@ -676,9 +679,9 @@ export class BolagsverketMapper {
       addresses: (richOrg.adresser ?? hvOrg.adresser ?? []) as Array<Record<string, unknown>>,
       allNames: (richOrg.samtligaOrganisationsnamn ?? []) as Array<Record<string, unknown>>,
       permits: (richOrg.tillstand ?? []) as Array<Record<string, unknown>>,
-      financialYear: richOrg.rakenskapsAr?.fel
+      financialYear: (richOrg.rakenskapsar ?? richOrg.rakenskapsAr)?.fel
         ? null
-        : ((richOrg.rakenskapsAr as Record<string, unknown> | undefined) ?? null),
+        : (((richOrg.rakenskapsar ?? richOrg.rakenskapsAr) as Record<string, unknown> | undefined) ?? null),
       industryCode,
       deregisteredAt,
       sourcePayloadSummary: {
