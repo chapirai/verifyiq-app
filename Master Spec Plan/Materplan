@@ -1,0 +1,161 @@
+Describe VerifyIQ as if explaining to a technical buyer in one paragraph: what the system does, what input it takes, and what output it produces.
+VerifyIQ is a B2B data platform that retrieves, normalizes, enriches, stores, and delivers Nordic company and related data through a web dashboard, API, bulk processing workflows, and developer integrations. The system takes inputs such as organization numbers, company names, uploaded company lists, and API requests, retrieves data from external sources, structures it into a unified schema, enriches it with derived fields and metadata, and returns structured outputs including company profiles, financial summaries, annual reports, KYC-relevant data, and monitoring signals. Each request also contributes to an internal repository, allowing VerifyIQ to build a continuously expanding dataset with historical snapshots and change tracking over time.
+
+Walk through a real customer scenario: who the user is, what they are trying to achieve, what steps they take using VerifyIQ, and what the final outcome is.
+A KYC analyst at a financial institution needs to onboard a new business customer and later perform periodic reviews. The analyst logs into VerifyIQ, searches for a company, reviews its identity data, representatives, filings, and financials, and saves it to a monitored portfolio. For periodic reviews, the analyst uploads a CSV of existing customers, and the system refreshes and enriches all records, flags changes, and returns updated structured data. A software company integrates VerifyIQ into its onboarding flow via API to automate data retrieval. A sales team uses the platform to identify potential leads and export structured lists. The outcome is reduced manual work, faster decisions, lower data costs, and a unified structured data layer.
+
+What is the pain today without VerifyIQ?
+Manual KYC processes, fragmented data sources, high pricing from multiple providers, lack of a finished API, unstructured data formats, inefficient workflows, and inability to scale data-driven operations efficiently.
+
+Describe all user types interacting with the system and what they actually do inside the platform.
+Client superuser manages account, users, API access, billing, and settings. Standard users include KYC analysts, credit analysts, sales users, operations, and customer service. Admin users manage system configurations. Billing users monitor payments and invoices.
+
+Who pays for the product and why do they justify the cost?
+Companies pay because the platform is critical for operations, compliance, risk assessment, and sales. Individuals may pay for development or project-based use. The cost is justified by automation, reduced manual work, and replacing multiple data providers.
+
+In a customer organization, who integrates your API, who consumes the data, and who monitors usage or compliance?
+Developers or technical teams integrate the API. Data is consumed by KYC, credit, operations, and sales teams. Usage and compliance are monitored by superusers, finance, and compliance teams.
+
+Describe how a completely new user discovers and starts using VerifyIQ, from landing page to first value.
+A user lands on the website, reads about services and use cases, selects a product path, signs up, completes payment if required, logs in, and performs their first search, API call, or bulk upload.
+
+Describe the first successful experience where the user clearly sees value.
+The user retrieves structured company data instantly through search, API, or bulk upload without manual aggregation from multiple sources.
+
+Describe all ways a user can interact with the product (API, dashboard, SDK/widget) in your own words.
+Users interact through a dashboard for manual workflows, API for system integration, SDK/widget for simplified developer integration, and bulk upload for large-scale processing.
+
+Describe how money flows through the system: when a user pays, what they are paying for, and what triggers billing.
+Users pay for subscriptions, API usage, bulk processing, and premium features. Billing is triggered by plan activation, usage, renewals, and upgrades.
+
+Describe how usage relates to cost and what actions increase cost for the user.
+Usage is driven by API calls, data records processed, bulk uploads, monitoring volume, and feature usage. Increased usage results in higher cost or plan upgrades.
+
+Describe what happens if usage exceeds expectations and what happens if payment fails.
+Usage exceeding limits results in overage charges, throttling, or required upgrades. Payment failure triggers retries, notifications, grace period, and eventual restriction of access.
+
+Describe how a user account is created, what information is required, and what validation is needed.
+Users register with name, email, company information, and password. Email verification is required. Additional validation may be applied for business accounts.
+
+After account creation, describe what is automatically provisioned and what access the user immediately has.
+The system creates a tenant, assigns plan, provisions roles, generates API keys, initializes usage tracking, and grants dashboard access.
+
+Describe how access evolves over time (upgrades, downgrades, restrictions).
+Access evolves through plan changes, usage limits, billing status, and role permissions. Upgrades expand access, downgrades restrict features, and unpaid accounts are limited.
+
+Describe the API from a user perspective: what requests they send and what responses they expect.
+Users send requests using identifiers and receive structured JSON responses containing company data, financials, filings, and related information.
+
+Describe a full API call lifecycle from request to processing to response.
+Request is authenticated, validated, processed via cache or source retrieval, normalized, enriched, stored, and returned with logging and usage tracking.
+
+What guarantees do you want to give in terms of speed, uptime, and consistency?
+High availability, predictable performance, consistent schema, and clear timestamps for data freshness.
+
+How should the system behave under high load, invalid input, and missing data?
+System should scale with rate limiting and queueing, validate input with clear errors, and return structured responses even when data is missing.
+
+Describe the structure of your data: what entities exist and how they are related.
+Entities include tenants, users, companies, persons, financials, filings, API keys, subscriptions, usage records, bulk jobs, monitoring events, and audit logs. Companies are central and linked to financials, filings, and persons.
+
+Describe how raw data becomes usable, from ingestion to transformation to output.
+Data is ingested from sources, normalized into a canonical schema, enriched, stored, and delivered through API and dashboard.
+
+What does “good data” mean for VerifyIQ?
+Structured, accurate, consistent, timestamped, and usable for decision-making.
+
+Describe where your data comes from and in what formats.
+External APIs, public registries, structured datasets, and files in formats such as JSON, XML, CSV, and Excel.
+
+Describe how often data should be updated.
+Near real-time for queries and scheduled updates for monitoring and bulk processing.
+
+Describe what happens when a data source changes or fails.
+System isolates failures, uses cached data if available, logs issues, and maintains stable output schema.
+
+Describe what “KYC” means inside your system and what the user actually sees or does.
+Users retrieve and review company data, perform checks, refresh portfolios, and track changes over time.
+
+Describe what “risk analysis” means and what outputs are generated.
+Risk analysis provides structured indicators, trends, and flags based on available data for decision support.
+
+What is calculated by your system versus what is raw data?
+Raw data comes from sources; calculated data includes ratios, trends, flags, and change indicators.
+
+Describe how a user searches for data and what inputs they provide.
+Users search using identifiers, names, or uploaded files.
+
+Describe how results are presented and how the user interacts with them.
+Results are shown in tables with detailed views, filtering, sorting, exporting, and monitoring options.
+
+What defines a fast and good user experience for you?
+Fast responses, clear structure, minimal steps, and high usability.
+
+Describe if and how users track changes over time and what events matter.
+Users track changes via monitoring, including status changes, filings, financial updates, and structural changes.
+
+Describe how the system communicates changes to the user.
+Through dashboard alerts, notifications, and reports.
+
+Describe your developer-facing integration beyond the API: what problem it solves and what it removes for the developer.
+SDK simplifies authentication, request handling, and data normalization.
+
+Describe how the SDK or widget is used step-by-step from installation to output.
+Install package, configure credentials, call methods, receive structured data.
+
+Describe where the SDK or widget runs (client, backend, or both).
+Primarily backend, optionally limited client-side.
+
+Describe the dashboard as a workspace and what users actually do there.
+Search, analyze, monitor, upload, export, manage API and billing.
+
+Describe the most important screen in the dashboard and what must always be visible.
+Search and company profile with key data and actions.
+
+Describe the full payment lifecycle from user initiation to system reaction.
+User selects plan, pays, system activates subscription, provisions access, and logs billing.
+
+What must happen automatically after a successful payment?
+Account activation, access provisioning, API key creation, notifications.
+
+Describe failure scenarios such as failed payment or expired subscription.
+Retries, notifications, grace period, and restricted access.
+
+Describe how usage is measured.
+API calls, processed records, bulk jobs, monitoring.
+
+Describe how limits are enforced.
+Through quotas, rate limits, and feature restrictions.
+
+Describe how users are informed about their usage.
+Dashboard and notifications.
+
+Describe how you prevent misuse of the system.
+Authentication, rate limiting, monitoring, and anomaly detection.
+
+Describe how you protect user and data security.
+Encryption, access control, secure storage, and logging.
+
+What level of logging and auditability do you need?
+Comprehensive logging for all actions and data access.
+
+Describe your ideal operating model and what manual work remains if everything is working perfectly.
+Fully automated system with minimal manual intervention limited to support and enterprise cases.
+
+List all processes that must be fully automated.
+Onboarding, billing, provisioning, API access, monitoring, and notifications.
+
+Describe any process that may require manual intervention and why.
+Enterprise onboarding, disputes, and exceptional cases.
+
+Describe what you need to monitor internally (business metrics, system performance, user behavior).
+Revenue, usage, performance, errors, and user activity.
+
+Describe how the system should evolve over time.
+Expand data coverage, features, analytics, and integrations.
+
+What would break first if you scale 10x?
+Data pipelines, performance, and operational processes if not properly designed.
+
+Describe VerifyIQ as a system in one sentence using input → processing → output → value.
+VerifyIQ takes company identifiers and data requests as input, processes and structures data through automated pipelines, outputs structured company intelligence via API and dashboard, and delivers value by enabling efficient KYC, risk, and business workflows.
