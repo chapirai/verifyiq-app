@@ -64,9 +64,9 @@ function RecentSearchItem({
         type="button"
         onClick={() => onClick(entry.identifier)}
         aria-label={`Search for company ${entry.identifier}${metaSummary}`}
-        className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5 transition hover:border-indigo-500 hover:text-white"
+        className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 transition hover:border-accent"
       >
-        <span className="font-mono text-xs text-slate-300">{entry.identifier}</span>
+        <span className="font-mono text-xs text-foreground">{entry.identifier}</span>
         {entry.metadata && (
           <span className="flex items-center gap-1" aria-hidden="true">
             <FreshnessDot freshness={entry.metadata.freshness} />
@@ -131,7 +131,7 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
           <div className="flex-1">
             <label
               htmlFor="identifier-input"
-              className="mb-1 block text-xs uppercase tracking-widest text-slate-400"
+              className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground"
             >
               Swedish Organisation Number or Personnummer
             </label>
@@ -146,7 +146,7 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
               autoComplete="off"
               spellCheck={false}
               className={[
-                'w-full rounded-xl border bg-background px-4 py-2.5 text-sm text-white placeholder-slate-500 transition',
+                'w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition',
                 'focus:outline-none focus:ring-2',
                 error
                   ? 'border-red-500 focus:ring-red-500/50'
@@ -170,13 +170,13 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
               handleSubmit();
             }}
             disabled={!isValid || loading}
-            className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="primary-btn disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? 'Searching…' : 'Search'}
           </button>
         </div>
 
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-muted-foreground">
           Enter a 10-digit or 12-digit Swedish organisation number, or a 12-digit personnummer.
         </p>
       </div>
@@ -185,13 +185,13 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
       {searches.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-6">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Recent Searches
             </h3>
             <button
               type="button"
               onClick={clearSearches}
-              className="text-xs text-slate-500 transition hover:text-slate-300"
+              className="text-xs text-muted-foreground transition hover:text-foreground"
             >
               Clear
             </button>

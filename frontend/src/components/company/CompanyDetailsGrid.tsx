@@ -6,8 +6,8 @@ interface DetailItemProps {
 function DetailItem({ label, value }: DetailItemProps) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-widest text-slate-500">{label}</dt>
-      <dd className="mt-1 text-sm text-white">{value ?? '—'}</dd>
+      <dt className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm text-foreground">{value ?? '—'}</dd>
     </div>
   );
 }
@@ -33,7 +33,7 @@ export function CompanyDetailsGrid({
 
   return (
     <div className="rounded-2xl border border-border bg-card p-6">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">
+      <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
         Company Details
       </h2>
       <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -43,10 +43,10 @@ export function CompanyDetailsGrid({
         <DetailItem label="Country" value={countryCode} />
         {businessDescription && (
           <div className="sm:col-span-2 lg:col-span-3">
-            <dt className="text-xs font-medium uppercase tracking-widest text-slate-500">
+            <dt className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
               Business Description
             </dt>
-            <dd className="mt-1 text-sm text-white">{businessDescription}</dd>
+            <dd className="mt-1 text-sm text-foreground">{businessDescription}</dd>
           </div>
         )}
       </dl>

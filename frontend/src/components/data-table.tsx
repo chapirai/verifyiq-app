@@ -16,7 +16,7 @@ export function DataTable<T>({ columns, rows, emptyMessage = 'No records found.'
   return (
     <div className="panel overflow-hidden">
       <table className="w-full text-left">
-        <thead className="bg-slate-900/70 text-sm text-slate-400">
+        <thead className="bg-muted text-sm text-muted-foreground">
           <tr>
             {columns.map((column) => (
               <th key={column.key} className="px-4 py-3">
@@ -28,13 +28,13 @@ export function DataTable<T>({ columns, rows, emptyMessage = 'No records found.'
         <tbody>
           {rows.length === 0 ? (
             <tr className="border-t border-border">
-              <td className="px-4 py-4 text-slate-400" colSpan={columns.length}>
+              <td className="px-4 py-4 text-muted-foreground" colSpan={columns.length}>
                 {emptyMessage}
               </td>
             </tr>
           ) : (
             rows.map((row, index) => (
-              <tr key={index} className="border-t border-border">
+              <tr key={index} className="border-t border-border transition-colors hover:bg-muted/50">
                 {columns.map((column) => (
                   <td key={column.key} className="px-4 py-3">
                     {column.render(row)}

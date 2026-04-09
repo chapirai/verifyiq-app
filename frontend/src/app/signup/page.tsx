@@ -30,18 +30,19 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
+    <main className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="panel w-full max-w-xl p-8">
-        <p className="mb-2 text-sm uppercase tracking-[0.2em] text-slate-400">VerifyIQ</p>
-        <h1 className="mb-6 text-3xl font-semibold">Create your workspace</h1>
+        <p className="mb-2 text-sm uppercase tracking-[0.2em] text-muted-foreground">Nordic Company Data</p>
+        <h1 className="mb-2 text-4xl" style={{ fontFamily: 'var(--font-calistoga), Georgia, serif' }}>Create VerifyIQ workspace</h1>
+        <p className="mb-6 text-sm text-muted-foreground">Set up your company tenant and admin account.</p>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <input className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" placeholder="Company name" value={tenantName} onChange={(e) => setTenantName(e.target.value)} required />
-          <input className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" placeholder="Company slug (e.g. northbank)" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value.toLowerCase())} required />
-          <input className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-          <input type="email" className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" placeholder="Work email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input type="password" className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" placeholder="Password (min 8 chars)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+          <input className="input-ui" placeholder="Company name" value={tenantName} onChange={(e) => setTenantName(e.target.value)} required />
+          <input className="input-ui" placeholder="Company slug (e.g. northbank)" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value.toLowerCase())} required />
+          <input className="input-ui" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          <input type="email" className="input-ui" placeholder="Work email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input type="password" className="input-ui" placeholder="Password (min 8 chars)" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
-          <button disabled={loading} className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-medium text-white disabled:opacity-60">
+          <button disabled={loading} className="primary-btn w-full disabled:opacity-60">
             {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>

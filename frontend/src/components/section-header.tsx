@@ -6,10 +6,15 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ eyebrow, title, description }: SectionHeaderProps) {
   return (
-    <div>
-      <p className="text-sm text-slate-400">{eyebrow}</p>
-      <h1 className="text-3xl font-semibold">{title}</h1>
-      {description ? <p className="mt-3 max-w-3xl text-slate-300">{description}</p> : null}
+    <div className="space-y-3">
+      <div className="section-badge">
+        <span className="section-badge-dot" />
+        <span className="section-badge-text">{eyebrow}</span>
+      </div>
+      <h1 className="text-4xl leading-tight" style={{ fontFamily: 'var(--font-calistoga), Georgia, serif' }}>
+        {title}
+      </h1>
+      {description ? <p className="max-w-3xl text-[15px] text-muted-foreground">{description}</p> : null}
     </div>
   );
 }

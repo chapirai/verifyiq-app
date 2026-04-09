@@ -1,12 +1,15 @@
+import { SectionHeader } from '@/components/section-header';
+
 export default function SettingsPage() {
   return (
     <section className="space-y-6">
-      <div>
-        <p className="text-sm text-slate-400">Workspace Settings</p>
-        <h1 className="text-3xl font-semibold">Team and Security</h1>
-      </div>
+      <SectionHeader
+        eyebrow="Workspace Settings"
+        title="Team and Security"
+        description="Manage workspace profile, user access, and account security controls."
+      />
       <div className="panel p-6">
-        <p className="text-slate-300">
+        <p className="text-muted-foreground">
           Settings foundation for workspace profile, user management, and security controls.
         </p>
       </div>

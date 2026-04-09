@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api, type ApiKeyRecord } from '@/lib/api';
+import { SectionHeader } from '@/components/section-header';
 
 export default function ApiAccessPage() {
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>([]);
@@ -54,10 +55,11 @@ export default function ApiAccessPage() {
 
   return (
     <section className="space-y-6">
-      <div>
-        <p className="text-sm text-slate-400">Developer Platform</p>
-        <h1 className="text-3xl font-semibold">API Access</h1>
-      </div>
+      <SectionHeader
+        eyebrow="Developer Platform"
+        title="API Access"
+        description="Manage key lifecycle, secure integrations, and monitor usage access."
+      />
 
       <div className="panel p-6 space-y-4">
         <h2 className="text-lg font-semibold">Create API key</h2>
@@ -65,15 +67,15 @@ export default function ApiAccessPage() {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2"
+            className="input-ui flex-1"
             placeholder="Key name"
           />
-          <button onClick={handleCreate} disabled={creating || !name.trim()} className="rounded-xl bg-indigo-600 px-4 py-2 font-medium disabled:opacity-60">
+          <button onClick={handleCreate} disabled={creating || !name.trim()} className="primary-btn disabled:opacity-60">
             {creating ? 'Creating…' : 'Create'}
           </button>
         </div>
         {lastCreated ? (
-          <p className="rounded-lg bg-emerald-900/40 p-3 text-sm text-emerald-200">
+          <p className="rounded-lg bg-emerald-100 p-3 text-sm text-emerald-800">
             New key (copy now): <span className="font-mono">{lastCreated}</span>
           </p>
         ) : null}
@@ -81,9 +83,9 @@ export default function ApiAccessPage() {
 
       <div className="panel p-6">
         <h2 className="text-lg font-semibold">Active API keys</h2>
-        {loading ? <p className="mt-3 text-slate-400">Loading keys…</p> : null}
+        {loading ? <p className="mt-3 text-muted-foreground">Loading keys…</p> : null}
         {!loading && apiKeys.length === 0 ? (
-          <p className="mt-3 text-slate-400">No API keys created yet.</p>
+          <p className="mt-3 text-muted-foreground">No API keys created yet.</p>
         ) : null}
         {!loading && apiKeys.length > 0 ? (
           <div className="mt-3 space-y-2">
@@ -91,11 +93,11 @@ export default function ApiAccessPage() {
               <div key={key.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                 <div>
                   <p className="font-medium">{key.name}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     Prefix: <span className="font-mono">{key.keyPrefix}</span>
                   </p>
                 </div>
-                <button onClick={() => handleRevoke(key.id)} className="rounded-lg bg-red-700/50 px-3 py-1.5 text-sm">
+                <button onClick={() => handleRevoke(key.id)} className="rounded-lg bg-red-100 px-3 py-1.5 text-sm text-red-700">
                   Revoke
                 </button>
               </div>

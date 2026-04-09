@@ -5,14 +5,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#0b1020',
-        card: '#121936',
-        muted: '#90a0c0',
-        border: '#24304f',
-        accent: '#4f8cff',
+        background: '#FAFAFA',
+        foreground: '#0F172A',
+        card: '#FFFFFF',
+        muted: '#F1F5F9',
+        'muted-foreground': '#64748B',
+        border: '#E2E8F0',
+        accent: '#0052FF',
+        'accent-secondary': '#4D7CFF',
       },
       boxShadow: {
-        soft: '0 8px 30px rgba(0,0,0,0.25)',
+        soft: '0 4px 14px rgba(15, 23, 42, 0.08)',
+        accent: '0 4px 14px rgba(0,82,255,0.25)',
       },
     },
   },

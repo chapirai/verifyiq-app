@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { SectionHeader } from '@/components/section-header';
 
 export default function BulkPage() {
   const [fileName, setFileName] = useState('portfolio.csv');
@@ -103,21 +104,22 @@ export default function BulkPage() {
 
   return (
     <section className="space-y-6">
-      <div>
-        <p className="text-sm text-slate-400">Bulk Processing</p>
-        <h1 className="text-3xl font-semibold">Portfolio Uploads</h1>
-      </div>
+      <SectionHeader
+        eyebrow="Bulk Processing"
+        title="Portfolio Uploads"
+        description="Queue large company identifier lists with asynchronous, rate-limited retrieval."
+      />
       <div className="panel p-6">
         <div className="space-y-3">
-          <input value={fileName} onChange={(e) => setFileName(e.target.value)} className="rounded-xl border border-border bg-background px-3 py-2" />
+          <input value={fileName} onChange={(e) => setFileName(e.target.value)} className="input-ui" />
           <textarea
             value={identifiersText}
             onChange={(e) => setIdentifiersText(e.target.value)}
             rows={6}
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 font-mono text-sm"
+            className="w-full rounded-xl border border-border bg-white px-3 py-2 font-mono text-sm"
             placeholder="One org number per line"
           />
-          <button onClick={createJob} className="rounded-xl bg-indigo-600 px-4 py-2 font-medium">Queue job</button>
+          <button onClick={createJob} className="primary-btn">Queue job</button>
         </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -127,27 +129,27 @@ export default function BulkPage() {
           {jobs.map((job) => (
             <button key={job.id} onClick={() => setSelectedJobId(job.id)} className={`w-full rounded-lg border p-3 text-left ${selectedJobId === job.id ? 'border-indigo-500' : 'border-border'}`}>
               <p className="font-medium">{job.fileName}</p>
-              <p className="text-xs text-slate-400">Rows: {job.rowsProcessed}/{job.rowsTotal} • Success: {job.successCount ?? 0} • Failed: {job.failedCount ?? 0} • Remaining: {job.remainingCount ?? 0}</p>
-              <p className="text-xs text-slate-400">Status: {job.status}</p>
+              <p className="text-xs text-muted-foreground">Rows: {job.rowsProcessed}/{job.rowsTotal} • Success: {job.successCount ?? 0} • Failed: {job.failedCount ?? 0} • Remaining: {job.remainingCount ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Status: {job.status}</p>
             </button>
           ))}
         </div>
       </div>
       <div className="panel p-6">
         <div className="mb-3 flex gap-2">
-          <button onClick={retryFailed} disabled={!selectedJobId} className="rounded-xl bg-amber-600 px-3 py-2 text-sm font-medium disabled:opacity-60">Retry failed</button>
-          <button onClick={downloadResults} disabled={!selectedJobId} className="rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium disabled:opacity-60">Download CSV</button>
+          <button onClick={retryFailed} disabled={!selectedJobId} className="secondary-btn disabled:opacity-60">Retry failed</button>
+          <button onClick={downloadResults} disabled={!selectedJobId} className="secondary-btn disabled:opacity-60">Download CSV</button>
         </div>
         <h2 className="text-lg font-semibold">Selected job items</h2>
         <div className="mt-3 max-h-[420px] space-y-2 overflow-auto">
           {selectedItems.map((item) => (
             <div key={item.id} className="rounded-lg border border-border p-3">
               <p className="font-mono text-sm">{item.identifier}</p>
-              <p className="text-xs text-slate-400">Status: {item.status} • Attempts: {item.attemptCount}</p>
+              <p className="text-xs text-muted-foreground">Status: {item.status} • Attempts: {item.attemptCount}</p>
               {item.errorReason ? <p className="text-xs text-red-400">{item.errorReason}</p> : null}
             </div>
           ))}
-          {selectedItems.length === 0 ? <p className="text-sm text-slate-400">No items yet.</p> : null}
+          {selectedItems.length === 0 ? <p className="text-sm text-muted-foreground">No items yet.</p> : null}
         </div>
       </div>
       </div>

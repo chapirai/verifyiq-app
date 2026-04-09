@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import SearchForm from '@/components/SearchForm';
+import { SectionHeader } from '@/components/section-header';
 import { api } from '@/lib/api';
 import { useRecentSearches } from '@/hooks/use-recent-searches';
 import { formatApiMessage } from '@/lib/api-errors';
@@ -68,26 +69,23 @@ export default function SearchPage() {
 
   return (
     <div className="space-y-8">
-      {/* Page header */}
-      <div>
-        <p className="text-sm text-slate-400">Company Lookup</p>
-        <h1 className="mt-1 text-3xl font-semibold">Company Search</h1>
-        <p className="mt-2 text-sm text-slate-400">
-          Search for a Swedish company by its organisation number to initiate a KYC lookup.
-        </p>
-      </div>
+      <SectionHeader
+        eyebrow="Company Lookup"
+        title="Company Search"
+        description="Search by organisation number to retrieve profile, source metadata, and freshness indicators."
+      />
 
       {/* Search form */}
       <SearchForm onSearch={handleSearch} loading={loading} />
 
       {/* Error state */}
       {error && (
-        <div className="rounded-xl border border-red-700 bg-red-900/30 p-4">
-          <p className="text-sm text-red-300">{error}</p>
+        <div className="rounded-xl border border-red-300 bg-red-50 p-4">
+          <p className="text-sm text-red-700">{error}</p>
           <button
             type="button"
             onClick={() => setError(null)}
-            className="mt-3 rounded-lg bg-red-700/40 px-4 py-2 text-xs text-red-200 transition hover:bg-red-700/60"
+            className="mt-3 rounded-lg bg-red-100 px-4 py-2 text-xs text-red-700 transition hover:bg-red-200"
           >
             Dismiss
           </button>
