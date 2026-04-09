@@ -1,7 +1,7 @@
 export interface JwtUser {
   sub: string;
   tenantId: string;
-  email: string;
+  email?: string;
   role: string;
-  fullName: string;
+  fullName?: string;
 }

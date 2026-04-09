@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AppController } from './app.controller';
+import { ApiKeysModule } from './api-keys/api-keys.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import envConfig from './config/env';
@@ -64,6 +65,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
       }),
     }),
     AuthModule,
+    ApiKeysModule,
     AuditModule,
     TenantsModule,
     UsersModule,

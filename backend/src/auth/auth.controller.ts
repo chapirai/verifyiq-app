@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
+import { SignupDto } from './dto/signup.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -24,6 +25,11 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto): Promise<any> {
     return this.authService.login(dto);
+  }
+
+  @Post('signup')
+  async signup(@Body() dto: SignupDto): Promise<any> {
+    return this.authService.signup(dto);
   }
 
   @Post('refresh')

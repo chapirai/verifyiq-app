@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuditModule } from '../audit/audit.module';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { UsersModule } from '../users/users.module';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -25,6 +26,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
     UsersModule,
     AuditModule,
+    EntitlementsModule,
     TenantsModule,
   ],
   controllers: [AuthController],

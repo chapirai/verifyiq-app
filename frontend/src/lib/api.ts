@@ -7,6 +7,15 @@ function readToken(key: string): string | null {
   return localStorage.getItem(key);
 }
 
+function writeAuthCookie(accessToken: string | null): void {
+  if (typeof document === 'undefined') return;
+  if (accessToken) {
+    document.cookie = `verifyiq_access_token=${encodeURIComponent(accessToken)}; Path=/; SameSite=Lax`;
+  } else {
+    document.cookie = 'verifyiq_access_token=; Path=/; Max-Age=0; SameSite=Lax';
+  }
+}
+
 export const httpClient: AxiosInstance = axios.create({
   baseURL,
   withCredentials: true,
@@ -46,6 +55,8 @@ httpClient.interceptors.response.use(
       } catch (refreshError) {
         localStorage.removeItem('verifyiq_access_token');
         localStorage.removeItem('verifyiq_refresh_token');
+        localStorage.removeItem('verifyiq_user');
+        writeAuthCookie(null);
         throw refreshError;
       }
     }
@@ -62,6 +73,24 @@ export interface LoginResponse {
     role: string;
     tenantId: string;
   };
+}
+
+export interface SignupPayload {
+  tenantName: string;
+  tenantSlug: string;
+  email: string;
+  password: string;
+  fullName: string;
+}
+
+export interface ApiKeyRecord {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  key?: string;
 }
 
 export interface CompanySearchResult {
@@ -216,6 +245,18 @@ export const api = {
       localStorage.setItem('verifyiq_access_token', response.data.accessToken || '');
       localStorage.setItem('verifyiq_refresh_token', response.data.refreshToken || '');
       localStorage.setItem('verifyiq_user', JSON.stringify(response.data.user ?? null));
+      writeAuthCookie(response.data.accessToken || null);
+    }
+    return response.data;
+  },
+
+  async signup(payload: SignupPayload): Promise<LoginResponse> {
+    const response = await httpClient.post<LoginResponse>('/auth/signup', payload);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('verifyiq_access_token', response.data.accessToken || '');
+      localStorage.setItem('verifyiq_refresh_token', response.data.refreshToken || '');
+      localStorage.setItem('verifyiq_user', JSON.stringify(response.data.user ?? null));
+      writeAuthCookie(response.data.accessToken || null);
     }
     return response.data;
   },
@@ -229,6 +270,7 @@ export const api = {
         localStorage.removeItem('verifyiq_access_token');
         localStorage.removeItem('verifyiq_refresh_token');
         localStorage.removeItem('verifyiq_user');
+        writeAuthCookie(null);
       }
     }
   },
@@ -310,6 +352,21 @@ export const api = {
 
   async listMonitoringAlerts() {
     const response = await httpClient.get('/monitoring/alerts');
+    return response.data;
+  },
+
+  async listApiKeys(): Promise<ApiKeyRecord[]> {
+    const response = await httpClient.get<{ data: ApiKeyRecord[] }>('/api-keys');
+    return response.data.data;
+  },
+
+  async createApiKey(name: string): Promise<ApiKeyRecord> {
+    const response = await httpClient.post<{ data: ApiKeyRecord }>('/api-keys', { name });
+    return response.data.data;
+  },
+
+  async revokeApiKey(id: string): Promise<{ success: boolean }> {
+    const response = await httpClient.delete<{ success: boolean }>(`/api-keys/${encodeURIComponent(id)}`);
     return response.data;
   },
 

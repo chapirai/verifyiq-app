@@ -1,34 +1,21 @@
-import { ExecutionContext } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
-
-const makeContext = (request: Record<string, any>): ExecutionContext =>
-  ({
-    switchToHttp: () => ({
-      getRequest: () => request,
-    }),
-  }) as ExecutionContext;
-
 describe('JwtAuthGuard', () => {
-  it('defaults tenantId when no header is provided', () => {
+  it('returns user when required claims are present', () => {
     const guard = new JwtAuthGuard();
-    const request: Record<string, any> = { headers: { authorization: 'Bearer token' } };
+    const user = { sub: 'u1', tenantId: 't1', role: 'admin' };
 
-    expect(guard.canActivate(makeContext(request))).toBe(true);
-    expect(request.user?.tenantId).toBe(DEFAULT_TENANT_ID);
-    expect(request.user?.sub).toBeNull();
+    expect(guard.handleRequest(null, user)).toEqual(user);
   });
 
-  it('uses tenantId from header when provided', () => {
+  it('throws when user is missing', () => {
     const guard = new JwtAuthGuard();
-    const customTenantId = '11111111-1111-1111-1111-111111111111';
-    const request: Record<string, any> = {
-      headers: { authorization: 'Bearer token', 'x-tenant-id': customTenantId },
-    };
+    expect(() => guard.handleRequest(null, null)).toThrow(UnauthorizedException);
+  });
 
-    expect(guard.canActivate(makeContext(request))).toBe(true);
-    expect(request.user?.tenantId).toBe(customTenantId);
-    expect(request.user?.sub).toBeNull();
+  it('throws when required claims are missing', () => {
+    const guard = new JwtAuthGuard();
+    expect(() => guard.handleRequest(null, { sub: 'u1' })).toThrow(UnauthorizedException);
   });
 });

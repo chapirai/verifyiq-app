@@ -1,31 +1,15 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
-export class JwtAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers?.authorization as string | undefined;
-
-    if (!authHeader?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing Bearer token');
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  handleRequest(err: unknown, user: any): any {
+    if (err || !user) {
+      throw err ?? new UnauthorizedException('Invalid or missing access token');
     }
-
-    const token = authHeader.slice(7).trim();
-    if (!token) {
-      throw new UnauthorizedException('Invalid Bearer token');
+    if (!user.sub || !user.tenantId || !user.role) {
+      throw new UnauthorizedException('Access token is missing required claims');
     }
-
-    const headerTenantId = request.headers?.['x-tenant-id'];
-    const tenantId = Array.isArray(headerTenantId) ? headerTenantId[0] : headerTenantId;
-
-    request.user = request.user ?? {
-      sub: null,
-      tenantId: tenantId ?? DEFAULT_TENANT_ID,
-      roles: ['admin'],
-    };
-
-    return true;
+    return user;
   }
 }

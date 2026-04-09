@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@demo-bank.se');
-  const [password, setPassword] = useState('Admin1234!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
