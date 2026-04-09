@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SubscriptionEntity } from './entities/subscription.entity';
@@ -12,6 +13,8 @@ const DEFAULT_PLANS = [
 
 @Injectable()
 export class BillingService {
+  private readonly mockCheckoutSessions = new Map<string, { tenantId: string; planCode: string }>();
+
   constructor(
     @InjectRepository(SubscriptionEntity)
     private readonly subscriptionRepository: Repository<SubscriptionEntity>,
@@ -43,5 +46,24 @@ export class BillingService {
       providerSubscriptionId: null,
     });
     return this.subscriptionRepository.save(subscription);
+  }
+
+  async createCheckoutSession(tenantId: string, planCode: string): Promise<{ checkoutUrl: string; sessionId: string }> {
+    const sessionId = `mock_cs_${randomUUID()}`;
+    this.mockCheckoutSessions.set(sessionId, { tenantId, planCode });
+    return {
+      checkoutUrl: `https://payments.verifyiq.local/checkout/${sessionId}`,
+      sessionId,
+    };
+  }
+
+  async confirmPayment(tenantId: string, sessionId: string, planCode: string): Promise<{ success: boolean }> {
+    const session = this.mockCheckoutSessions.get(sessionId);
+    if (!session || session.tenantId !== tenantId) {
+      return { success: false };
+    }
+    await this.upsertSubscription(tenantId, { planCode, status: 'active' });
+    this.mockCheckoutSessions.delete(sessionId);
+    return { success: true };
   }
 }

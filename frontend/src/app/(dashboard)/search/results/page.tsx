@@ -27,30 +27,30 @@ function statusBadge(status: string | null | undefined): React.ReactNode {
   const s = (status ?? '').toLowerCase();
   if (s === 'active') {
     return (
-      <span className="inline-flex items-center rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-xs font-medium text-emerald-300">
+      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
         Active
       </span>
     );
   }
   if (s === 'inactive' || s === 'dissolved') {
     return (
-      <span className="inline-flex items-center rounded-full bg-red-900/50 px-2.5 py-0.5 text-xs font-medium text-red-300">
+      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
         {status}
       </span>
     );
   }
   if (s === 'pending') {
     return (
-      <span className="inline-flex items-center rounded-full bg-yellow-900/50 px-2.5 py-0.5 text-xs font-medium text-yellow-300">
+      <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
         Pending
       </span>
     );
   }
   if (!status) {
-    return <span className="text-slate-500">—</span>;
+    return <span className="text-muted-foreground">—</span>;
   }
   return (
-    <span className="inline-flex items-center rounded-full bg-slate-700/50 px-2.5 py-0.5 text-xs font-medium text-slate-300">
+    <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
       {status}
     </span>
   );
@@ -63,7 +63,7 @@ function SkeletonRow() {
     <tr className="border-t border-border">
       {[1, 2, 3, 4, 5].map((i) => (
         <td key={i} className="px-4 py-3">
-          <div className="h-4 animate-pulse rounded bg-slate-800" />
+          <div className="h-4 animate-pulse rounded bg-muted" />
         </td>
       ))}
     </tr>
@@ -73,10 +73,10 @@ function SkeletonRow() {
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="h-8 w-64 animate-pulse rounded-lg bg-slate-800" />
+      <div className="h-8 w-64 animate-pulse rounded-lg bg-muted" />
       <div className="panel overflow-hidden">
         <table className="w-full text-left">
-          <thead className="bg-slate-900/70 text-sm text-slate-400">
+          <thead className="bg-muted text-sm text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Org Number</th>
               <th className="px-4 py-3">Company Name</th>
@@ -104,18 +104,18 @@ interface ResultsHeaderProps {
 function ResultsHeader({ query, total }: ResultsHeaderProps) {
   return (
     <div>
-      <div className="flex items-center gap-2 text-sm text-slate-400">
-        <Link href="/search" className="transition hover:text-white">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Link href="/search" className="transition hover:text-foreground">
           Company Search
         </Link>
         <span>/</span>
-        <span className="text-slate-200">Results</span>
+        <span className="text-foreground">Results</span>
       </div>
       <h1 className="mt-3 text-3xl font-semibold">Search Results</h1>
-      <p className="mt-1 text-sm text-slate-400">
-        <span className="font-medium text-white">{total}</span>{' '}
+      <p className="mt-1 text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">{total}</span>{' '}
         {total === 1 ? 'result' : 'results'} for{' '}
-        <span className="font-mono font-medium text-white">{query}</span>
+        <span className="font-mono font-medium text-foreground">{query}</span>
       </p>
     </div>
   );
@@ -131,7 +131,7 @@ function SearchResultsTable({ results }: SearchResultsTableProps) {
   return (
     <div className="panel overflow-hidden">
       <table className="w-full text-left">
-        <thead className="bg-slate-900/70 text-sm text-slate-400">
+        <thead className="bg-muted text-sm text-muted-foreground">
           <tr>
             <th className="px-4 py-3">Org Number</th>
             <th className="px-4 py-3">Company Name</th>
@@ -144,13 +144,13 @@ function SearchResultsTable({ results }: SearchResultsTableProps) {
           {results.map((row) => (
             <tr
               key={row.orgNumber}
-              className="cursor-pointer border-t border-border transition hover:bg-slate-900/40"
+              className="cursor-pointer border-t border-border transition hover:bg-muted/60"
               onClick={() => router.push(`/companies/${encodeURIComponent(row.orgNumber)}`)}
             >
               <td className="px-4 py-3 font-mono text-sm text-accent">{row.orgNumber}</td>
               <td className="px-4 py-3 text-sm">{row.legalName ?? '—'}</td>
               <td className="hidden px-4 py-3 sm:table-cell">{statusBadge(row.status)}</td>
-              <td className="hidden px-4 py-3 text-sm text-slate-400 lg:table-cell">
+              <td className="hidden px-4 py-3 text-sm text-muted-foreground lg:table-cell">
                 {relativeTime(row.fetchedAt)}
               </td>
               <td className="px-4 py-3">
@@ -192,36 +192,36 @@ function PaginationControls({ page, totalPages, query, limit }: PaginationContro
       {page > 1 ? (
         <Link
           href={buildHref(page - 1)}
-          className="rounded-xl bg-slate-700 px-4 py-2 text-white transition hover:bg-slate-600"
+          className="secondary-btn"
         >
           ← Previous
         </Link>
       ) : (
         <button
           disabled
-          className="rounded-xl bg-slate-800/50 px-4 py-2 text-slate-500 cursor-not-allowed"
+          className="rounded-xl bg-muted px-4 py-2 text-muted-foreground cursor-not-allowed"
           aria-disabled="true"
         >
           ← Previous
         </button>
       )}
 
-      <span className="text-slate-400">
-        Page <span className="font-medium text-white">{page}</span> of{' '}
-        <span className="font-medium text-white">{totalPages}</span>
+      <span className="text-muted-foreground">
+        Page <span className="font-medium text-foreground">{page}</span> of{' '}
+        <span className="font-medium text-foreground">{totalPages}</span>
       </span>
 
       {page < totalPages ? (
         <Link
           href={buildHref(page + 1)}
-          className="rounded-xl bg-slate-700 px-4 py-2 text-white transition hover:bg-slate-600"
+          className="secondary-btn"
         >
           Next →
         </Link>
       ) : (
         <button
           disabled
-          className="rounded-xl bg-slate-800/50 px-4 py-2 text-slate-500 cursor-not-allowed"
+          className="rounded-xl bg-muted px-4 py-2 text-muted-foreground cursor-not-allowed"
           aria-disabled="true"
         >
           Next →
@@ -239,30 +239,30 @@ function NoResultsState({ query }: NoResultsStateProps) {
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center gap-2 text-sm text-slate-400">
-          <Link href="/search" className="transition hover:text-white">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link href="/search" className="transition hover:text-foreground">
             Company Search
           </Link>
           <span>/</span>
-          <span className="text-slate-200">Results</span>
+          <span className="text-foreground">Results</span>
         </div>
         <h1 className="mt-3 text-3xl font-semibold">No Results Found</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           No companies matched your search for{' '}
-          <span className="font-mono font-medium text-white">{query}</span>.
+          <span className="font-mono font-medium text-foreground">{query}</span>.
         </p>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-slate-400">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
           Search Again
         </h2>
         <RefinementForm defaultQuery={query} />
         <div className="border-t border-border pt-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Suggestions
           </p>
-          <ul className="space-y-1 text-sm text-slate-400">
+          <ul className="space-y-1 text-sm text-muted-foreground">
             <li>• Try a different organisation number</li>
             <li>• Ensure the format is 12 consecutive digits (e.g. 202100123456)</li>
             <li>• Remove any hyphens or spaces and try again</li>
@@ -270,7 +270,7 @@ function NoResultsState({ query }: NoResultsStateProps) {
         </div>
         <Link
           href="/search"
-          className="inline-block rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500"
+          className="primary-btn inline-flex text-sm"
         >
           ← Back to Search
         </Link>
@@ -299,7 +299,7 @@ function RefinementForm({ defaultQuery }: RefinementFormProps) {
       <div className="flex-1">
         <label
           htmlFor="refinement-input"
-          className="mb-1 block text-xs uppercase tracking-widest text-slate-400"
+          className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground"
         >
           Organisation Number
         </label>
@@ -311,12 +311,12 @@ function RefinementForm({ defaultQuery }: RefinementFormProps) {
           placeholder="e.g. 202100123456"
           autoComplete="off"
           spellCheck={false}
-          className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-white placeholder-slate-500 transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="input-ui"
         />
       </div>
       <button
         type="submit"
-        className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500"
+        className="primary-btn text-sm"
       >
         Search
       </button>
@@ -331,18 +331,18 @@ interface ErrorStateProps {
 
 function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
-    <div className="rounded-xl border border-red-700 bg-red-900/30 p-5">
-      <p className="font-medium text-red-300">{message}</p>
+    <div className="rounded-xl border border-red-300 bg-red-50 p-5">
+      <p className="font-medium text-red-700">{message}</p>
       <div className="mt-3 flex gap-3">
         <button
           onClick={onRetry}
-          className="rounded-lg bg-red-700/40 px-4 py-2 text-sm text-red-200 transition hover:bg-red-700/60"
+          className="rounded-lg bg-red-100 px-4 py-2 text-sm text-red-700 transition hover:bg-red-200"
         >
           Retry
         </button>
         <Link
           href="/search"
-          className="rounded-lg bg-slate-700/40 px-4 py-2 text-sm text-slate-300 transition hover:bg-slate-700/60"
+          className="secondary-btn text-sm"
         >
           Back to Search
         </Link>
@@ -388,10 +388,10 @@ function SearchResultsContent() {
   if (!q) {
     return (
       <div className="space-y-4">
-        <p className="text-slate-400">No search query provided.</p>
+        <p className="text-muted-foreground">No search query provided.</p>
         <Link
           href="/search"
-          className="inline-block rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500"
+          className="primary-btn inline-flex text-sm"
         >
           ← Back to Search
         </Link>
@@ -420,7 +420,7 @@ function SearchResultsContent() {
           const nextSortDir = String(form.get('sortDir') ?? 'desc');
           router.push(`/search/results?q=${encodeURIComponent(q)}&page=1&limit=${limit}&status=${encodeURIComponent(nextStatus)}&sortBy=${encodeURIComponent(nextSortBy)}&sortDir=${encodeURIComponent(nextSortDir)}`);
         }}>
-          <select name="status" defaultValue={status} className="rounded-xl border border-border bg-background px-3 py-2">
+          <select name="status" defaultValue={status} className="input-ui h-10 px-3 py-2">
             <option value="">All statuses</option>
             <option value="ACTIVE">ACTIVE</option>
             <option value="INACTIVE">INACTIVE</option>
@@ -428,16 +428,16 @@ function SearchResultsContent() {
             <option value="BANKRUPT">BANKRUPT</option>
             <option value="DISSOLVED">DISSOLVED</option>
           </select>
-          <select name="sortBy" defaultValue={sortBy} className="rounded-xl border border-border bg-background px-3 py-2">
+          <select name="sortBy" defaultValue={sortBy} className="input-ui h-10 px-3 py-2">
             <option value="updatedAt">Last updated</option>
             <option value="legalName">Legal name</option>
             <option value="createdAt">Created</option>
           </select>
-          <select name="sortDir" defaultValue={sortDir} className="rounded-xl border border-border bg-background px-3 py-2">
+          <select name="sortDir" defaultValue={sortDir} className="input-ui h-10 px-3 py-2">
             <option value="desc">Descending</option>
             <option value="asc">Ascending</option>
           </select>
-          <button type="submit" className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium">Apply filters</button>
+          <button type="submit" className="primary-btn text-sm">Apply filters</button>
         </form>
       </div>
       <SearchResultsTable results={results} />

@@ -49,6 +49,7 @@ httpClient.interceptors.response.use(
         const refreshResponse = await axios.post(`${baseURL}/auth/refresh`, { refreshToken });
         const nextAccessToken = refreshResponse.data.accessToken || '';
         localStorage.setItem('verifyiq_access_token', nextAccessToken);
+        writeAuthCookie(nextAccessToken || null);
         original.headers = original.headers ?? {};
         original.headers.Authorization = `Bearer ${nextAccessToken}`;
         return httpClient(original);
@@ -81,6 +82,11 @@ export interface SignupPayload {
   email: string;
   password: string;
   fullName: string;
+}
+
+export interface CheckoutSessionResponse {
+  checkoutUrl: string;
+  sessionId: string;
 }
 
 export interface ApiKeyRecord {
@@ -397,6 +403,16 @@ export const api = {
 
   async upsertSubscription(payload: { planCode: string; status?: string }): Promise<{ id: string; tenantId: string; planCode: string; status: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; canceledAt: string | null }> {
     const response = await httpClient.post<{ data: { id: string; tenantId: string; planCode: string; status: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; canceledAt: string | null } }>('/billing/subscription', payload);
+    return response.data.data;
+  },
+
+  async createCheckoutSession(payload: { planCode: string }): Promise<CheckoutSessionResponse> {
+    const response = await httpClient.post<{ data: CheckoutSessionResponse }>('/billing/checkout-session', payload);
+    return response.data.data;
+  },
+
+  async confirmPayment(payload: { sessionId: string; planCode: string }): Promise<{ success: boolean }> {
+    const response = await httpClient.post<{ data: { success: boolean } }>('/billing/payment/confirm', payload);
     return response.data.data;
   },
 

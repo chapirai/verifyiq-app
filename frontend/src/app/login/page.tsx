@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [tenantSlug, setTenantSlug] = useState(process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG || 'demo-bank');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -16,10 +17,10 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      await api.login(email, password);
+      await api.login(email, password, tenantSlug.trim().toLowerCase());
       router.push('/dashboard');
-    } catch (err) {
-      setError('Login failed. Check backend and credentials.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Login failed. Check credentials and tenant slug.');
     } finally {
       setLoading(false);
     }
@@ -32,6 +33,10 @@ export default function LoginPage() {
         <h1 className="mb-2 text-4xl" style={{ fontFamily: 'var(--font-calistoga), Georgia, serif' }}>VerifyIQ</h1>
         <p className="mb-6 text-sm text-muted-foreground">Sign in to your data workspace</p>
         <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="mb-2 block text-sm text-muted-foreground">Tenant slug</label>
+            <input className="input-ui" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} />
+          </div>
           <div>
             <label className="mb-2 block text-sm text-muted-foreground">Email</label>
             <input className="input-ui" value={email} onChange={(e) => setEmail(e.target.value)} />

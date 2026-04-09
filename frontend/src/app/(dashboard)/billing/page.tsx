@@ -8,6 +8,7 @@ export default function BillingPage() {
   const [plans, setPlans] = useState<Array<{ id: string; code: string; name: string; monthlyPriceCents: number; currency: string; isActive: boolean }>>([]);
   const [subscription, setSubscription] = useState<{ id: string; tenantId: string; planCode: string; status: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; canceledAt: string | null } | null>(null);
   const [error, setError] = useState('');
+  const [processingPlan, setProcessingPlan] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -21,10 +22,18 @@ export default function BillingPage() {
 
   async function choosePlan(planCode: string) {
     try {
-      const updated = await api.upsertSubscription({ planCode, status: 'active' });
+      setProcessingPlan(planCode);
+      const checkout = await api.createCheckoutSession({ planCode });
+      const confirmed = await api.confirmPayment({ sessionId: checkout.sessionId, planCode });
+      if (!confirmed.success) {
+        throw new Error('Payment confirmation failed');
+      }
+      const updated = await api.getSubscription();
       setSubscription(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update plan');
+    } finally {
+      setProcessingPlan(null);
     }
   }
 
@@ -48,8 +57,8 @@ export default function BillingPage() {
           <div key={plan.id} className="panel p-5">
             <h2 className="text-xl font-semibold">{plan.name}</h2>
             <p className="mt-1 text-muted-foreground">{plan.monthlyPriceCents > 0 ? `${(plan.monthlyPriceCents / 100).toFixed(0)} ${plan.currency}/mo` : 'Custom'}</p>
-            <button onClick={() => choosePlan(plan.code)} className="primary-btn mt-4 text-sm">
-              Select {plan.name}
+            <button onClick={() => choosePlan(plan.code)} disabled={processingPlan !== null} className="primary-btn mt-4 text-sm disabled:opacity-60">
+              {processingPlan === plan.code ? 'Processing payment…' : `Select ${plan.name}`}
             </button>
           </div>
         ))}

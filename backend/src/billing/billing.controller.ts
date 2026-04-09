@@ -24,4 +24,20 @@ export class BillingController {
   async upsertSubscription(@CurrentUser() currentUser: JwtUser, @Body() dto: UpsertSubscriptionDto) {
     return { data: await this.billingService.upsertSubscription(currentUser.tenantId, dto) };
   }
+
+  @Post('checkout-session')
+  async createCheckoutSession(
+    @CurrentUser() currentUser: JwtUser,
+    @Body() dto: { planCode: string },
+  ) {
+    return { data: await this.billingService.createCheckoutSession(currentUser.tenantId, dto.planCode) };
+  }
+
+  @Post('payment/confirm')
+  async confirmPayment(
+    @CurrentUser() currentUser: JwtUser,
+    @Body() dto: { sessionId: string; planCode: string },
+  ) {
+    return { data: await this.billingService.confirmPayment(currentUser.tenantId, dto.sessionId, dto.planCode) };
+  }
 }
