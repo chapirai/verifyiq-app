@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   BvFel,
   BvFirmateckning,
@@ -332,6 +332,8 @@ function resolveLegalName(
 
 @Injectable()
 export class BolagsverketMapper {
+  private readonly logger = new Logger(BolagsverketMapper.name);
+
   /**
    * Map high-value dataset + rich organisation information into a single
    * normalised company record ready for persistence.
@@ -368,7 +370,7 @@ export class BolagsverketMapper {
 
     const fieldErrors: FieldError[] = [];
 
-    const officers = this.mapOfficers(richOrg.funktionarer ?? []);
+    const officers = this.mapOfficers(this.normalizeArrayField<BvOfficer>(richOrg.funktionarer, 'funktionarer'));
 
     // ── Field-level fel detection ──────────────────────────────────────────
     const signatoryText = this.extractFieldOrNull(
@@ -441,7 +443,7 @@ export class BolagsverketMapper {
       ? {
           identitetsbeteckning: hvOrg.identitetsbeteckning ?? null,
           namn: hvOrg.namn ?? null,
-          names: (hvOrg.organisationsnamnLista ?? [])
+          names: this.normalizeArrayField(hvOrg.organisationsnamnLista, 'organisationer.organisationsnamnLista')
             .filter((n) => !n.fel)
             .map((n) => ({
               namn: n.namn ?? null,
@@ -455,13 +457,13 @@ export class BolagsverketMapper {
           organisationsdatum: extractDateFromWrapper(hvOrg.organisationsdatum, 'registreringsdatum') ?? null,
           registreringsdatum: hvOrg.registreringsdatum ?? null,
           verksamhetsbeskrivning: extractKodKlartext(hvOrg.verksamhetsbeskrivning) ?? null,
-          naringsgren: (hvOrg.snikoder ?? [])
+          naringsgren: this.normalizeArrayField(hvOrg.snikoder, 'organisationer.snikoder')
             .filter((c) => !c.fel)
             .map((c) => ({ snikod: c.snikod ?? null, snikodText: c.snikodText ?? null })),
-          statusar: (hvOrg.organisationsstatusar ?? [])
+          statusar: this.normalizeArrayField(hvOrg.organisationsstatusar, 'organisationer.organisationsstatusar')
             .filter((s) => !s.fel)
             .map((s) => ({ status: extractStatusText(s), statusdatum: extractStatusdatum(s) })),
-          adresser: (hvOrg.adresser ?? []).filter((a) => !a.fel).map((a) => mapAddress(a)!),
+          adresser: this.normalizeArrayField(hvOrg.adresser, 'organisationer.adresser').filter((a) => !a.fel).map((a) => mapAddress(a)!),
           postadressOrganisation: mapAddress(hvOrg.postadressOrganisation),
           reklamsparr: extractKodKlartext(hvOrg.reklamsparr) ?? null,
           avregistreradOrganisation: extractDateFromWrapper(hvOrg.avregistreradOrganisation, 'avregistreringsdatum') ?? null,
@@ -494,7 +496,7 @@ export class BolagsverketMapper {
           organisationsform: extractKodKlartext(richOrg.organisationsform) ?? null,
           organisationsdatum: extractDateFromWrapper(richOrg.organisationsdatum, 'registreringsdatum', 'bildatDatum') ?? null,
           registreringsdatum: richOrg.registreringsdatum ?? null,
-          organisationsstatusar: (richOrg.organisationsstatusar ?? [])
+          organisationsstatusar: this.normalizeArrayField(richOrg.organisationsstatusar, 'organisationsstatusar')
             .filter((s) => !s.fel)
             .map((s: V4OrganisationStatus) => ({
               // v4 format: the whole entry IS a KodKlartextDatum { kod, klartext, datum }.
@@ -540,7 +542,7 @@ export class BolagsverketMapper {
             typeof richOrg.firmateckning === 'object' && !richOrg.firmateckning?.fel
               ? ((richOrg.firmateckning as BvFirmateckning)?.firmateckningstyp ?? null)
               : null,
-          samtligaOrganisationsnamn: (richOrg.samtligaOrganisationsnamn ?? [])
+          samtligaOrganisationsnamn: this.normalizeArrayField(richOrg.samtligaOrganisationsnamn, 'samtligaOrganisationsnamn')
             .filter((n) => !n.fel)
             .map((n) => ({
               namn: n.namn ?? null,
@@ -549,12 +551,12 @@ export class BolagsverketMapper {
               registreringsdatum: n.registreringsdatum ?? null,
               avregistreringsdatum: n.avregistreringsdatum ?? null,
             })),
-          funktionarer: (richOrg.funktionarer ?? [])
+          funktionarer: this.normalizeArrayField(richOrg.funktionarer, 'funktionarer')
             .filter((o) => !o.fel)
             .map((o) => ({
               namn: o.namn ?? null,
               personId: o.personId ?? o.identitetsbeteckning ?? null,
-              roller: (o.roller ?? []).map((r) => ({
+              roller: this.normalizeArrayField(o.roller, 'funktionarer.roller').map((r) => ({
                 rollkod: r.rollkod ?? null,
                 rollbeskrivning: r.rollbeskrivning ?? null,
                 rollstatus: r.rollstatus ?? null,
@@ -578,7 +580,7 @@ export class BolagsverketMapper {
                   antalAktierMin: richOrg.aktieinformation.antalAktierMin ?? (richOrg.aktieinformation.aktiegranser?.antalAktierGranser?.lagst ?? null),
                   antalAktierMax: richOrg.aktieinformation.antalAktierMax ?? (richOrg.aktieinformation.aktiegranser?.antalAktierGranser?.hogst ?? null),
                   registreringsdatum: richOrg.aktieinformation.registreringsdatum ?? null,
-                  aktieslag: (richOrg.aktieinformation.aktieslag ?? [])
+                  aktieslag: this.normalizeArrayField(richOrg.aktieinformation.aktieslag, 'aktieinformation.aktieslag')
                     .filter((s) => !s.fel)
                     .map((s) => ({
                       aktieslagsnamn: s.aktieslagsnamn ?? s.namn ?? null,
@@ -589,8 +591,8 @@ export class BolagsverketMapper {
                     })),
                 }
               : null,
-          adresser: (richOrg.adresser ?? []).filter((a) => !a.fel).map((a) => mapAddress(a)!),
-          tillstand: (richOrg.tillstand ?? [])
+          adresser: this.normalizeArrayField(richOrg.adresser, 'adresser').filter((a) => !a.fel).map((a) => mapAddress(a)!),
+          tillstand: this.normalizeArrayField(richOrg.tillstand, 'tillstand')
             .filter((t) => !t.fel)
             .map((t) => ({
               tillstandstyp: t.tillstandstyp ?? null,
@@ -601,21 +603,21 @@ export class BolagsverketMapper {
               giltigTom: t.giltigTom ?? null,
               utfardareNamn: t.utfardareNamn ?? null,
             })),
-          organisationsmarkeringar: (richOrg.organisationsmarkeringar ?? [])
+          organisationsmarkeringar: this.normalizeArrayField(richOrg.organisationsmarkeringar, 'organisationsmarkeringar')
             .filter((m) => !m.fel)
             .map((m) => ({
               markeringstyp: m.markeringstyp ?? null,
               markeringsdatum: m.markeringsdatum ?? null,
               text: m.text ?? null,
             })),
-          bestammelser: (richOrg.bestammelser ?? [])
+          bestammelser: this.normalizeArrayField(richOrg.bestammelser, 'bestammelser')
             .filter((b) => !b.fel)
             .map((b) => ({
               bestammelsetyp: b.bestammelsetyp ?? null,
               text: b.text ?? null,
               registreringsdatum: b.registreringsdatum ?? null,
             })),
-          vakanserOchUpplysningar: (richOrg.vakanserOchUpplysningar ?? [])
+          vakanserOchUpplysningar: this.normalizeArrayField(richOrg.vakanserOchUpplysningar, 'vakanserOchUpplysningar')
             .filter((v) => !v.fel)
             .map((v) => ({
               typ: v.typ ?? null,
@@ -641,7 +643,7 @@ export class BolagsverketMapper {
                   utlandskOrganisationLand: richOrg.utlandskFilialagandeOrganisation.utlandskOrganisationLand ?? null,
                 }
               : null,
-          finansiellaRapporter: (richOrg.finansiellaRapporter ?? [])
+          finansiellaRapporter: this.normalizeArrayField(richOrg.finansiellaRapporter, 'finansiellaRapporter')
             .filter((r) => !r.fel)
             .map((r) => ({
               rapporttyp: r.rapporttyp ?? null,
@@ -678,10 +680,10 @@ export class BolagsverketMapper {
       shareInformation: richOrg.aktieinformation?.fel
         ? {}
         : ((richOrg.aktieinformation as Record<string, unknown>) ?? {}),
-      financialReports: (richOrg.finansiellaRapporter as Array<Record<string, unknown>>) ?? [],
-      addresses: (richOrg.adresser ?? hvOrg.adresser ?? []) as Array<Record<string, unknown>>,
-      allNames: (richOrg.samtligaOrganisationsnamn ?? []) as Array<Record<string, unknown>>,
-      permits: (richOrg.tillstand ?? []) as Array<Record<string, unknown>>,
+      financialReports: this.normalizeArrayField<Record<string, unknown>>(richOrg.finansiellaRapporter, 'finansiellaRapporter'),
+      addresses: this.normalizeArrayField<Record<string, unknown>>(richOrg.adresser ?? hvOrg.adresser, 'adresser'),
+      allNames: this.normalizeArrayField<Record<string, unknown>>(richOrg.samtligaOrganisationsnamn, 'samtligaOrganisationsnamn'),
+      permits: this.normalizeArrayField<Record<string, unknown>>(richOrg.tillstand, 'tillstand'),
       financialYear: (richOrg.rakenskapsar ?? richOrg.rakenskapsAr)?.fel
         ? null
         : (((richOrg.rakenskapsar ?? richOrg.rakenskapsAr) as Record<string, unknown> | undefined) ?? null),
@@ -728,5 +730,20 @@ export class BolagsverketMapper {
       fodelseAr: o.fodelseAr ?? null,
       nationalitet: o.nationalitet ?? null,
     }));
+  }
+
+  /**
+   * Normalize fields that are expected to be arrays but may arrive as:
+   * - array: returned as-is
+   * - null/undefined: []
+   * - object: [object] (schema-tolerant single-entry payload)
+   * - other primitive: [] with warning
+   */
+  private normalizeArrayField<T>(value: unknown, fieldName: string): T[] {
+    if (Array.isArray(value)) return value as T[];
+    if (value == null) return [];
+    if (typeof value === 'object') return [value as T];
+    this.logger.warn(`Unexpected payload shape for "${fieldName}". Expected array/object/null, got ${typeof value}`);
+    return [];
   }
 }
