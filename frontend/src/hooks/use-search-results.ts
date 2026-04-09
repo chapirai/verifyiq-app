@@ -19,6 +19,9 @@ export interface UseSearchResultsParams {
   query: string;
   page: number;
   limit: number;
+  status?: string;
+  sortBy?: 'updatedAt' | 'legalName' | 'createdAt';
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface SearchResultsState {
@@ -28,7 +31,14 @@ export interface SearchResultsState {
   retry: () => void;
 }
 
-export function useSearchResults({ query, page, limit }: UseSearchResultsParams): SearchResultsState {
+export function useSearchResults({
+  query,
+  page,
+  limit,
+  status,
+  sortBy,
+  sortDir,
+}: UseSearchResultsParams): SearchResultsState {
   const [data, setData] = useState<CompanySearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +48,7 @@ export function useSearchResults({ query, page, limit }: UseSearchResultsParams)
     setLoading(true);
     setError(null);
     try {
-      const result = await api.searchCompanies(query, page, limit);
+      const result = await api.searchCompanies(query, page, limit, { status, sortBy, sortDir });
       setData(result);
     } catch (err: unknown) {
       const apiErr = isApiError(err) ? err : null;
@@ -58,7 +68,7 @@ export function useSearchResults({ query, page, limit }: UseSearchResultsParams)
     } finally {
       setLoading(false);
     }
-  }, [query, page, limit]);
+  }, [query, page, limit, status, sortBy, sortDir]);
 
   useEffect(() => {
     doFetch();

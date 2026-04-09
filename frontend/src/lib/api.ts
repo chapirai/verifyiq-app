@@ -134,6 +134,9 @@ export interface CompanySearchResponse {
   };
 }
 
+export type CompanySortBy = 'updatedAt' | 'legalName' | 'createdAt';
+export type CompanySortDir = 'asc' | 'desc';
+
 export interface CompanyLookupPayload {
   identitetsbeteckning: string;
   organisationInformationsmangd?: string[];
@@ -318,9 +321,21 @@ export const api = {
     return response.data;
   },
 
-  async searchCompanies(q: string, page = 1, limit = 10): Promise<CompanySearchResponse> {
+  async searchCompanies(
+    q: string,
+    page = 1,
+    limit = 10,
+    options?: { status?: string; sortBy?: CompanySortBy; sortDir?: CompanySortDir },
+  ): Promise<CompanySearchResponse> {
     const response = await httpClient.get<CompanyListResponse>('/companies', {
-      params: { q, page, limit },
+      params: {
+        q,
+        page,
+        limit,
+        status: options?.status,
+        sort_by: options?.sortBy ?? 'updatedAt',
+        sort_dir: options?.sortDir ?? 'desc',
+      },
     });
     // Map the backend CompanyListResponse shape to the CompanySearchResponse shape
     // that the search results page expects.
@@ -368,6 +383,31 @@ export const api = {
   async revokeApiKey(id: string): Promise<{ success: boolean }> {
     const response = await httpClient.delete<{ success: boolean }>(`/api-keys/${encodeURIComponent(id)}`);
     return response.data;
+  },
+
+  async listPlans(): Promise<Array<{ id: string; code: string; name: string; monthlyPriceCents: number; currency: string; isActive: boolean }>> {
+    const response = await httpClient.get<{ data: Array<{ id: string; code: string; name: string; monthlyPriceCents: number; currency: string; isActive: boolean }> }>('/billing/plans');
+    return response.data.data;
+  },
+
+  async getSubscription(): Promise<{ id: string; tenantId: string; planCode: string; status: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; canceledAt: string | null } | null> {
+    const response = await httpClient.get<{ data: { id: string; tenantId: string; planCode: string; status: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; canceledAt: string | null } | null }>('/billing/subscription');
+    return response.data.data;
+  },
+
+  async upsertSubscription(payload: { planCode: string; status?: string }): Promise<{ id: string; tenantId: string; planCode: string; status: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; canceledAt: string | null }> {
+    const response = await httpClient.post<{ data: { id: string; tenantId: string; planCode: string; status: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; canceledAt: string | null } }>('/billing/subscription', payload);
+    return response.data.data;
+  },
+
+  async createBulkJob(payload: { fileName: string; rowsTotal: number }): Promise<{ id: string; fileName: string; rowsTotal: number; rowsProcessed: number; status: string; createdAt: string }> {
+    const response = await httpClient.post<{ data: { id: string; fileName: string; rowsTotal: number; rowsProcessed: number; status: string; createdAt: string } }>('/bulk/jobs', payload);
+    return response.data.data;
+  },
+
+  async listBulkJobs(): Promise<Array<{ id: string; fileName: string; rowsTotal: number; rowsProcessed: number; status: string; createdAt: string }>> {
+    const response = await httpClient.get<{ data: Array<{ id: string; fileName: string; rowsTotal: number; rowsProcessed: number; status: string; createdAt: string }> }>('/bulk/jobs');
+    return response.data.data;
   },
 
   bolagsverket: {

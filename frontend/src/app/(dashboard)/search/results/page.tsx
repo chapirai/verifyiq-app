@@ -360,8 +360,18 @@ function SearchResultsContent() {
   const q = searchParams.get('q') ?? '';
   const page = Math.max(1, Number(searchParams.get('page') ?? '1'));
   const limit = Math.max(1, Number(searchParams.get('limit') ?? '10'));
+  const status = searchParams.get('status') ?? '';
+  const sortBy = (searchParams.get('sortBy') as 'updatedAt' | 'legalName' | 'createdAt' | null) ?? 'updatedAt';
+  const sortDir = (searchParams.get('sortDir') as 'asc' | 'desc' | null) ?? 'desc';
 
-  const { data, loading, error, retry } = useSearchResults({ query: q, page, limit });
+  const { data, loading, error, retry } = useSearchResults({
+    query: q,
+    page,
+    limit,
+    status: status || undefined,
+    sortBy,
+    sortDir,
+  });
 
   const results = data?.results ?? [];
   const total = data?.metadata.total ?? 0;
@@ -401,6 +411,35 @@ function SearchResultsContent() {
   return (
     <div className="space-y-6">
       <ResultsHeader query={q} total={total} />
+      <div className="panel p-4">
+        <form className="grid gap-3 md:grid-cols-4" onSubmit={(e) => {
+          e.preventDefault();
+          const form = new FormData(e.currentTarget);
+          const nextStatus = String(form.get('status') ?? '');
+          const nextSortBy = String(form.get('sortBy') ?? 'updatedAt');
+          const nextSortDir = String(form.get('sortDir') ?? 'desc');
+          router.push(`/search/results?q=${encodeURIComponent(q)}&page=1&limit=${limit}&status=${encodeURIComponent(nextStatus)}&sortBy=${encodeURIComponent(nextSortBy)}&sortDir=${encodeURIComponent(nextSortDir)}`);
+        }}>
+          <select name="status" defaultValue={status} className="rounded-xl border border-border bg-background px-3 py-2">
+            <option value="">All statuses</option>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="INACTIVE">INACTIVE</option>
+            <option value="LIQUIDATION">LIQUIDATION</option>
+            <option value="BANKRUPT">BANKRUPT</option>
+            <option value="DISSOLVED">DISSOLVED</option>
+          </select>
+          <select name="sortBy" defaultValue={sortBy} className="rounded-xl border border-border bg-background px-3 py-2">
+            <option value="updatedAt">Last updated</option>
+            <option value="legalName">Legal name</option>
+            <option value="createdAt">Created</option>
+          </select>
+          <select name="sortDir" defaultValue={sortDir} className="rounded-xl border border-border bg-background px-3 py-2">
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+          <button type="submit" className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium">Apply filters</button>
+        </form>
+      </div>
       <SearchResultsTable results={results} />
       <PaginationControls page={page} totalPages={totalPages} query={q} limit={limit} />
     </div>

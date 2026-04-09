@@ -590,7 +590,20 @@ export class CompaniesService {
       qb.andWhere('c.status = :status', { status: query.status });
     }
 
-    const [data, total] = await qb.skip(offset).take(limit).getManyAndCount();
+    const sortFieldMap: Record<string, string> = {
+      updatedAt: 'c.updatedAt',
+      legalName: 'c.legalName',
+      createdAt: 'c.createdAt',
+    };
+    const sortField = sortFieldMap[query.sort_by ?? 'updatedAt'] ?? 'c.updatedAt';
+    const sortDir = (query.sort_dir ?? 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const [data, total] = await qb
+      .orderBy(sortField, sortDir)
+      .addOrderBy('c.id', 'DESC')
+      .skip(offset)
+      .take(limit)
+      .getManyAndCount();
 
     await this.auditService.log({
       tenantId: ctx.tenantId,
@@ -602,6 +615,8 @@ export class CompaniesService {
         q: query.q ?? null,
         org_number: query.org_number ?? null,
         status: query.status ?? null,
+        sort_by: query.sort_by ?? 'updatedAt',
+        sort_dir: query.sort_dir ?? 'desc',
         page,
         limit,
         total,
