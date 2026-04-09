@@ -400,14 +400,36 @@ export const api = {
     return response.data.data;
   },
 
-  async createBulkJob(payload: { fileName: string; rowsTotal: number }): Promise<{ id: string; fileName: string; rowsTotal: number; rowsProcessed: number; status: string; createdAt: string }> {
+  async createBulkJob(payload: { fileName: string; rowsTotal?: number; identifiers?: string[] }): Promise<{ id: string; fileName: string; rowsTotal: number; rowsProcessed: number; successCount?: number; failedCount?: number; remainingCount?: number; status: string; createdAt: string }> {
     const response = await httpClient.post<{ data: { id: string; fileName: string; rowsTotal: number; rowsProcessed: number; status: string; createdAt: string } }>('/bulk/jobs', payload);
     return response.data.data;
   },
 
-  async listBulkJobs(): Promise<Array<{ id: string; fileName: string; rowsTotal: number; rowsProcessed: number; status: string; createdAt: string }>> {
+  async listBulkJobs(): Promise<Array<{ id: string; fileName: string; rowsTotal: number; rowsProcessed: number; successCount?: number; failedCount?: number; remainingCount?: number; status: string; createdAt: string }>> {
     const response = await httpClient.get<{ data: Array<{ id: string; fileName: string; rowsTotal: number; rowsProcessed: number; status: string; createdAt: string }> }>('/bulk/jobs');
     return response.data.data;
+  },
+
+  async getBulkJob(id: string): Promise<{ id: string; fileName: string; rowsTotal: number; rowsProcessed: number; successCount?: number; failedCount?: number; remainingCount?: number; status: string; createdAt: string }> {
+    const response = await httpClient.get<{ data: { id: string; fileName: string; rowsTotal: number; rowsProcessed: number; successCount?: number; failedCount?: number; remainingCount?: number; status: string; createdAt: string } }>(`/bulk/jobs/${encodeURIComponent(id)}`);
+    return response.data.data;
+  },
+
+  async listBulkJobItems(id: string): Promise<Array<{ id: string; identifier: string; status: string; attemptCount: number; errorReason: string | null; snapshotId: string | null; resultMetadata: Record<string, unknown> }>> {
+    const response = await httpClient.get<{ data: Array<{ id: string; identifier: string; status: string; attemptCount: number; errorReason: string | null; snapshotId: string | null; resultMetadata: Record<string, unknown> }> }>(`/bulk/jobs/${encodeURIComponent(id)}/items`);
+    return response.data.data;
+  },
+
+  async retryFailedBulkItems(id: string): Promise<{ queued: number }> {
+    const response = await httpClient.post<{ data: { queued: number } }>(`/bulk/jobs/${encodeURIComponent(id)}/retry-failures`);
+    return response.data.data;
+  },
+
+  async downloadBulkResults(id: string): Promise<{ blob: Blob; fileName: string }> {
+    const response = await httpClient.get(`/bulk/jobs/${encodeURIComponent(id)}/download`, {
+      responseType: 'blob',
+    });
+    return { blob: response.data as Blob, fileName: `bulk-job-${id}.csv` };
   },
 
   bolagsverket: {

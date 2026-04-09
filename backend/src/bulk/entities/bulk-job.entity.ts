@@ -25,11 +25,23 @@ export class BulkJobEntity {
   @Column({ name: 'rows_processed', type: 'int', default: 0 })
   rowsProcessed!: number;
 
+  @Column({ name: 'success_count', type: 'int', default: 0 })
+  successCount!: number;
+
+  @Column({ name: 'failed_count', type: 'int', default: 0 })
+  failedCount!: number;
+
+  @Column({ name: 'remaining_count', type: 'int', default: 0 })
+  remainingCount!: number;
+
   @Column({ type: 'varchar', length: 32, default: 'queued' })
   status!: string;
 
   @Column({ name: 'error_message', type: 'text', nullable: true })
   errorMessage!: string | null;
+
+  @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
+  completedAt!: Date | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

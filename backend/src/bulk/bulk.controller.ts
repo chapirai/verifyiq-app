@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Post, UseGuards } from '@nestjs/common';
 import type { JwtUser } from '../auth/interfaces/jwt-user.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -18,5 +18,26 @@ export class BulkController {
   @Get('jobs')
   async listJobs(@CurrentUser() currentUser: JwtUser) {
     return { data: await this.bulkService.listJobs(currentUser.tenantId) };
+  }
+
+  @Get('jobs/:id')
+  async getJob(@CurrentUser() currentUser: JwtUser, @Param('id') id: string) {
+    return { data: await this.bulkService.getJob(currentUser.tenantId, id) };
+  }
+
+  @Get('jobs/:id/items')
+  async listItems(@CurrentUser() currentUser: JwtUser, @Param('id') id: string) {
+    return { data: await this.bulkService.listJobItems(currentUser.tenantId, id) };
+  }
+
+  @Post('jobs/:id/retry-failures')
+  async retryFailed(@CurrentUser() currentUser: JwtUser, @Param('id') id: string) {
+    return { data: await this.bulkService.retryFailedItems(currentUser.tenantId, id) };
+  }
+
+  @Get('jobs/:id/download')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  async downloadCsv(@CurrentUser() currentUser: JwtUser, @Param('id') id: string) {
+    return await this.bulkService.exportCsv(currentUser.tenantId, id);
   }
 }
