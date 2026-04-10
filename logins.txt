@@ -1,45 +1,52 @@
 NODE_ENV=production
 PORT=4000
 
-PG_HOST=<production-db-host>
+# PostgreSQL
+PG_HOST=dpg-d75pf78ule4c73cvdf7g-a.frankfurt-postgres.render.com
 PG_PORT=5432
-PG_DBNAME=Company
-PG_USER=postgres
-PG_PASSWORD=<strong-password>
-DATABASE_URL=postgresql://postgres:<strong-password>@<production-db-host>:5432/Company
+PG_DBNAME=verifyiq_database
+PG_USER=verifyiq_database_user
+PG_PASSWORD=4bZrMFqqP1uiTFFBaE4iV0fkWJ8tQaLT
+DATABASE_URL=postgresql://verifyiq_database_user:4bZrMFqqP1uiTFFBaE4iV0fkWJ8tQaLT@dpg-d75pf78ule4c73cvdf7g-a.frankfurt-postgres.render.com/verifyiq_database
 
-REDIS_HOST=<production-redis-host>
-REDIS_PORT=6380
-REDIS_PASSWORD=<strong-password>
-BULLMQ_SKIP_REDIS_VERSION_CHECK=false
+# Redis
+REDIS_HOST=red-d784b4nkijhs73fvfklg
+REDIS_PORT=6379
+REDIS_PASSWORD=
 
-MINIO_ENDPOINT=<production-minio-host>
-MINIO_PORT=9000
+# Cloudflare R2
+MINIO_ENDPOINT=70596e944d2276a84149dcbad193da66.r2.cloudflarestorage.com
+MINIO_PORT=443
 MINIO_USE_SSL=true
-MINIO_REGION=eu-west-1
-MINIO_ROOT_USER=<strong-username>
-MINIO_ROOT_PASSWORD=<strong-password>
-AWS_ACCESS_KEY_ID=<strong-username>
-AWS_SECRET_ACCESS_KEY=<strong-password>
+MINIO_REGION=auto
+MINIO_ROOT_USER=2b6e32015d4f4a2cffd6e34920ee70f7
+MINIO_ROOT_PASSWORD=1165160c88cd6e439de1602f93f79f31644f6521b6bba29d9e8bc2b225fa2f71
+AWS_ACCESS_KEY_ID=2b6e32015d4f4a2cffd6e34920ee70f7
+AWS_SECRET_ACCESS_KEY=1165160c88cd6e439de1602f93f79f31644f6521b6bba29d9e8bc2b225fa2f71
 S3_BUCKET=verifyiq-documents
 
-JWT_SECRET=<openssl-rand-base64-32>
-JWT_REFRESH_SECRET=<openssl-rand-base64-32>
-INTEGRATION_TOKEN_ENCRYPTION_KEY=<openssl-rand-base64-32>
+# JWT
+JWT_SECRET=WZ68qSjcW6YNHkHetT39/vBJFmKrzzr53iv+nFpxm5Y=
+JWT_REFRESH_SECRET=uppyoy6DH7cb/nO5wdEdELl8FgDlhF9qWxugzQmzta4=
 
-BV_CLIENT_ID=<real-bolagsverket-client-id>
-BV_CLIENT_SECRET=<real-bolagsverket-client-secret>
-BV_HVD_CLIENT_ID=<if-different-from-default>
-BV_HVD_CLIENT_SECRET=<if-different-from-default>
+# Bolagsverket HVD
+BV_CLIENT_ID=
+BV_CLIENT_SECRET=
 BV_HVD_BASE_URL=https://gw.api.bolagsverket.se/vardefulla-datamangder/v1
+BV_HVD_TOKEN_URL=https://portal.api.bolagsverket.se/oauth2/token
+BV_HVD_REVOKE_URL=https://portal.api.bolagsverket.se/oauth2/revoke
 BV_HVD_SCOPES=vardefulla-datamangder:read vardefulla-datamangder:ping
 BV_HVD_DOCUMENT_PATH=/dokument
 
+# Bolagsverket Företagsinformation
 BV_FORETAGSINFO_BASE_URL=https://gw.api.bolagsverket.se/foretagsinformation/v4
-BV_FORETAGSINFO_USE_OAUTH=false
-BV_FORETAGSINFO_BEARER_TOKEN=<if-using-bearer-auth>
+BV_FORETAGSINFO_SCOPES=foretagsinformation:read foretagsinformation:ping 
+BV_FORETAGSINFO_USE_OAUTH=true
+BV_FORETAGSINFO_CLIENT_ID=
+BV_FORETAGSINFO_CLIENT_SECRET=
+BV_FORETAGSINFO_TOKEN_URL=https://portal.api.bolagsverket.se/oauth2/token
 
+# URLs
 API_BASE_URL=https://verifyiq.onrender.com/api/v1
-FRONTEND_URL=https://nordiccompanydata.com
-FRONTEND_URLS=https://nordiccompanydata.com,https://www.nordiccompanydata.com
-NEXT_PUBLIC_API_BASE_URL=https://verifyiq.onrender.com/api/v1
+FRONTEND_URL=https://verifyiq-app-frontend-git-main-chapirais-projects.vercel.app
+FRONTEND_URLS=https://www.nordiccompanydata.com,https://nordiccompanydata.com,https://verifyiq-app-frontend-git-main-chapirais-projects.vercel.app
