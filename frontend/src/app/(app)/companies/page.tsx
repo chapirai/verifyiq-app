@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
 import type { CompanyListResponse } from '@/types/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -83,7 +84,14 @@ export default function CompaniesPage() {
                 <td>{company.legalName}</td>
                 <td>{company.organisationNumber}</td>
                 <td>{company.status}</td>
-                <td><Link href={`/companies/${company.id}`} className="underline underline-offset-4">View</Link></td>
+                <td>
+                  <Link
+                    href={`/companies/workspace/${normalizeIdentitetsbeteckning(company.organisationNumber)}`}
+                    className="underline underline-offset-4"
+                  >
+                    View
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>

@@ -1,5 +1,6 @@
 import { getAccessToken } from '@/lib/auth';
 import { api, ApiError } from '@/lib/api';
+import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
 import type {
   FiCasesResponse,
   FiFinancialReportsResponse,
@@ -15,6 +16,16 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api/v1';
 
+function normalizeBolagsverketPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...payload };
+  const idKeys = ['identitetsbeteckning', 'organisationIdentitetsbeteckning', 'funktionarIdentitetsbeteckning'] as const;
+  for (const k of idKeys) {
+    const v = out[k];
+    if (typeof v === 'string') out[k] = normalizeIdentitetsbeteckning(v);
+  }
+  return out;
+}
+
 async function postJson<T>(path: string, payload: Record<string, unknown>): Promise<T> {
   const token = getAccessToken();
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -23,7 +34,7 @@ async function postJson<T>(path: string, payload: Record<string, unknown>): Prom
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(normalizeBolagsverketPayload(payload)),
   });
   if (!res.ok) {
     const text = await res.text();
