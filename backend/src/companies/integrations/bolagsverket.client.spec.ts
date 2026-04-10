@@ -489,4 +489,48 @@ describe('BolagsverketClient', () => {
       await expect(client.fetchOrganisationInformation('5560000001')).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
+
+  // ── FI optional endpoints: HTTP 404 → empty payload (no ERROR log) ─────────
+
+  describe('fetchFinancialReports / fetchOrganizationEngagements (empty on 404)', () => {
+    const financialUrl = 'https://gw.api.bolagsverket.se/foretagsinformation/v4/finansiellarapporter';
+    const engagementUrl = 'https://gw.api.bolagsverket.se/foretagsinformation/v4/organisationsengagemang';
+    const fiAuth = { BV_FORETAGSINFO_BEARER_TOKEN: 'tok' };
+
+    it('returns empty finansiellaRapporter when FI returns HTTP 404', async () => {
+      const postMock = jest.fn((url: string) => {
+        if (url === financialUrl) {
+          return throwError(() => ({ response: { status: 404, data: { status: 404, code: '404' } } }));
+        }
+        throw new Error(`Unexpected POST to: ${url}`);
+      });
+      const client = makeClient(postMock, jest.fn(), fiAuth);
+      const result = await client.fetchFinancialReports('5591288708');
+      expect(result.responsePayload.finansiellaRapporter).toEqual([]);
+      expect(result.requestPayload.identitetsbeteckning).toBe('5591288708');
+    });
+
+    it('returns empty engagements when FI returns HTTP 404 with FM130 body', async () => {
+      const postMock = jest.fn((url: string) => {
+        if (url === engagementUrl) {
+          return throwError(() => ({
+            response: {
+              status: 404,
+              data: {
+                status: 404,
+                title: 'Information saknas',
+                detail: 'Information saknas: 5591288708',
+                code: 'FM130',
+              },
+            },
+          }));
+        }
+        throw new Error(`Unexpected POST to: ${url}`);
+      });
+      const client = makeClient(postMock, jest.fn(), fiAuth);
+      const result = await client.fetchOrganizationEngagements('5591288708');
+      expect(result.responsePayload.funktionarsOrganisationsengagemang).toEqual([]);
+      expect(result.responsePayload.totaltAntalTraffar).toBe(0);
+    });
+  });
 });

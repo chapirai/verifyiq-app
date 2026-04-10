@@ -67,6 +67,20 @@ const TOKEN_REFRESH_SKEW_MS = 60_000;
  */
 const BEARER_PREFIX_PATTERN = /^Bearer\s+/i;
 
+/**
+ * FI optional endpoints return HTTP 404 (sometimes with FM130 in body) when there is no dataset for that org.
+ * requestWithRetry throws this instead of mapError so callers can return empty payloads without ERROR-level logs.
+ */
+class BvFiEndpointNoDataError extends Error {
+  constructor(
+    readonly requestId: string,
+    readonly url: string,
+  ) {
+    super('Bolagsverket FI endpoint returned no resource (HTTP 404)');
+    this.name = 'BvFiEndpointNoDataError';
+  }
+}
+
 @Injectable()
 export class BolagsverketClient {
   private readonly logger = new Logger(BolagsverketClient.name);
@@ -288,6 +302,8 @@ export class BolagsverketClient {
       responseType?: AxiosRequestConfig['responseType'];
       extraHeaders?: Record<string, string>;
       context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null };
+      /** When true, FI POST HTTP 404 throws BvFiEndpointNoDataError (no mapError / no ERROR log). */
+      treatHttp404AsEmptyFi?: boolean;
     },
   ): Promise<{ responseData: T; requestId: string; responseHeaders?: Record<string, string> }> {
     let attempt = 0;
@@ -329,6 +345,10 @@ export class BolagsverketClient {
           continue;
         }
 
+        if (options?.treatHttp404AsEmptyFi && status === 404 && options?.auth === 'org') {
+          throw new BvFiEndpointNoDataError(requestId, url);
+        }
+
         this.mapError(status, requestId, error?.response?.data, url);
       }
     }
@@ -353,6 +373,10 @@ export class BolagsverketClient {
     }
     const msg = err instanceof Error ? err.message : String(err);
     return msg.includes('FM130') || (msg.includes('Information saknas') && msg.includes('Bolagsverket'));
+  }
+
+  private isFiOptionalEndpointEmptyError(err: unknown): boolean {
+    return err instanceof BvFiEndpointNoDataError || this.isDokumentlistaNoCatalogError(err);
   }
 
   private invalidateToken(): void {
@@ -827,13 +851,30 @@ export class BolagsverketClient {
       payload['filtrering'] = filters;
     }
 
-    const { responseData, requestId } = await this.requestWithRetry<OrganisationsengagemangResponse>(
-      'post',
-      this.buildUrl(this.getOrganisationBaseUrl(), '/organisationsengagemang'),
-      payload,
-      { auth: 'org', context },
-    );
-    return { requestPayload: payload, responsePayload: responseData, requestId };
+    try {
+      const { responseData, requestId } = await this.requestWithRetry<OrganisationsengagemangResponse>(
+        'post',
+        this.buildUrl(this.getOrganisationBaseUrl(), '/organisationsengagemang'),
+        payload,
+        { auth: 'org', context, treatHttp404AsEmptyFi: true },
+      );
+      return { requestPayload: payload, responsePayload: responseData, requestId };
+    } catch (err: unknown) {
+      if (this.isFiOptionalEndpointEmptyError(err)) {
+        this.logger.warn(
+          `organisationsengagemang: no data for identitetsbeteckning=${identitetsbeteckning} — using empty funktionarsOrganisationsengagemang[]`,
+        );
+        return {
+          requestPayload: payload,
+          responsePayload: {
+            totaltAntalTraffar: 0,
+            funktionarsOrganisationsengagemang: [],
+          },
+          requestId: randomUUID(),
+        };
+      }
+      throw err;
+    }
   }
 
   /**
@@ -854,13 +895,27 @@ export class BolagsverketClient {
     if (fromdatum) payload['fromdatum'] = fromdatum;
     if (tomdatum) payload['tomdatum'] = tomdatum;
 
-    const { responseData, requestId } = await this.requestWithRetry<FinansiellaRapporterResponse>(
-      'post',
-      this.buildUrl(this.getOrganisationBaseUrl(), '/finansiellarapporter'),
-      payload,
-      { auth: 'org', context },
-    );
-    return { requestPayload: payload, responsePayload: responseData, requestId };
+    try {
+      const { responseData, requestId } = await this.requestWithRetry<FinansiellaRapporterResponse>(
+        'post',
+        this.buildUrl(this.getOrganisationBaseUrl(), '/finansiellarapporter'),
+        payload,
+        { auth: 'org', context, treatHttp404AsEmptyFi: true },
+      );
+      return { requestPayload: payload, responsePayload: responseData, requestId };
+    } catch (err: unknown) {
+      if (this.isFiOptionalEndpointEmptyError(err)) {
+        this.logger.warn(
+          `finansiellarapporter: no data for identitetsbeteckning=${identitetsbeteckning} — using empty finansiellaRapporter[]`,
+        );
+        return {
+          requestPayload: payload,
+          responsePayload: { finansiellaRapporter: [] },
+          requestId: randomUUID(),
+        };
+      }
+      throw err;
+    }
   }
 
   /**
