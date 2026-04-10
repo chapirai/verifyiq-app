@@ -5,6 +5,7 @@ import { BvOrganisationEntity } from '../entities/bv-organisation.entity';
 import { BvHvdPayloadEntity } from '../entities/bv-hvd-payload.entity';
 import { BvForetagsinfoPayloadEntity } from '../entities/bv-foretagsinfo-payload.entity';
 import { BvDocumentListEntity } from '../entities/bv-document-list.entity';
+import { CompanyRawPayloadEntity } from '../entities/company-raw-payload.entity';
 import { NormalisedCompany } from '../integrations/bolagsverket.mapper';
 
 @Injectable()
@@ -20,6 +21,8 @@ export class BvPersistenceService {
     private readonly foretagsinfoPayloadRepo: Repository<BvForetagsinfoPayloadEntity>,
     @InjectRepository(BvDocumentListEntity)
     private readonly documentListRepo: Repository<BvDocumentListEntity>,
+    @InjectRepository(CompanyRawPayloadEntity)
+    private readonly endpointPayloadRepo: Repository<CompanyRawPayloadEntity>,
   ) {}
 
   async upsertOrganisation(
@@ -169,5 +172,24 @@ export class BvPersistenceService {
     const saved = await this.documentListRepo.save(entity);
     this.logger.debug(`Stored document list (${documents.length} entries) ${saved.id} for ${organisationsnummer}`);
     return saved;
+  }
+
+  async storeEndpointPayload(params: {
+    tenantId: string;
+    organisationNumber: string;
+    source: string;
+    requestPayload: Record<string, unknown>;
+    responsePayload: Record<string, unknown>;
+    requestId: string;
+  }): Promise<void> {
+    const row = this.endpointPayloadRepo.create({
+      tenantId: params.tenantId,
+      organisationNumber: params.organisationNumber,
+      source: params.source,
+      requestPayload: params.requestPayload,
+      responsePayload: params.responsePayload,
+      requestId: params.requestId,
+    });
+    await this.endpointPayloadRepo.save(row);
   }
 }

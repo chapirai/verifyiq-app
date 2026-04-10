@@ -150,3 +150,17 @@ export class BvPersonEnrichDto {
   @IsOptional()
   forceRefresh?: boolean;
 }
+
+export class BolagsverketPersonDto {
+  @IsString()
+  @Matches(ID_REGEX, {
+    message:
+      'identitetsbeteckning must be a 10-digit organisationsnummer, 12-digit personnummer/samordningsnummer, or 10-digit GD-nummer (302XXXXXXX)',
+  })
+  identitetsbeteckning!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  personInformationsmangd?: string[];
+}

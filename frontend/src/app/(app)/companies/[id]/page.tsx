@@ -95,9 +95,11 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
 
   const getDocumentRows = (payload: Record<string, unknown> | null): Array<Record<string, unknown>> => {
     if (!payload) return [];
+    const explicit = payload.dokument;
+    if (Array.isArray(explicit)) return explicit as Array<Record<string, unknown>>;
     const values = Object.values(payload);
-    const list = values.find((value) => Array.isArray(value)) as Array<Record<string, unknown>> | undefined;
-    return list ?? [];
+    const firstArray = values.find((value) => Array.isArray(value));
+    return Array.isArray(firstArray) ? (firstArray as Array<Record<string, unknown>>) : [];
   };
 
   if (error) {
@@ -209,10 +211,12 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
               <ul className="space-y-3">
                 {docs.slice(0, 40).map((row, idx) => {
                   const docId = String(row.dokumentId ?? row.dokumentid ?? row.id ?? '');
-                  const year = String(row.ar ?? row.year ?? row.arsredovisningsar ?? '-');
+                  const period = String(row.rapporteringsperiodTom ?? row.ar ?? row.year ?? row.arsredovisningsar ?? '-');
+                  const registeredAt = String(row.registreringstidpunkt ?? '-');
+                  const format = String(row.filformat ?? '-');
                   return (
                     <li key={`${docId}-${idx}`} className="flex items-center justify-between border-b border-foreground/20 pb-2 text-sm">
-                      <span>{year} | dokumentId: {docId || 'n/a'}</span>
+                      <span>{period} | registered: {registeredAt} | format: {format} | dokumentId: {docId || 'n/a'}</span>
                       {docId ? (
                         <button
                           className="underline underline-offset-4"

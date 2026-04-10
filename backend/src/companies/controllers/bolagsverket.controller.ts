@@ -9,6 +9,7 @@ import {
   BolagsverketEngagemangDto,
   BolagsverketFinancialReportsDto,
   BolagsverketLookupDto,
+  BolagsverketPersonDto,
   BolagsverketShareCapitalHistoryDto,
   BolagsverketSignatoryPowerDto,
   BvEnrichDto,
@@ -80,9 +81,19 @@ export class BolagsverketController {
     return this.bolagsverketService.healthCheck();
   }
 
+  @Get('hvd/isalive')
+  hvdIsAlive() {
+    return this.bolagsverketService.healthCheck();
+  }
+
   /** GET /bolagsverket/health/foretagsinfo – check Företagsinformation v4 API availability. */
   @Get('health/foretagsinfo')
   foretagsinfoHealthCheck() {
+    return this.bolagsverketService.foretagsinfoHealthCheck();
+  }
+
+  @Get('fi/isalive')
+  fiIsAlive() {
     return this.bolagsverketService.foretagsinfoHealthCheck();
   }
 
@@ -106,6 +117,16 @@ export class BolagsverketController {
     });
   }
 
+  @Post('hvd/organisationer')
+  getHvdOrganisation(@Body() dto: BolagsverketLookupDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.getHighValueCompanyInformation(dto.identitetsbeteckning, {
+      tenantId,
+      actorId: actorId ?? null,
+    });
+  }
+
   /**
    * POST /bolagsverket/company-information
    * Retrieve company information from Företagsinformation API.
@@ -122,6 +143,22 @@ export class BolagsverketController {
     );
   }
 
+  @Post('fi/organisationer')
+  getFiOrganisation(@Body() dto: BolagsverketLookupDto, @Req() req: any) {
+    return this.getCompanyInformation(dto, req);
+  }
+
+  @Post('fi/personer')
+  getFiPerson(@Body() dto: BolagsverketPersonDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.getPersonInformation(
+      dto.identitetsbeteckning,
+      { tenantId, actorId: actorId ?? null },
+      dto.personInformationsmangd,
+    );
+  }
+
   /**
    * POST /bolagsverket/documents
    * List available annual reports and financial documents for an organisation.
@@ -134,6 +171,11 @@ export class BolagsverketController {
       tenantId,
       actorId: actorId ?? null,
     });
+  }
+
+  @Post('hvd/dokumentlista')
+  getHvdDocumentList(@Body() dto: BolagsverketDocumentListDto, @Req() req: any) {
+    return this.getDocumentList(dto, req);
   }
 
   /**
@@ -153,6 +195,11 @@ export class BolagsverketController {
       'Content-Disposition': `attachment; filename="${document.fileName}"`,
     });
     return new StreamableFile(document.data);
+  }
+
+  @Get('hvd/dokument/:dokumentId')
+  async downloadHvdDocument(@Param('dokumentId') dokumentId: string, @Req() req: any, @Res({ passthrough: true }) res: Response) {
+    return this.downloadDocument(dokumentId, req, res);
   }
 
   /**
@@ -184,6 +231,11 @@ export class BolagsverketController {
     );
   }
 
+  @Post('fi/firmateckningsalternativ')
+  getFiSignatoryAlternatives(@Body() dto: BolagsverketSignatoryPowerDto, @Req() req: any) {
+    return this.verifySignatoryPower(dto, req);
+  }
+
   /**
    * POST /bolagsverket/share-capital-history
    * Retrieve historical share capital changes.
@@ -198,6 +250,11 @@ export class BolagsverketController {
       dto.tomdatum,
       { tenantId, actorId: actorId ?? null },
     );
+  }
+
+  @Post('fi/aktiekapitalforandringar')
+  getFiShareCapitalHistory(@Body() dto: BolagsverketShareCapitalHistoryDto, @Req() req: any) {
+    return this.getShareCapitalHistory(dto, req);
   }
 
   /**
@@ -217,6 +274,11 @@ export class BolagsverketController {
     );
   }
 
+  @Post('fi/arenden')
+  getFiCases(@Body() dto: BolagsverketArendeDto, @Req() req: any) {
+    return this.getCaseInformation(dto, req);
+  }
+
   /**
    * POST /bolagsverket/engagements
    * Find all organisations where a person/organisation holds officer positions.
@@ -233,6 +295,11 @@ export class BolagsverketController {
     );
   }
 
+  @Post('fi/organisationsengagemang')
+  getFiEngagements(@Body() dto: BolagsverketEngagemangDto, @Req() req: any) {
+    return this.getEngagements(dto, req);
+  }
+
   /**
    * POST /bolagsverket/financial-reports
    * Retrieve financial reports for an organisation.
@@ -247,6 +314,11 @@ export class BolagsverketController {
       dto.tomdatum,
       { tenantId, actorId: actorId ?? null },
     );
+  }
+
+  @Post('fi/finansiella-rapporter')
+  getFiFinancialReports(@Body() dto: BolagsverketFinancialReportsDto, @Req() req: any) {
+    return this.getFinancialReports(dto, req);
   }
 
   /**

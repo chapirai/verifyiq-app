@@ -49,10 +49,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   async healthHvd() {
-    return request('/bolagsverket/health');
+    return request('/bolagsverket/hvd/isalive');
   },
   async healthFi() {
-    return request('/bolagsverket/health/foretagsinfo');
+    return request('/bolagsverket/fi/isalive');
   },
   async login(payload: { tenantId: string; email: string; password: string }) {
     const data = await request<AuthTokens>('/auth/login', { method: 'POST', body: JSON.stringify(payload) });

@@ -23,6 +23,7 @@ import { SnapshotChainService } from './snapshot-chain.service';
 import { SnapshotComparisonService } from './snapshot-comparison.service';
 import { AuditEventType } from '../../audit/audit-event.entity';
 import { AuditService } from '../../audit/audit.service';
+import { randomUUID } from 'crypto';
 
 /** Allowed tolerance when validating share-capital arithmetic (1 %). */
 const SHARE_CAPITAL_TOLERANCE = 0.01;
@@ -127,12 +128,37 @@ export class BolagsverketService {
     identitetsbeteckning: string,
     context?: BvRequestContext,
   ): Promise<HighValueDatasetResponse> {
-    const { responsePayload } = await this.client.fetchHighValueDataset(identitetsbeteckning, context);
+    const { responsePayload, requestId } = await this.client.fetchHighValueDataset(identitetsbeteckning, context);
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: identitetsbeteckning,
+        source: 'hvd.organisationer',
+        requestPayload: { identitetsbeteckning },
+        responsePayload: responsePayload as unknown as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
     return responsePayload;
   }
 
   async getDocument(dokumentId: string, context?: BvRequestContext): Promise<DocumentDownload> {
     const result = await this.client.fetchDocument(dokumentId, context);
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: 'unknown',
+        source: 'hvd.dokument',
+        requestPayload: { dokumentId },
+        responsePayload: {
+          dokumentId,
+          fileName: result.fileName,
+          contentType: result.contentType,
+          requestId: result.requestId,
+        },
+        requestId: result.requestId ?? randomUUID(),
+      });
+    }
     const safeDocumentId = sanitizeBolagsverketFilename(dokumentId) ?? 'document';
     return {
       data: result.responsePayload,
@@ -213,13 +239,23 @@ export class BolagsverketService {
     context?: BvRequestContext,
     namnskyddslopnummer?: string,
   ): Promise<OrganisationInformationResponse[]> {
-    const { responsePayload } = await this.client.fetchOrganisationInformation(
+    const { responsePayload, requestId } = await this.client.fetchOrganisationInformation(
       identitetsbeteckning,
       informationCategories,
       tidpunkt,
       context,
       namnskyddslopnummer,
     );
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: identitetsbeteckning,
+        source: 'fi.organisationer',
+        requestPayload: { identitetsbeteckning, informationCategories, tidpunkt, namnskyddslopnummer },
+        responsePayload: { organisationInformation: responsePayload } as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
     return responsePayload;
   }
 
@@ -228,11 +264,21 @@ export class BolagsverketService {
     context?: BvRequestContext,
     personInformationsmangd?: string[],
   ): Promise<PersonResponse> {
-    const { responsePayload } = await this.client.fetchPersonInformation(
+    const { responsePayload, requestId } = await this.client.fetchPersonInformation(
       identitetsbeteckning,
       context,
       personInformationsmangd,
     );
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: identitetsbeteckning,
+        source: 'fi.personer',
+        requestPayload: { identitetsbeteckning, personInformationsmangd },
+        responsePayload: responsePayload as unknown as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
     return responsePayload;
   }
 
@@ -309,11 +355,21 @@ export class BolagsverketService {
     organisationIdentitetsbeteckning: string,
     context?: BvRequestContext,
   ): Promise<FirmateckningsalternativResponse> {
-    const { responsePayload } = await this.client.verifySignatoryPower(
+    const { responsePayload, requestId } = await this.client.verifySignatoryPower(
       funktionarIdentitetsbeteckning,
       organisationIdentitetsbeteckning,
       context,
     );
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: organisationIdentitetsbeteckning,
+        source: 'fi.firmateckningsalternativ',
+        requestPayload: { funktionarIdentitetsbeteckning, organisationIdentitetsbeteckning },
+        responsePayload: responsePayload as unknown as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
     return responsePayload;
   }
 
@@ -325,12 +381,22 @@ export class BolagsverketService {
     tomdatum?: string,
     context?: BvRequestContext,
   ): Promise<AktiekapitalforandringResponse> {
-    const { responsePayload } = await this.client.fetchShareCapitalHistory(
+    const { responsePayload, requestId } = await this.client.fetchShareCapitalHistory(
       identitetsbeteckning,
       fromdatum,
       tomdatum,
       context,
     );
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: identitetsbeteckning,
+        source: 'fi.aktiekapitalforandringar',
+        requestPayload: { identitetsbeteckning, fromdatum, tomdatum },
+        responsePayload: responsePayload as unknown as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
     return responsePayload;
   }
 
@@ -343,13 +409,23 @@ export class BolagsverketService {
     tomdatum?: string,
     context?: BvRequestContext,
   ): Promise<ArendeResponse> {
-    const { responsePayload } = await this.client.fetchArendeInformation(
+    const { responsePayload, requestId } = await this.client.fetchArendeInformation(
       arendenummer,
       organisationIdentitetsbeteckning,
       fromdatum,
       tomdatum,
       context,
     );
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: organisationIdentitetsbeteckning ?? arendenummer ?? 'unknown',
+        source: 'fi.arenden',
+        requestPayload: { arendenummer, organisationIdentitetsbeteckning, fromdatum, tomdatum },
+        responsePayload: responsePayload as unknown as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
     return responsePayload;
   }
 
@@ -361,7 +437,7 @@ export class BolagsverketService {
     pageSize = 20,
     context?: BvRequestContext,
   ): Promise<OrganisationsengagemangResponse> {
-    const { responsePayload } = await this.client.fetchOrganizationEngagements(
+    const { responsePayload, requestId } = await this.client.fetchOrganizationEngagements(
       identitetsbeteckning,
       pageNumber,
       pageSize,
@@ -370,6 +446,16 @@ export class BolagsverketService {
       undefined,
       context,
     );
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: identitetsbeteckning,
+        source: 'fi.organisationsengagemang',
+        requestPayload: { identitetsbeteckning, pageNumber, pageSize },
+        responsePayload: responsePayload as unknown as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
     return responsePayload;
   }
 
@@ -381,12 +467,22 @@ export class BolagsverketService {
     tomdatum?: string,
     context?: BvRequestContext,
   ): Promise<FinansiellaRapporterResponse> {
-    const { responsePayload } = await this.client.fetchFinancialReports(
+    const { responsePayload, requestId } = await this.client.fetchFinancialReports(
       identitetsbeteckning,
       fromdatum,
       tomdatum,
       context,
     );
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: identitetsbeteckning,
+        source: 'fi.finansiella-rapporter',
+        requestPayload: { identitetsbeteckning, fromdatum, tomdatum },
+        responsePayload: responsePayload as unknown as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
     return responsePayload;
   }
 
@@ -396,7 +492,32 @@ export class BolagsverketService {
     identitetsbeteckning: string,
     context?: BvRequestContext,
   ): Promise<DocumentListResponse> {
-    const { responsePayload } = await this.client.fetchDocumentList(identitetsbeteckning, context);
+    const { responsePayload, requestId } = await this.client.fetchDocumentList(identitetsbeteckning, context);
+    if (context?.tenantId) {
+      const documents = (responsePayload?.dokument ?? []) as Array<{
+        dokumentId?: string;
+        filformat?: string;
+        rapporteringsperiodTom?: string;
+        registreringstidpunkt?: string;
+        dokumenttyp?: string;
+      }>;
+      void this.bvPersistenceService.storeDocumentList(
+        context.tenantId,
+        identitetsbeteckning,
+        new Date(),
+        documents,
+        requestId ?? null,
+        null,
+      );
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: identitetsbeteckning,
+        source: 'hvd.dokumentlista',
+        requestPayload: { identitetsbeteckning },
+        responsePayload: responsePayload as unknown as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
     return responsePayload;
   }
 

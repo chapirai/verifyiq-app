@@ -37,14 +37,14 @@ export const hvdClient = {
     return api.healthHvd();
   },
   async hvdGetOrganisation(payload: { identitetsbeteckning: string; namnskyddslopnummer?: string; informationCategories?: string[] }) {
-    return postJson<HvdOrganisationResponse>('/bolagsverket/company', payload);
+    return postJson<HvdOrganisationResponse>('/bolagsverket/hvd/organisationer', payload);
   },
   async hvdGetDocumentList(payload: { identitetsbeteckning: string; namnskyddslopnummer?: string }) {
-    return postJson<HvdDocumentListResponse>('/bolagsverket/documents', payload);
+    return postJson<HvdDocumentListResponse>('/bolagsverket/hvd/dokumentlista', payload);
   },
   async hvdDownloadDocument(dokumentId: string): Promise<HvdDocumentDownloadResponse> {
     const token = getAccessToken();
-    const res = await fetch(`${API_BASE_URL}/bolagsverket/documents/${encodeURIComponent(dokumentId)}/download`, {
+    const res = await fetch(`${API_BASE_URL}/bolagsverket/hvd/dokument/${encodeURIComponent(dokumentId)}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) {
@@ -62,24 +62,24 @@ export const fiClient = {
     return api.healthFi();
   },
   async fiGetOrganisation(payload: { identitetsbeteckning: string; informationCategories?: string[]; tidpunkt?: string; namnskyddslopnummer?: string }) {
-    return postJson<FiOrganisationResponse>('/bolagsverket/company-information', payload);
+    return postJson<FiOrganisationResponse>('/bolagsverket/fi/organisationer', payload);
   },
-  async fiGetPerson(payload: { identitetsbeteckning: string; informationCategories?: string[] }) {
-    return postJson<FiPersonResponse>('/bolagsverket/officers', payload);
+  async fiGetPerson(payload: { identitetsbeteckning: string; personInformationsmangd?: string[] }) {
+    return postJson<FiPersonResponse>('/bolagsverket/fi/personer', payload);
   },
   async fiGetSignatoryAlternatives(payload: { funktionarIdentitetsbeteckning: string; organisationIdentitetsbeteckning: string }) {
-    return postJson<FiSignatoryAlternativesResponse>('/bolagsverket/signatory-power', payload);
+    return postJson<FiSignatoryAlternativesResponse>('/bolagsverket/fi/firmateckningsalternativ', payload);
   },
   async fiGetCases(payload: { arendenummer?: string; organisationIdentitetsbeteckning?: string; fromdatum?: string; tomdatum?: string }) {
-    return postJson<FiCasesResponse>('/bolagsverket/cases', payload);
+    return postJson<FiCasesResponse>('/bolagsverket/fi/arenden', payload);
   },
   async fiGetShareCapitalChanges(payload: { identitetsbeteckning: string; fromdatum?: string; tomdatum?: string }) {
-    return postJson<FiShareCapitalChangesResponse>('/bolagsverket/share-capital-history', payload);
+    return postJson<FiShareCapitalChangesResponse>('/bolagsverket/fi/aktiekapitalforandringar', payload);
   },
   async fiGetOrganisationEngagements(payload: { identitetsbeteckning: string; paginering?: { sida: number; antalPerSida: number } }) {
-    return postJson<FiOrganisationEngagementsResponse>('/bolagsverket/engagements', payload);
+    return postJson<FiOrganisationEngagementsResponse>('/bolagsverket/fi/organisationsengagemang', payload);
   },
   async fiGetFinancialReports(payload: { identitetsbeteckning: string; fromdatum?: string; tomdatum?: string }) {
-    return postJson<FiFinancialReportsResponse>('/bolagsverket/financial-reports', payload);
+    return postJson<FiFinancialReportsResponse>('/bolagsverket/fi/finansiella-rapporter', payload);
   },
 };
