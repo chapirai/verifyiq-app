@@ -159,6 +159,8 @@ export interface HighValueDatasetResponse {
 
 export interface BvDokument {
   dokumentId?: string;
+  /** Some upstream payloads use PascalCase for this field. */
+  DokumentId?: string;
   filformat?: string;
   rapporteringsperiodTom?: string;
   registreringstidpunkt?: string;

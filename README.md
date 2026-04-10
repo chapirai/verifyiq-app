@@ -265,10 +265,23 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 | `POST` | `/api/v1/bolagsverket/enrich` | Full enrichment (HVD + org info + docs) with 30-day cache |
 | `POST` | `/api/v1/bolagsverket/enrich/person` | Officer-engagement lookup by personnummer with cache |
 | `POST` | `/api/v1/bolagsverket/company-information` | Företagsinformation lookup by identitetsbeteckning |
-| `GET` | `/api/v1/bolagsverket/documents/:dokumentId/download` | Download a document ZIP from Värdefulla Datamängder |
+| `POST` | `/api/v1/bolagsverket/hvd/dokumentlista` | List HVD documents (`dokument[]` with `dokumentId`); alias: `POST …/bolagsverket/documents` |
+| `GET` | `/api/v1/bolagsverket/hvd/dokument/:dokumentId` | Download ZIP for one `dokumentId` from the list above |
+| `GET` | `/api/v1/bolagsverket/documents/:dokumentId/download` | Same download handler as `…/hvd/dokument/:dokumentId` (legacy path) |
 | `GET` | `/api/v1/bolagsverket/snapshots?orgNr=…` | List fetch history for an org/person number |
 | `GET` | `/api/v1/bolagsverket/stored-documents?orgNr=…` | List MinIO-stored documents for an org |
 | `GET` | `/api/v1/bolagsverket/stored-documents/:id/download` | Pre-signed 15-minute download URL |
+
+#### HVD annual reports: app URL vs Bolagsverket URL
+
+The browser calls **your API** (JWT). The backend then calls **Bolagsverket** with HVD OAuth. These pairs are equivalent (default `BV_HVD_BASE_URL` = `https://gw.api.bolagsverket.se/vardefulla-datamangder/v1`):
+
+| Step | VerifyIQ (client → this backend) | Upstream (backend → Bolagsverket) |
+|------|-------------------------------------|-----------------------------------|
+| 1 | `POST /api/v1/bolagsverket/hvd/dokumentlista` + JSON `{ "identitetsbeteckning": "…" }` | `POST {BV_HVD_BASE_URL}/dokumentlista` (same body) |
+| 2 | `GET /api/v1/bolagsverket/hvd/dokument/<dokumentId>` | `GET {BV_HVD_BASE_URL}/dokument/<dokumentId>` |
+
+Important: the Bolagsverket resource is **`…/v1/dokument/{dokumentId}`** (the id is a **path segment** after `dokument/`), not `GET …/dokument/` with an empty path. The `dokumentId` values must come **only** from `dokument[]` in step 1.
 
 #### Enrich request body
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
+import { pickDokumentIdFromListRow } from '@/lib/hvd-dokument';
 import { fiClient, hvdClient } from '@/lib/source-clients';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -55,34 +56,11 @@ function dokumentArrayFromRoot(payload: unknown): Array<Record<string, unknown>>
   return raw.filter((x) => x && typeof x === 'object') as Array<Record<string, unknown>>;
 }
 
-/** Deep scan when root has no `dokument` array (some proxies / legacy shapes). */
-function collectDokumentRowsDeep(node: unknown, out: Array<Record<string, unknown>>, seen: Set<string>) {
-  if (node === null || node === undefined) return;
-  if (Array.isArray(node)) {
-    for (const item of node) collectDokumentRowsDeep(item, out, seen);
-    return;
-  }
-  if (typeof node !== 'object') return;
-  const row = node as Record<string, unknown>;
-  const id = row.dokumentId ?? row.dokumentid;
-  if (typeof id === 'string' && id.trim()) {
-    const key = id.trim();
-    if (!seen.has(key)) {
-      seen.add(key);
-      out.push(row);
-    }
-    return;
-  }
-  for (const v of Object.values(row)) collectDokumentRowsDeep(v, out, seen);
-}
-
-/** HVD POST /dokumentlista → { dokument: [...] } (case variants + nested dokumentId tolerated) */
+/**
+ * Only the root `dokument` array from dokumentlista (never deep-search nested dokumentId — those may be FI or other contexts).
+ */
 export function extractHvdDocuments(payload: unknown): Array<Record<string, unknown>> {
-  const direct = dokumentArrayFromRoot(payload);
-  if (direct.length > 0) return direct;
-  const deep: Array<Record<string, unknown>> = [];
-  collectDokumentRowsDeep(payload, deep, new Set());
-  return deep;
+  return dokumentArrayFromRoot(payload);
 }
 
 function formatHvdDokumentlistaFel(payload: unknown): string | null {
@@ -592,7 +570,7 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                 </thead>
                 <tbody>
                   {dokumentRows.map((row, idx) => {
-                    const docId = String(row.dokumentId ?? row.dokumentid ?? '');
+                    const docId = pickDokumentIdFromListRow(row) ?? '';
                     return (
                       <tr key={`${docId}-${idx}`}>
                         <td>{String(row.rapporteringsperiodTom ?? '—')}</td>

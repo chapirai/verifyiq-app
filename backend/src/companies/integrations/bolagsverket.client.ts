@@ -6,6 +6,7 @@ import {
   BadRequestException,
   ForbiddenException,
   InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -241,13 +242,14 @@ export class BolagsverketClient {
     return headers;
   }
 
-  private mapError(status?: number, requestId?: string, details?: BvApiError | string): never {
+  private mapError(status?: number, requestId?: string, details?: BvApiError | string, url?: string): never {
     const normalized = this.normalizeApiErrorDetails(status, requestId, details);
     const detailMessage = normalized.detail || normalized.title || normalized.code;
     const detailSuffix = detailMessage ? `: ${detailMessage}` : '';
     const base = normalized.requestId ? ` (requestId: ${normalized.requestId})` : '';
+    const urlPart = url ? ` ${url}` : '';
     this.logger.error(
-      `Bolagsverket upstream error${base}`,
+      `Bolagsverket upstream error${urlPart}${base}`,
       JSON.stringify({
         status: normalized.status,
         title: normalized.title,
@@ -260,7 +262,8 @@ export class BolagsverketClient {
     if (mappedStatus === 400) throw new BadRequestException(`Bolagsverket rejected the request${base}${detailSuffix}`);
     if (mappedStatus === 401) throw new UnauthorizedException(`Bolagsverket authentication failed${base}${detailSuffix}`);
     if (mappedStatus === 403) throw new ForbiddenException(`Bolagsverket access forbidden${base}${detailSuffix}`);
-    throw new InternalServerErrorException(`Bolagsverket request failed${base}${detailSuffix}`);
+    const http = mappedStatus ?? status ?? 'unknown';
+    throw new InternalServerErrorException(`Bolagsverket request failed (HTTP ${http})${base}${detailSuffix}`);
   }
 
   private normalizeApiErrorDetails(status?: number, requestId?: string, details?: BvApiError | string) {
@@ -326,9 +329,30 @@ export class BolagsverketClient {
           continue;
         }
 
-        this.mapError(status, requestId, error?.response?.data);
+        this.mapError(status, requestId, error?.response?.data, url);
       }
     }
+  }
+
+  /**
+   * dokumentlista returns 404 + FM130 / "Information saknas" when Bolagsverket has no document list for that org
+   * (not the same as an empty dokument[]). Treat as empty list so enrich and workspace stay consistent.
+   */
+  private isDokumentlistaNoCatalogError(err: unknown): boolean {
+    if (err instanceof HttpException) {
+      const r = err.getResponse();
+      if (typeof r === 'string') {
+        return r.includes('FM130') || r.includes('Information saknas');
+      }
+      if (r && typeof r === 'object') {
+        const o = r as Record<string, unknown>;
+        const msg = o.message;
+        const joined = Array.isArray(msg) ? msg.join(' ') : typeof msg === 'string' ? msg : '';
+        if (joined.includes('FM130') || joined.includes('Information saknas')) return true;
+      }
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    return msg.includes('FM130') || (msg.includes('Information saknas') && msg.includes('Bolagsverket'));
   }
 
   private invalidateToken(): void {
@@ -571,13 +595,44 @@ export class BolagsverketClient {
     if (request.namnskyddslopnummer !== undefined && request.namnskyddslopnummer !== '') {
       payload.namnskyddslopnummer = request.namnskyddslopnummer;
     }
-    const { responseData, requestId } = await this.requestWithRetry<DocumentListResponse>(
-      'post',
-      this.buildUrl(this.getHvdBaseUrl(), '/dokumentlista'),
-      payload,
-      { auth: 'hvd', context },
-    );
-    return { requestPayload: payload, responsePayload: responseData, requestId };
+    const listUrl = this.buildUrl(this.getHvdBaseUrl(), '/dokumentlista');
+    try {
+      const { responseData, requestId } = await this.requestWithRetry<DocumentListResponse>(
+        'post',
+        listUrl,
+        payload,
+        { auth: 'hvd', context },
+      );
+      const dokument = Array.isArray(responseData?.dokument) ? responseData.dokument : [];
+      return {
+        requestPayload: payload,
+        responsePayload: { ...responseData, dokument },
+        requestId,
+      };
+    } catch (err: unknown) {
+      if (this.isDokumentlistaNoCatalogError(err)) {
+        this.logger.warn(
+          `dokumentlista: no document catalog for identitetsbeteckning=${request.identitetsbeteckning} (Bolagsverket FM130 / Information saknas) — using empty dokument[]`,
+        );
+        return {
+          requestPayload: payload,
+          responsePayload: { dokument: [] },
+          requestId: randomUUID(),
+        };
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('HTTP 404') && msg.includes('Bolagsverket')) {
+        this.logger.warn(
+          `dokumentlista: upstream 404 for identitetsbeteckning=${request.identitetsbeteckning} — using empty dokument[]`,
+        );
+        return {
+          requestPayload: payload,
+          responsePayload: { dokument: [] },
+          requestId: randomUUID(),
+        };
+      }
+      throw err;
+    }
   }
 
   /** GET /vardefulla-datamangder/v1/dokument/{dokumentId} — binary (dokumentId from dokumentlista only). */

@@ -1,4 +1,19 @@
-import { Body, Controller, ForbiddenException, Get, HttpException, InternalServerErrorException, Param, Post, Query, Req, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpException,
+  InternalServerErrorException,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AuditEventType } from '../../audit/audit-event.entity';
@@ -188,9 +203,13 @@ export class BolagsverketController {
    */
   @Get('documents/:dokumentId/download')
   async downloadDocument(@Param('dokumentId') dokumentId: string, @Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const id = dokumentId?.trim();
+    if (!id) {
+      throw new BadRequestException('dokumentId is required (use an id returned from POST …/dokumentlista only)');
+    }
     const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
-    const document = await this.bolagsverketService.getDocument(dokumentId, {
+    const document = await this.bolagsverketService.getDocument(id, {
       tenantId,
       actorId: actorId ?? null,
     });

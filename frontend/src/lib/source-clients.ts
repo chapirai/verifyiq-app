@@ -1,4 +1,5 @@
 import { getAccessToken } from '@/lib/auth';
+import { API_V1_BASE_URL } from '@/lib/api-base-url';
 import { api, ApiError } from '@/lib/api';
 import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
 import type {
@@ -14,8 +15,6 @@ import type {
   HvdOrganisationResponse,
 } from '@/types/source-data';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api/v1';
-
 function normalizeBolagsverketPayload(payload: Record<string, unknown>): Record<string, unknown> {
   const out = { ...payload };
   const idKeys = ['identitetsbeteckning', 'organisationIdentitetsbeteckning', 'funktionarIdentitetsbeteckning'] as const;
@@ -28,7 +27,7 @@ function normalizeBolagsverketPayload(payload: Record<string, unknown>): Record<
 
 async function postJson<T>(path: string, payload: Record<string, unknown>): Promise<T> {
   const token = getAccessToken();
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(`${API_V1_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -53,10 +52,15 @@ export const hvdClient = {
   async hvdGetDocumentList(payload: { identitetsbeteckning: string; namnskyddslopnummer?: string }) {
     return postJson<HvdDocumentListResponse>('/bolagsverket/hvd/dokumentlista', payload);
   },
-  /** Pass only dokumentId from the same session's hvdGetDocumentList rows (unique per document; never from env or FI). */
+  /** Pass only dokumentId from hvdGetDocumentList rows (same value as Bolagsverket GET …/v1/dokument/{id}). */
   async hvdDownloadDocument(dokumentId: string): Promise<HvdDocumentDownloadResponse> {
+    const id = dokumentId?.trim();
+    if (!id) {
+      throw new ApiError('Missing dokumentId (use an id from dokumentlista only)', 400);
+    }
     const token = getAccessToken();
-    const res = await fetch(`${API_BASE_URL}/bolagsverket/hvd/dokument/${encodeURIComponent(dokumentId)}`, {
+    const pathSeg = encodeURIComponent(id);
+    const res = await fetch(`${API_V1_BASE_URL}/bolagsverket/hvd/dokument/${pathSeg}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) {
@@ -64,7 +68,7 @@ export const hvdClient = {
     }
     const disposition = res.headers.get('content-disposition') ?? '';
     const fileNameMatch = disposition.match(/filename="(.+)"/);
-    const fileName = fileNameMatch?.[1] ?? `${dokumentId}.zip`;
+    const fileName = fileNameMatch?.[1] ?? `${id}.zip`;
     return { fileName, blob: await res.blob() };
   },
 };
