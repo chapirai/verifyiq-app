@@ -164,9 +164,8 @@ export class BolagsverketController {
   }
 
   /**
-   * POST /bolagsverket/documents — proxies Bolagsverket HVD step 1:
-   * POST https://gw.api.bolagsverket.se/vardefulla-datamangder/v1/dokumentlista
-   * Response dokument[] yields dokumentId for step 2 only (never merge with FI).
+   * POST /bolagsverket/documents — same contract as upstream
+   * POST {BV_HVD_BASE_URL}/dokumentlista → JSON with dokument[] (dokumentId for step 2 only; not FI).
    */
   @Post('documents')
   getDocumentList(@Body() dto: BolagsverketDocumentListDto, @Req() req: any) {
@@ -184,8 +183,8 @@ export class BolagsverketController {
   }
 
   /**
-   * HVD step 2 — proxies GET https://gw.api.bolagsverket.se/vardefulla-datamangder/v1/dokument/{dokumentId}
-   * (or POST /dokument + body if BV_HVD_DOCUMENT_PATH=/dokument). dokumentId must come from dokumentlista.
+   * HVD step 2 — same bytes as upstream GET {BV_HVD_BASE_URL}/dokument/{dokumentId}
+   * (dokumentId from dokumentlista only). JWT auth to this API; HVD OAuth on the server.
    */
   @Get('documents/:dokumentId/download')
   async downloadDocument(@Param('dokumentId') dokumentId: string, @Req() req: any, @Res({ passthrough: true }) res: Response) {

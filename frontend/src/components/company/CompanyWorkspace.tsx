@@ -528,13 +528,13 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
             {hvdDocs.error ? <ErrorState title="HVD dokumentlista failed" message={hvdDocs.error} /> : null}
             <div className="mb-4 space-y-2 text-sm text-muted-foreground">
               <p>
-                <strong>Chained HVD flow (required):</strong> (1) POST{' '}
-                <code className="font-mono text-xs">…/vardefulla-datamangder/v1/dokumentlista</code> with{' '}
-                <code className="font-mono text-xs">identitetsbeteckning</code> → read <code className="font-mono text-xs">dokument[]</code> → (2) GET{' '}
-                <code className="font-mono text-xs">{`…/vardefulla-datamangder/v1/dokument/{dokumentId}`}</code> for the file. Our app proxies these as{' '}
-                <code className="font-mono text-xs">POST /api/v1/bolagsverket/hvd/dokumentlista</code> then{' '}
-                <code className="font-mono text-xs">GET /api/v1/bolagsverket/hvd/dokument/:dokumentId</code> — same binary as upstream; no{' '}
-                <code className="font-mono text-xs">dokumentId</code> is invented and FI report metadata is never used here.
+                <strong>Automatic HVD chain (per company):</strong> (1) POST{' '}
+                <code className="font-mono text-xs">…/dokumentlista</code> for this org → each row’s{' '}
+                <code className="font-mono text-xs">dokumentId</code> is unique to that document (and differs by company); (2) Download runs GET{' '}
+                <code className="font-mono text-xs">{`…/dokument/{dokumentId}`}</code> using <strong>only</strong> the id from that table — nothing to type or
+                configure. Backend uses the same upstream URLs (HVD OAuth on server); browser calls{' '}
+                <code className="font-mono text-xs">POST …/hvd/dokumentlista</code> and{' '}
+                <code className="font-mono text-xs">GET …/hvd/dokument/:dokumentId</code>. FI metadata is never used for ids.
               </p>
             </div>
             <div className="mb-6 flex flex-col gap-3 border-2 border-foreground p-4 md:flex-row md:items-end">

@@ -31,7 +31,6 @@ const envSchema = z.object({
   BV_HVD_TOKEN_URL: z.string().url().optional(),
   BV_HVD_REVOKE_URL: z.string().url().optional(),
   BV_HVD_SCOPES: z.string().min(1).optional(),
-  BV_HVD_DOCUMENT_PATH: z.string().min(1).optional(),
   BV_FORETAGSINFO_BASE_URL: z.string().url().optional(),
   BV_FORETAGSINFO_CLIENT_ID: z.string().min(1).optional(),
   BV_FORETAGSINFO_CLIENT_SECRET: z.string().min(1).optional(),

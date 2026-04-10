@@ -53,6 +53,7 @@ export const hvdClient = {
   async hvdGetDocumentList(payload: { identitetsbeteckning: string; namnskyddslopnummer?: string }) {
     return postJson<HvdDocumentListResponse>('/bolagsverket/hvd/dokumentlista', payload);
   },
+  /** Pass only dokumentId from the same session's hvdGetDocumentList rows (unique per document; never from env or FI). */
   async hvdDownloadDocument(dokumentId: string): Promise<HvdDocumentDownloadResponse> {
     const token = getAccessToken();
     const res = await fetch(`${API_BASE_URL}/bolagsverket/hvd/dokument/${encodeURIComponent(dokumentId)}`, {

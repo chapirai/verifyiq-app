@@ -6,6 +6,7 @@ out/
 coverage/
 .env
 .env.local
+logins.txt
 .env.*.local
 *.log
 npm-debug.log*

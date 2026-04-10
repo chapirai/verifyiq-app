@@ -173,6 +173,7 @@ export class BolagsverketService {
     return responsePayload;
   }
 
+  /** dokumentId must be taken from the dokumentlista response only (unique per file; not configured in env). */
   async getDocument(dokumentId: string, context?: BvRequestContext): Promise<DocumentDownload> {
     const result = await this.client.fetchDocument(dokumentId, context);
     if (context?.tenantId) {

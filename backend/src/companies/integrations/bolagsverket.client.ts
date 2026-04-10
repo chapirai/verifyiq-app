@@ -55,9 +55,15 @@ const ORG_BASE_URL = 'https://gw.api.bolagsverket.se/foretagsinformation/v4';
 const DEFAULT_HVD_SCOPES = 'vardefulla-datamangder:read vardefulla-datamangder:ping';
 const DEFAULT_HVD_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token';
 const DEFAULT_HVD_REVOKE_URL = 'https://portal.api.bolagsverket.se/oauth2/revoke';
-/** Upstream: GET {base}/dokument/{dokumentId}. Override with BV_HVD_DOCUMENT_PATH=/dokument for legacy POST+body. */
-const DEFAULT_HVD_DOCUMENT_PATH = '/dokument/{dokumentId}';
 const TOKEN_REFRESH_SKEW_MS = 60_000;
+
+/**
+ * Bolagsverket HVD (värdefulla datamängder) — paths under BV_HVD_BASE_URL, default:
+ *   GET  …/v1/isalive
+ *   POST …/v1/organisationer
+ *   POST …/v1/dokumentlista
+ *   GET  …/v1/dokument/{dokumentId}   ← dokumentId only from dokumentlista (opaque, unique per listed document / company)
+ */
 const BEARER_PREFIX_PATTERN = /^Bearer\s+/i;
 
 @Injectable()
@@ -574,29 +580,25 @@ export class BolagsverketClient {
     return { requestPayload: payload, responsePayload: responseData, requestId };
   }
 
-  /** GET or POST /vardefulla-datamangder/v1/dokument – binary annual report (dokumentId from dokumentlista only). */
+  /** GET /vardefulla-datamangder/v1/dokument/{dokumentId} — binary (dokumentId from dokumentlista only). */
   async fetchDocument(
     dokumentId: string,
     context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
   ): Promise<{
-    requestPayload: { dokumentId: string } | null;
+    /** No JSON body; GET uses path segment only. */
+    requestPayload: null;
     responsePayload: Buffer;
     requestId: string;
     contentType: string;
     fileName?: string;
   }> {
-    const documentPath = this.configService.get<string>('BV_HVD_DOCUMENT_PATH') ?? DEFAULT_HVD_DOCUMENT_PATH;
-    const isPathTemplate = documentPath.includes('{dokumentId}');
-    const resolvedPath = isPathTemplate
-      ? documentPath.replace('{dokumentId}', encodeURIComponent(dokumentId))
-      : documentPath;
-    const url = this.buildUrl(this.getHvdBaseUrl(), resolvedPath);
-    const payload = isPathTemplate ? null : { dokumentId };
+    const path = `/dokument/${encodeURIComponent(dokumentId)}`;
+    const url = this.buildUrl(this.getHvdBaseUrl(), path);
 
     const { responseData, requestId, responseHeaders } = await this.requestWithRetry<ArrayBuffer>(
-      payload ? 'post' : 'get',
+      'get',
       url,
-      payload ?? undefined,
+      undefined,
       {
         auth: 'hvd',
         responseType: 'arraybuffer',
@@ -615,7 +617,7 @@ export class BolagsverketClient {
     const safeFileName = sanitizeBolagsverketFilename(rawFileName);
 
     return {
-      requestPayload: payload,
+      requestPayload: null,
       responsePayload: buffer,
       requestId,
       contentType,

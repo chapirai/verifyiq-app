@@ -294,7 +294,7 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 | `BV_HVD_TOKEN_URL` | Optional OAuth token endpoint override for Värdefulla Datamängder (defaults to `<BV_HVD_BASE_URL>/oauth2/token`) |
 | `BV_HVD_REVOKE_URL` | OAuth token revocation endpoint (optional) |
 | `BV_HVD_SCOPES` | OAuth scopes (default: `vardefulla-datamangder:read vardefulla-datamangder:ping`) |
-| `BV_HVD_DOCUMENT_PATH` | Document download path (default: `/dokument`) |
+| *(none)* | HVD annual files: always `POST …/dokumentlista` then `GET …/dokument/{dokumentId}` under `BV_HVD_BASE_URL` (no path override env) |
 | `BV_FORETAGSINFO_BASE_URL` | Override base URL for Företagsinformation |
 | `BV_FORETAGSINFO_USE_OAUTH` | Set `true` to fetch Företagsinformation tokens via OAuth client-credentials |
 | `BV_FORETAGSINFO_TOKEN_URL` | Optional token endpoint override for Företagsinformation OAuth mode |

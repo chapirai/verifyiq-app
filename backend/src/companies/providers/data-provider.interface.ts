@@ -83,7 +83,7 @@ export interface DataProvider {
     context?: ProviderRequestContext,
   ): Promise<FinansiellaRapporterResponse>;
 
-  /** HVD step 1: POST …/dokumentlista — dokumentId list only. */
+  /** HVD: POST …/dokumentlista (dokumentId list only). */
   fetchDocumentList(
     request: BvDokumentListaRequest,
     context?: ProviderRequestContext,

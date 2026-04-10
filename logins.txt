@@ -36,7 +36,6 @@ BV_HVD_BASE_URL=https://gw.api.bolagsverket.se/vardefulla-datamangder/v1
 BV_HVD_TOKEN_URL=https://portal.api.bolagsverket.se/oauth2/token
 BV_HVD_REVOKE_URL=https://portal.api.bolagsverket.se/oauth2/revoke
 BV_HVD_SCOPES=vardefulla-datamangder:read vardefulla-datamangder:ping
-BV_HVD_DOCUMENT_PATH=/dokument
 
 # Bolagsverket Företagsinformation
 BV_FORETAGSINFO_BASE_URL=https://gw.api.bolagsverket.se/foretagsinformation/v4
