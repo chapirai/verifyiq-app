@@ -181,11 +181,29 @@ export class BvPersistenceService {
     requestPayload: Record<string, unknown>;
     responsePayload: Record<string, unknown>;
     requestId: string;
+    sourceSystem?: string;
+    endpointName?: string;
+    identitetsbeteckning?: string;
+    dokumentId?: string;
+    correlationId?: string | null;
+    snapshotId?: string | null;
+    fetchedAt?: Date;
+    requestContext?: Record<string, unknown>;
   }): Promise<void> {
+    const [derivedSystem, ...endpointParts] = params.source.split('.');
+    const derivedEndpoint = endpointParts.join('.');
     const row = this.endpointPayloadRepo.create({
       tenantId: params.tenantId,
       organisationNumber: params.organisationNumber,
       source: params.source,
+      sourceSystem: params.sourceSystem ?? (derivedSystem || null),
+      endpointName: params.endpointName ?? (derivedEndpoint || params.source),
+      identitetsbeteckning: params.identitetsbeteckning ?? params.organisationNumber,
+      dokumentId: params.dokumentId ?? null,
+      correlationId: params.correlationId ?? null,
+      snapshotId: params.snapshotId ?? null,
+      fetchedAt: params.fetchedAt ?? new Date(),
+      requestContext: params.requestContext ?? {},
       requestPayload: params.requestPayload,
       responsePayload: params.responsePayload,
       requestId: params.requestId,

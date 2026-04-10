@@ -106,6 +106,36 @@ export class BolagsverketService {
     return this.client.foretagsinfoHealthCheck();
   }
 
+  async hvdIsAlive(context?: BvRequestContext): Promise<{ status: string }> {
+    const response = await this.client.healthCheck();
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: 'system',
+        source: 'hvd.isalive',
+        requestPayload: {},
+        responsePayload: response as unknown as Record<string, unknown>,
+        requestId: randomUUID(),
+      });
+    }
+    return response;
+  }
+
+  async fiIsAlive(context?: BvRequestContext): Promise<{ status: string }> {
+    const response = await this.client.foretagsinfoHealthCheck();
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: 'system',
+        source: 'fi.isalive',
+        requestPayload: {},
+        responsePayload: response as unknown as Record<string, unknown>,
+        requestId: randomUUID(),
+      });
+    }
+    return response;
+  }
+
   async isAlive(): Promise<{ status: string }> {
     return this.healthCheck();
   }

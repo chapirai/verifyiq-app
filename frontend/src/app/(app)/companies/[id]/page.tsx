@@ -13,7 +13,7 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState('');
   const [orgNumber, setOrgNumber] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'hvd' | 'fi' | 'reports' | 'cases' | 'capital' | 'engagements'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'hvd' | 'fi' | 'reports' | 'cases' | 'capital' | 'engagements' | 'person' | 'signatory'>('overview');
   const [hvdOrganisation, setHvdOrganisation] = useState<SourceFetchState<Record<string, unknown>>>({ data: null, error: null, ok: false });
   const [hvdDocuments, setHvdDocuments] = useState<SourceFetchState<Record<string, unknown>>>({ data: null, error: null, ok: false });
   const [fiOrganisation, setFiOrganisation] = useState<SourceFetchState<Record<string, unknown>>>({ data: null, error: null, ok: false });
@@ -21,6 +21,10 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
   const [fiCapital, setFiCapital] = useState<SourceFetchState<Record<string, unknown>>>({ data: null, error: null, ok: false });
   const [fiEngagements, setFiEngagements] = useState<SourceFetchState<Record<string, unknown>>>({ data: null, error: null, ok: false });
   const [fiFinancial, setFiFinancial] = useState<SourceFetchState<Record<string, unknown>>>({ data: null, error: null, ok: false });
+  const [fiPerson, setFiPerson] = useState<SourceFetchState<Record<string, unknown>>>({ data: null, error: null, ok: false });
+  const [fiSignatory, setFiSignatory] = useState<SourceFetchState<Record<string, unknown>>>({ data: null, error: null, ok: false });
+  const [personIdentitet, setPersonIdentitet] = useState('');
+  const [funktionarIdentitet, setFunktionarIdentitet] = useState('');
   const [downloadState, setDownloadState] = useState<string>('');
   const [snapshots, setSnapshots] = useState<Array<Record<string, unknown>>>([]);
 
@@ -148,6 +152,8 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
         <button className={`border px-3 py-2 text-xs ${activeTab === 'cases' ? 'bg-foreground text-background' : ''}`} onClick={() => setActiveTab('cases')}>Cases</button>
         <button className={`border px-3 py-2 text-xs ${activeTab === 'capital' ? 'bg-foreground text-background' : ''}`} onClick={() => setActiveTab('capital')}>Share Capital</button>
         <button className={`border px-3 py-2 text-xs ${activeTab === 'engagements' ? 'bg-foreground text-background' : ''}`} onClick={() => setActiveTab('engagements')}>Engagements</button>
+        <button className={`border px-3 py-2 text-xs ${activeTab === 'person' ? 'bg-foreground text-background' : ''}`} onClick={() => setActiveTab('person')}>Person (FI)</button>
+        <button className={`border px-3 py-2 text-xs ${activeTab === 'signatory' ? 'bg-foreground text-background' : ''}`} onClick={() => setActiveTab('signatory')}>Signatory (FI)</button>
       </div>
       <div className="grid gap-4 md:grid-cols-4">
         <article className="border-2 border-foreground p-4"><p className="mono-label text-[10px]">Data source</p><p className="mt-2 text-sm">{String(metadata.source ?? '-')}</p></article>
@@ -255,6 +261,59 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
       {activeTab === 'cases' ? <div className="border-2 border-foreground p-6">{fiCases.error ? <ErrorState title="FI cases failed" message={fiCases.error} /> : renderKeyValues(fiCases.data, 'No FI case data')}</div> : null}
       {activeTab === 'capital' ? <div className="border-2 border-foreground p-6">{fiCapital.error ? <ErrorState title="FI share capital failed" message={fiCapital.error} /> : renderKeyValues(fiCapital.data, 'No FI share capital history')}</div> : null}
       {activeTab === 'engagements' ? <div className="border-2 border-foreground p-6">{fiEngagements.error ? <ErrorState title="FI engagements failed" message={fiEngagements.error} /> : renderKeyValues(fiEngagements.data, 'No FI engagements')}</div> : null}
+      {activeTab === 'person' ? (
+        <div className="space-y-4 border-2 border-foreground p-6">
+          <p className="mono-label text-[10px]">FI Person Endpoint (/personer)</p>
+          <div className="flex gap-3">
+            <Input value={personIdentitet} onChange={(e) => setPersonIdentitet(e.target.value)} placeholder="Person identitetsbeteckning" />
+            <Button
+              onClick={async () => {
+                try {
+                  const payload = await fiClient.fiGetPerson({
+                    identitetsbeteckning: personIdentitet,
+                    personInformationsmangd: ['ORGANISATIONSENGAGEMANG', 'PERSONLIG_KONKURS', 'BITRADESFORBUD', 'NARINGSFORBUD'],
+                  });
+                  setFiPerson({ data: payload, ok: true, error: null });
+                } catch (e) {
+                  setFiPerson({ data: null, ok: false, error: e instanceof Error ? e.message : 'FI person call failed' });
+                }
+              }}
+            >
+              Fetch person
+            </Button>
+          </div>
+          {fiPerson.error ? <ErrorState title="FI person failed" message={fiPerson.error} /> : renderKeyValues(fiPerson.data, 'No FI person data yet')}
+        </div>
+      ) : null}
+      {activeTab === 'signatory' ? (
+        <div className="space-y-4 border-2 border-foreground p-6">
+          <p className="mono-label text-[10px]">FI Signatory Endpoint (/firmateckningsalternativ)</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Input value={funktionarIdentitet} onChange={(e) => setFunktionarIdentitet(e.target.value)} placeholder="Funktionär identitetsbeteckning" />
+            <Input
+              value={orgNumber}
+              onChange={(e) => setOrgNumber(e.target.value)}
+              placeholder="Organisation identitetsbeteckning"
+            />
+          </div>
+          <Button
+            onClick={async () => {
+              try {
+                const payload = await fiClient.fiGetSignatoryAlternatives({
+                  funktionarIdentitetsbeteckning: funktionarIdentitet,
+                  organisationIdentitetsbeteckning: orgNumber,
+                });
+                setFiSignatory({ data: payload, ok: true, error: null });
+              } catch (e) {
+                setFiSignatory({ data: null, ok: false, error: e instanceof Error ? e.message : 'FI signatory call failed' });
+              }
+            }}
+          >
+            Fetch alternatives
+          </Button>
+          {fiSignatory.error ? <ErrorState title="FI signatory failed" message={fiSignatory.error} /> : renderKeyValues(fiSignatory.data, 'No FI signatory data yet')}
+        </div>
+      ) : null}
     </section>
   );
 }

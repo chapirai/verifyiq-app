@@ -82,8 +82,10 @@ export class BolagsverketController {
   }
 
   @Get('hvd/isalive')
-  hvdIsAlive() {
-    return this.bolagsverketService.healthCheck();
+  hvdIsAlive(@Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.hvdIsAlive({ tenantId, actorId: actorId ?? null });
   }
 
   /** GET /bolagsverket/health/foretagsinfo – check Företagsinformation v4 API availability. */
@@ -93,8 +95,10 @@ export class BolagsverketController {
   }
 
   @Get('fi/isalive')
-  fiIsAlive() {
-    return this.bolagsverketService.foretagsinfoHealthCheck();
+  fiIsAlive(@Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.fiIsAlive({ tenantId, actorId: actorId ?? null });
   }
 
   /** GET /bolagsverket/token-cache – expose OAuth token cache diagnostics. */
