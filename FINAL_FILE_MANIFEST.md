@@ -41,16 +41,3 @@
 - src/reports/*
 
 ## Frontend
-- Dockerfile
-- package.json
-- tsconfig.json
-- next.config.ts
-- postcss.config.js
-- tailwind.config.ts
-- components.json
-- .eslintrc.js
-- src/app/*
-- src/components/*
-- src/hooks/*
-- src/lib/*
-- src/types/*

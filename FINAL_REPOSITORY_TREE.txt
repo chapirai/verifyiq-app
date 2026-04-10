@@ -37,17 +37,3 @@ verifyiq-app/
 │       ├── documents/
 │       └── reports/
 └── frontend/
-    ├── Dockerfile
-    ├── package.json
-    ├── tsconfig.json
-    ├── next.config.ts
-    ├── postcss.config.js
-    ├── tailwind.config.ts
-    ├── components.json
-    ├── .eslintrc.js
-    └── src/
-        ├── app/
-        ├── components/
-        ├── hooks/
-        ├── lib/
-        └── types/
