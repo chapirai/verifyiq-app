@@ -15,7 +15,6 @@
 
 * {
   box-sizing: border-box;
-  border-radius: 0 !important;
 }
 
 html,
@@ -62,7 +61,7 @@ a {
 }
 
 .btn-base {
-  @apply inline-flex min-h-12 items-center justify-center border-2 border-foreground px-8 py-4 text-sm font-medium uppercase tracking-widest transition-none;
+  @apply inline-flex min-h-12 items-center justify-center border-2 border-foreground px-7 py-3 text-[11px] font-medium uppercase tracking-[0.18em] transition-none;
 }
 
 .btn-primary {
@@ -100,6 +99,38 @@ a {
 
 .focus-outline {
   @apply focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-foreground focus-visible:outline-offset-[3px];
+}
+
+.input-base {
+  @apply focus-outline w-full border-2 border-foreground bg-background px-4 py-3 text-base text-foreground;
+}
+
+.input-base::placeholder {
+  color: var(--muted-foreground);
+}
+
+.select-base {
+  @apply input-base appearance-none;
+}
+
+.textarea-base {
+  @apply input-base min-h-[120px] resize-y;
+}
+
+.table-shell {
+  @apply w-full border-2 border-foreground bg-background;
+}
+
+.table-shell th {
+  @apply border-b-2 border-foreground px-4 py-3 text-left font-mono text-xs uppercase tracking-widest;
+}
+
+.table-shell td {
+  @apply border-b border-foreground/20 px-4 py-3 align-top;
+}
+
+.skeleton {
+  @apply animate-pulse bg-muted;
 }
 
 input,
