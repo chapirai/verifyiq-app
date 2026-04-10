@@ -6,8 +6,8 @@ interface DetailItemProps {
 function DetailItem({ label, value }: DetailItemProps) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm text-foreground">{value ?? '—'}</dd>
+      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="mt-1.5 text-sm font-medium text-foreground">{value ?? '—'}</dd>
     </div>
   );
 }
@@ -27,26 +27,24 @@ export function CompanyDetailsGrid({
   countryCode,
   businessDescription,
 }: CompanyDetailsGridProps) {
-  const formattedDate = registeredAt
-    ? new Date(registeredAt).toLocaleDateString('sv-SE')
-    : null;
+  const formattedDate = registeredAt ? new Date(registeredAt).toLocaleDateString('sv-SE') : null;
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-        Company Details
-      </h2>
-      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <DetailItem label="Organisation Number" value={orgNumber} />
-        <DetailItem label="Registration Date" value={formattedDate} />
-        <DetailItem label="Company Form" value={companyForm} />
+    <div className="panel p-6 md:p-8">
+      <h3 className="mb-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Company details
+      </h3>
+      <dl className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <DetailItem label="Organisation number" value={orgNumber} />
+        <DetailItem label="Registration date" value={formattedDate} />
+        <DetailItem label="Company form" value={companyForm} />
         <DetailItem label="Country" value={countryCode} />
         {businessDescription && (
           <div className="sm:col-span-2 lg:col-span-3">
-            <dt className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-              Business Description
+            <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Business description
             </dt>
-            <dd className="mt-1 text-sm text-foreground">{businessDescription}</dd>
+            <dd className="mt-1.5 text-sm leading-relaxed text-foreground">{businessDescription}</dd>
           </div>
         )}
       </dl>

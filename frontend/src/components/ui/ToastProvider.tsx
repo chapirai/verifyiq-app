@@ -43,9 +43,9 @@ function ToastContainer() {
 }
 
 const variantStyles: Record<string, string> = {
-  success: 'border-emerald-500 text-emerald-300',
-  error: 'border-red-500 text-red-300',
-  info: 'border-blue-500 text-blue-300',
+  success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  error: 'border-red-200 bg-red-50 text-red-900',
+  info: 'border-blue-200 bg-blue-50 text-blue-900',
 };
 
 const variantIcons: Record<string, string> = {
@@ -66,10 +66,10 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
   return (
     <div
       role="alert"
-      className={`flex min-w-[260px] max-w-xs items-start gap-3 rounded-xl border bg-slate-900 px-4 py-3 text-sm shadow-lg ${colorClass}`}
+      className={`flex min-w-[260px] max-w-xs items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-card ${colorClass}`}
     >
-      <span className="mt-0.5 shrink-0 font-bold">{icon}</span>
-      <span className="flex-1">{toast.message}</span>
+      <span className="mt-0.5 shrink-0 font-bold opacity-80">{icon}</span>
+      <span className="flex-1 leading-snug">{toast.message}</span>
       <div className="flex shrink-0 flex-col gap-1">
         {toast.onRetry && (
           <button
@@ -77,7 +77,8 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
               onDismiss();
               toast.onRetry?.();
             }}
-            className="rounded px-2 py-0.5 text-xs font-medium underline-offset-2 hover:underline"
+            className="rounded-lg px-2 py-0.5 text-xs font-semibold text-primary hover:underline"
+            type="button"
           >
             Retry
           </button>
@@ -86,6 +87,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
           onClick={onDismiss}
           aria-label="Dismiss notification"
           className="rounded px-2 py-0.5 text-xs opacity-60 hover:opacity-100"
+          type="button"
         >
           ✕
         </button>

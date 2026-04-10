@@ -27,7 +27,7 @@ export default function SearchResultsPage() {
             {data?.results.map((company) => (
               <Link
                 key={company.orgNumber}
-                className="block rounded-xl border border-border bg-muted/30 px-4 py-3 transition hover:border-accent/40"
+                className="interactive-row block px-4 py-3"
                 href={`/companies/${encodeURIComponent(company.orgNumber)}`}
               >
                 <p className="font-medium">{company.legalName || company.orgNumber}</p>

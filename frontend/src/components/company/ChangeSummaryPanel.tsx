@@ -35,57 +35,52 @@ export function ChangeSummaryPanel({
   canViewSensitive,
 }: ChangeSummaryPanelProps) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-6">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">
-        Latest Changes
-      </h2>
+    <div className="panel p-6 md:p-8">
+      <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Latest changes
+      </h3>
 
       {!canViewSensitive ? (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           Change details are restricted to admin and audit roles.
         </p>
       ) : loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="h-4 w-full animate-pulse rounded bg-slate-800" />
+            <div key={index} className="h-4 w-full animate-pulse rounded-md bg-muted" />
           ))}
         </div>
       ) : error ? (
-        <div className="space-y-3 text-sm text-red-300">
-          <p>{error}</p>
-          <button
-            onClick={onRetry}
-            className="rounded-lg bg-red-700/40 px-3 py-1.5 text-xs text-red-100 transition hover:bg-red-700/60"
-          >
+        <div className="space-y-3">
+          <div className="alert-error">{error}</div>
+          <button className="secondary-btn !min-h-9 px-4 text-xs" onClick={onRetry} type="button">
             Retry
           </button>
         </div>
       ) : events.length === 0 ? (
-        <p className="text-sm text-slate-400">No recent changes recorded.</p>
+        <p className="text-sm text-muted-foreground">No recent changes recorded.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-border text-xs uppercase tracking-widest text-slate-500">
-                <th className="pb-2 pr-4">Attribute</th>
-                <th className="pb-2 pr-4">Previous</th>
-                <th className="pb-2 pr-4">Current</th>
-                <th className="pb-2">Changed At</th>
+              <tr className="border-b border-border text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="pb-3 pr-4">Attribute</th>
+                <th className="pb-3 pr-4">Previous</th>
+                <th className="pb-3 pr-4">Current</th>
+                <th className="pb-3">Changed at</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {events.map((event) => (
-                <tr key={event.id}>
-                  <td className="py-2 pr-4 text-slate-200">{event.attributeName}</td>
-                  <td className="py-2 pr-4 text-slate-400">
+                <tr key={event.id} className="hover:bg-muted/30">
+                  <td className="py-3 pr-4 font-medium text-foreground">{event.attributeName}</td>
+                  <td className="py-3 pr-4 text-muted-foreground">
                     {formatChangeValue(event.oldValue ?? null, canViewSensitive)}
                   </td>
-                  <td className="py-2 pr-4 text-slate-400">
+                  <td className="py-3 pr-4 text-muted-foreground">
                     {formatChangeValue(event.newValue ?? null, canViewSensitive)}
                   </td>
-                  <td className="py-2 text-slate-400">
-                    {new Date(event.createdAt).toLocaleString()}
-                  </td>
+                  <td className="py-3 text-muted-foreground">{new Date(event.createdAt).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

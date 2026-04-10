@@ -38,7 +38,7 @@ function SourceLabel({ source }: { source: 'DB' | 'API' }) {
   return (
     <span
       className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-        isDB ? 'bg-emerald-900/60 text-emerald-300' : 'bg-blue-900/60 text-blue-300'
+        isDB ? 'bg-emerald-50 text-emerald-800' : 'bg-blue-50 text-blue-800'
       }`}
       title={label}
       aria-label={`Source: ${label}`}
@@ -64,7 +64,7 @@ function RecentSearchItem({
         type="button"
         onClick={() => onClick(entry.identifier)}
         aria-label={`Search for company ${entry.identifier}${metaSummary}`}
-        className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 transition hover:border-accent"
+        className="interactive-row flex items-center gap-2 px-3 py-1.5"
       >
         <span className="font-mono text-xs text-foreground">{entry.identifier}</span>
         {entry.metadata && (
@@ -126,12 +126,12 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
   return (
     <div className="space-y-6">
       {/* Search input */}
-      <div className="rounded-2xl border border-border bg-card p-6">
+      <div className="panel p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex-1">
             <label
               htmlFor="identifier-input"
-              className="mb-1 block text-xs uppercase tracking-widest text-muted-foreground"
+              className="mb-1.5 block text-sm font-medium text-foreground"
             >
               Swedish Organisation Number or Personnummer
             </label>
@@ -146,18 +146,17 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
               autoComplete="off"
               spellCheck={false}
               className={[
-                'w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition',
-                'focus:outline-none focus:ring-2',
+                'input-ui !min-h-[44px] py-2.5',
                 error
-                  ? 'border-red-500 focus:ring-red-500/50'
+                  ? '!border-destructive focus:!shadow-[0_0_0_3px_var(--destructive-soft)]'
                   : isValid
-                    ? 'border-emerald-500 focus:ring-emerald-500/50'
-                    : 'border-border focus:ring-indigo-500',
+                    ? '!border-emerald-500 focus:!shadow-[0_0_0_3px_rgba(16,185,129,0.15)]'
+                    : '',
               ].join(' ')}
             />
-            {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
+            {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
             {!error && isValid && (
-              <p className="mt-1.5 text-xs text-emerald-400">
+              <p className="mt-1.5 text-xs font-medium text-emerald-700">
                 ✓ Valid {IDENTIFIER_TYPE_LABELS[identifierType]}
               </p>
             )}
@@ -183,9 +182,9 @@ export default function SearchForm({ onSearch, loading = false }: SearchFormProp
 
       {/* Recent searches */}
       {searches.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="panel p-6">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Recent Searches
             </h3>
             <button

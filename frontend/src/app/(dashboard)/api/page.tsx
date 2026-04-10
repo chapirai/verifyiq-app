@@ -44,7 +44,7 @@ export default function ApiAccessPage() {
         title="Manage API keys"
         description="Create and revoke tenant API keys used by external integrations."
       />
-      {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
+      {error ? <div className="alert-error">{error}</div> : null}
       <section className="panel space-y-4 p-6">
         <div className="flex flex-col gap-3 sm:flex-row">
           <input

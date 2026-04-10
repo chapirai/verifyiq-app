@@ -8,10 +8,10 @@ function StatusBadge({ status }: StatusBadgeProps) {
   const lower = status.toLowerCase();
   const classes =
     lower === 'active'
-      ? 'bg-emerald-900/50 text-emerald-300'
+      ? 'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-100'
       : lower === 'inactive' || lower === 'liquidation' || lower === 'dissolved'
-        ? 'bg-red-100 text-red-700'
-        : 'bg-amber-100 text-amber-700';
+        ? 'bg-red-50 text-red-800 ring-1 ring-inset ring-red-100'
+        : 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-100';
 
   return (
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${classes}`}>
@@ -29,27 +29,26 @@ interface CompanyHeaderProps {
 
 export function CompanyHeader({ legalName, orgNumber, status, countryCode }: CompanyHeaderProps) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-6">
+    <div className="panel p-6 md:p-8">
       <div className="flex items-start gap-4">
-        {/* Logo placeholder */}
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-2xl font-bold text-muted-foreground">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-muted/80 text-2xl font-bold text-muted-foreground shadow-sm">
           {legalName ? legalName.charAt(0).toUpperCase() : '?'}
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-semibold text-foreground">
+          <h2 className="truncate text-2xl font-bold tracking-tight text-foreground">
             {legalName ?? 'Unknown Company'}
-          </h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            {orgNumber && <span>{orgNumber}</span>}
+          </h2>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            {orgNumber && <span className="font-mono text-foreground/90">{orgNumber}</span>}
             {countryCode && (
               <>
-                <span>·</span>
+                <span className="text-border">·</span>
                 <span>{countryCode}</span>
               </>
             )}
             {status && (
               <>
-                <span>·</span>
+                <span className="text-border">·</span>
                 <StatusBadge status={status} />
               </>
             )}

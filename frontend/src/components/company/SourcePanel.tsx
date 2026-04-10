@@ -10,12 +10,12 @@ interface SourcePanelProps {
 function CacheDecisionBadge({ decision }: { decision: CompanyCacheDecision }) {
   const style =
     decision === 'fetched_from_provider'
-      ? 'bg-blue-900/50 text-blue-300'
+      ? 'bg-blue-50 text-blue-900 ring-blue-100'
       : decision === 'served_stale'
-        ? 'bg-amber-900/50 text-amber-300'
+        ? 'bg-amber-50 text-amber-900 ring-amber-100'
         : decision === 'served_from_cache'
-          ? 'bg-emerald-900/50 text-emerald-300'
-          : 'bg-slate-800 text-slate-300';
+          ? 'bg-emerald-50 text-emerald-900 ring-emerald-100'
+          : 'bg-muted text-foreground ring-border';
 
   const label =
     decision === 'fetched_from_provider'
@@ -26,43 +26,44 @@ function CacheDecisionBadge({ decision }: { decision: CompanyCacheDecision }) {
           ? 'Served from cache'
           : 'Unknown';
 
-  return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>{label}</span>;
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${style}`}>
+      {label}
+    </span>
+  );
 }
 
 export function SourcePanel({ data, loading, error, onRetry }: SourcePanelProps) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-6">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">Source</h2>
+    <div className="panel p-6 md:p-8">
+      <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source</h3>
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="h-4 w-3/4 animate-pulse rounded bg-slate-800" />
+            <div key={index} className="h-4 w-3/4 animate-pulse rounded-md bg-muted" />
           ))}
         </div>
       ) : error ? (
-        <div className="space-y-3 text-sm text-red-300">
-          <p>{error}</p>
-          <button
-            onClick={onRetry}
-            className="rounded-lg bg-red-700/40 px-3 py-1.5 text-xs text-red-100 transition hover:bg-red-700/60"
-          >
+        <div className="space-y-3">
+          <div className="alert-error">{error}</div>
+          <button className="secondary-btn !min-h-9 px-4 text-xs" onClick={onRetry} type="button">
             Retry
           </button>
         </div>
       ) : !data || !data.has_data ? (
-        <p className="text-sm text-slate-400">Source data is not available yet.</p>
+        <p className="text-sm text-muted-foreground">Source data is not available yet.</p>
       ) : (
-        <dl className="space-y-3 text-sm text-slate-300">
+        <dl className="space-y-3 text-sm">
           <div className="flex items-center justify-between gap-4">
-            <dt className="text-slate-500">Provider</dt>
-            <dd className="text-right text-white">{data.provider_name ?? '—'}</dd>
+            <dt className="text-muted-foreground">Provider</dt>
+            <dd className="text-right font-medium text-foreground">{data.provider_name ?? '—'}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <dt className="text-slate-500">Endpoint used</dt>
-            <dd className="text-right font-mono text-xs text-slate-200">{data.endpoint_used ?? '—'}</dd>
+            <dt className="text-muted-foreground">Endpoint used</dt>
+            <dd className="text-right font-mono text-xs text-foreground">{data.endpoint_used ?? '—'}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <dt className="text-slate-500">Cache decision</dt>
+            <dt className="text-muted-foreground">Cache decision</dt>
             <dd className="text-right">
               <CacheDecisionBadge decision={data.cache_decision} />
             </dd>

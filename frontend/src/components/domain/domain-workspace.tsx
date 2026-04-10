@@ -29,10 +29,10 @@ const STATUS_LABEL: Record<DomainWorkspaceItem['status'], string> = {
 };
 
 const STATUS_CLASS: Record<DomainWorkspaceItem['status'], string> = {
-  open: 'bg-blue-50 text-blue-700',
-  in_review: 'bg-amber-50 text-amber-700',
-  blocked: 'bg-red-50 text-red-700',
-  done: 'bg-emerald-50 text-emerald-700',
+  open: 'bg-blue-50 text-blue-800 ring-1 ring-inset ring-blue-100',
+  in_review: 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-100',
+  blocked: 'bg-red-50 text-red-800 ring-1 ring-inset ring-red-100',
+  done: 'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-100',
 };
 
 export function DomainWorkspace({
@@ -161,7 +161,7 @@ export function DomainWorkspace({
       </section>
 
       <section className="panel overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-3 border-b border-border bg-muted/60 px-5 py-3 text-xs uppercase tracking-[0.12em] text-muted-foreground">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-3 border-b border-border bg-muted/70 px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <p>Item</p>
           <p>Owner</p>
           <p>Status</p>

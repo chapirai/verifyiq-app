@@ -49,14 +49,14 @@ export default function BillingPage() {
         title="Plans and subscription"
         description="Pick a plan and run a mock checkout to update your tenant subscription."
       />
-      {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
+      {error ? <div className="alert-error">{error}</div> : null}
       <section className="grid gap-5 md:grid-cols-3">
         {sortedPlans.map((plan, index) => {
           const isActive = activePlan === plan.code;
           return (
             <article
               key={plan.code}
-              className={`panel p-6 ${index === 1 ? 'border-accent shadow-accent' : ''} ${isActive ? 'ring-2 ring-accent/30' : ''}`}
+              className={`panel p-8 ${index === 1 ? 'ring-2 ring-primary/20 shadow-primary' : ''} ${isActive ? 'ring-2 ring-primary/35' : ''}`}
             >
               <h3 className="text-xl font-semibold">{plan.name}</h3>
               <p className="mt-2 text-3xl font-semibold">€{(plan.monthlyPriceCents / 100).toFixed(0)}</p>

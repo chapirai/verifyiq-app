@@ -45,10 +45,10 @@ export default function BulkPage() {
         title="Queue and track bulk lookups"
         description="Submit many identifiers, monitor status, and process work asynchronously."
       />
-      {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
+      {error ? <div className="alert-error">{error}</div> : null}
       <section className="panel space-y-4 p-6">
         <textarea
-          className="min-h-40 w-full rounded-xl border border-border p-3"
+          className="textarea-ui"
           placeholder="One identifier per line"
           value={input}
           onChange={(e) => setInput(e.target.value)}

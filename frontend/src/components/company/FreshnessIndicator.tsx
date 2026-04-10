@@ -28,33 +28,33 @@ export function FreshnessIndicator({ fetchedAt, ageDays, freshness }: FreshnessI
 
   const freshnessClasses =
     freshness === 'fresh'
-      ? 'text-emerald-400'
+      ? 'text-emerald-700'
       : freshness === 'stale'
-        ? 'text-yellow-400'
-        : 'text-red-400';
+        ? 'text-amber-700'
+        : 'text-red-700';
 
   const freshnessLabel =
     freshness === 'fresh' ? 'Fresh' : freshness === 'stale' ? 'Stale' : 'Expired';
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span>
         Last fetched:{' '}
-        <span className="text-slate-300" title={absoluteTime}>
+        <span className="font-medium text-foreground" title={absoluteTime}>
           {relativeTime}
         </span>
       </span>
-      <span className="text-slate-600">·</span>
+      <span className="text-border">·</span>
       <span>
         Age:{' '}
-        <span className="text-slate-300">
+        <span className="font-medium text-foreground">
           {ageDays} day{ageDays === 1 ? '' : 's'}
         </span>
       </span>
-      <span className="text-slate-600">·</span>
+      <span className="text-border">·</span>
       <span>
         Cache status:{' '}
-        <span className={freshnessClasses}>{freshnessLabel}</span>
+        <span className={`font-semibold ${freshnessClasses}`}>{freshnessLabel}</span>
       </span>
     </div>
   );

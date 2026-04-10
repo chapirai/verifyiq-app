@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useMemo, useState } from 'react';
+import { MarketingNav } from '@/components/marketing-nav';
 import { api } from '@/lib/api';
 
 export default function LoginPage() {
@@ -36,47 +37,70 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen px-6 py-16">
-      <div className="mx-auto max-w-md space-y-6">
-        <div className="space-y-3">
-          <div className="section-badge">
-            <span className="section-badge-dot" />
-            <span className="section-badge-text">Authentication</span>
+    <div className="min-h-screen">
+      <MarketingNav />
+      <main className="px-6 pb-20 pt-4">
+        <div className="mx-auto max-w-md space-y-6">
+          <div className="space-y-3">
+            <div className="section-badge">
+              <span className="section-badge-dot" />
+              <span className="section-badge-text">Authentication</span>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Sign in</h1>
+            <p className="text-sm text-muted-foreground">Access your VerifyIQ workspace.</p>
           </div>
-          <h1 className="text-4xl" style={{ fontFamily: 'var(--font-calistoga), Georgia, serif' }}>
-            Sign in
-          </h1>
+          <form className="panel space-y-4 p-6" onSubmit={handleSubmit}>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground" htmlFor="tenant">
+                Tenant slug
+              </label>
+              <input
+                id="tenant"
+                className="input-ui"
+                value={tenantSlug}
+                onChange={(e) => setTenantSlug(e.target.value)}
+                autoComplete="organization"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground" htmlFor="email">
+                Email
+              </label>
+              <input
+                id="email"
+                className="input-ui"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground" htmlFor="password">
+                Password
+              </label>
+              <input
+                id="password"
+                className="input-ui"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+            {error ? <div className="alert-error">{error}</div> : null}
+            <button className="primary-btn w-full" disabled={busy} type="submit">
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+          <p className="text-center text-sm text-muted-foreground">
+            No account yet?{' '}
+            <Link className="font-medium text-primary hover:underline" href="/signup">
+              Create your workspace
+            </Link>
+          </p>
         </div>
-        <form className="panel space-y-4 p-6" onSubmit={handleSubmit}>
-          <div className="space-y-1">
-            <label className="text-sm text-muted-foreground">Tenant slug</label>
-            <input className="input-ui" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm text-muted-foreground">Email</label>
-            <input className="input-ui" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm text-muted-foreground">Password</label>
-            <input
-              className="input-ui"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          <button className="primary-btn w-full" disabled={busy} type="submit">
-            {busy ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-        <p className="text-sm text-muted-foreground">
-          No account yet?{' '}
-          <Link className="text-accent hover:underline" href="/signup">
-            Create your workspace
-          </Link>
-        </p>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
