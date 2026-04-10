@@ -48,6 +48,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  async healthHvd() {
+    return request('/bolagsverket/health');
+  },
+  async healthFi() {
+    return request('/bolagsverket/health/foretagsinfo');
+  },
   async login(payload: { tenantId: string; email: string; password: string }) {
     const data = await request<AuthTokens>('/auth/login', { method: 'POST', body: JSON.stringify(payload) });
     setSession(data.accessToken, data.refreshToken, data.user);
