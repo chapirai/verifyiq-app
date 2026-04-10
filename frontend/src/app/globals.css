@@ -1,18 +1,18 @@
 /* VerifyIQ design system — aligned with designprompts.dev/saas (light SaaS, primary #2563eb) */
 
 :root {
-  --background: #f4f6fb;
+  --background: #fafafa;
   --foreground: #0f172a;
   --card: #ffffff;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
-  --border: #e5e7eb;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  --border: #e2e8f0;
+  --primary: #0052ff;
+  --primary-hover: #0046da;
   --primary-foreground: #ffffff;
-  --primary-soft: rgba(37, 99, 235, 0.1);
-  --accent: #2563eb;
-  --accent-secondary: #3b82f6;
+  --primary-soft: rgba(0, 82, 255, 0.12);
+  --accent: #0052ff;
+  --accent-secondary: #4d7cff;
   --destructive: #dc2626;
   --destructive-soft: rgba(220, 38, 38, 0.08);
   --radius-sm: 8px;
@@ -42,9 +42,9 @@ body {
   min-height: 100vh;
   background-color: var(--background);
   background-image:
-    radial-gradient(ellipse 120% 90% at 50% -35%, rgba(37, 99, 235, 0.12), transparent 55%),
-    radial-gradient(ellipse 90% 60% at 100% 0%, rgba(139, 92, 246, 0.08), transparent 50%),
-    radial-gradient(ellipse 80% 50% at 0% 25%, rgba(59, 130, 246, 0.06), transparent 45%);
+    radial-gradient(ellipse 120% 90% at 50% -35%, rgba(0, 82, 255, 0.1), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 100% 0%, rgba(77, 124, 255, 0.08), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 0% 25%, rgba(0, 82, 255, 0.06), transparent 45%);
   background-attachment: fixed;
 }
 
@@ -99,18 +99,18 @@ a {
   border-radius: var(--radius-lg);
   min-height: 44px;
   padding: 0 1.25rem;
-  background: var(--primary);
+  background: linear-gradient(to right, var(--accent), var(--accent-secondary));
   color: var(--primary-foreground);
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
   transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-  box-shadow: var(--shadow-sm), 0 4px 14px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .primary-btn:hover:not(:disabled) {
-  background: var(--primary-hover);
-  box-shadow: var(--shadow-primary);
+  filter: brightness(1.08);
+  box-shadow: 0 4px 14px rgba(0, 82, 255, 0.25);
   transform: translateY(-1px);
 }
 
@@ -144,8 +144,8 @@ a {
 }
 
 .secondary-btn:hover:not(:disabled) {
-  border-color: rgba(37, 99, 235, 0.25);
-  background: var(--card);
+  border-color: rgba(148, 163, 184, 0.6);
+  background: rgba(241, 245, 249, 0.45);
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
 }
 
@@ -194,8 +194,8 @@ select.input-ui {
   align-items: center;
   gap: 0.5rem;
   border-radius: 9999px;
-  border: 1px solid rgba(37, 99, 235, 0.2);
-  background: rgba(239, 246, 255, 0.95);
+  border: 1px solid rgba(0, 82, 255, 0.22);
+  background: rgba(0, 82, 255, 0.05);
   padding: 0.35rem 0.85rem;
 }
 
@@ -208,8 +208,8 @@ select.input-ui {
 
 .section-badge-text {
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-weight: 500;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--primary);
 }
@@ -233,6 +233,6 @@ select.input-ui {
 }
 
 .interactive-row:hover {
-  border-color: rgba(37, 99, 235, 0.35);
+  border-color: rgba(0, 82, 255, 0.3);
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
 }

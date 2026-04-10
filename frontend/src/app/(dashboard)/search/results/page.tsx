@@ -21,7 +21,7 @@ export default function SearchResultsPage() {
       />
       <section className="panel p-6">
         {loading ? <p className="text-sm text-muted-foreground">Loading results...</p> : null}
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+        {error ? <div className="alert-error">{error}</div> : null}
         {!loading && !error && (
           <div className="space-y-2">
             {data?.results.map((company) => (

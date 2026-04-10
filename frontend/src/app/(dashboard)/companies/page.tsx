@@ -29,7 +29,7 @@ export default function CompaniesPage() {
         description="View companies stored in your workspace and open detailed profiles."
       />
       <section className="panel p-6">
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+        {error ? <div className="alert-error">{error}</div> : null}
         <div className="space-y-2">
           {companies.map((company) => (
             <Link

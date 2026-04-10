@@ -23,6 +23,25 @@ export default function DashboardPage() {
           }
         />
       </section>
+      <section className="panel p-6 md:p-8">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Recent activity</h2>
+          <Link className="secondary-btn !min-h-9 px-3 text-xs" href="/company-cases">
+            View all
+          </Link>
+        </div>
+        <div className="space-y-2">
+          {[
+            'Case CAS-9001 moved to in review',
+            'New API key created for Production backend',
+            'Bulk job JOB-104 completed with 96% success',
+          ].map((item) => (
+            <div key={item} className="interactive-row px-4 py-3 text-sm text-foreground">
+              {item}
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
