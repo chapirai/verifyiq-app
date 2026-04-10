@@ -22,6 +22,7 @@ import {
   BvFiltrering,
   BvPaginering,
   BvSortering,
+  BvDokumentListaRequest,
   DocumentListResponse,
   FinansiellaRapporterResponse,
   FirmateckningsalternativResponse,
@@ -54,7 +55,8 @@ const ORG_BASE_URL = 'https://gw.api.bolagsverket.se/foretagsinformation/v4';
 const DEFAULT_HVD_SCOPES = 'vardefulla-datamangder:read vardefulla-datamangder:ping';
 const DEFAULT_HVD_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token';
 const DEFAULT_HVD_REVOKE_URL = 'https://portal.api.bolagsverket.se/oauth2/revoke';
-const DEFAULT_HVD_DOCUMENT_PATH = '/dokument';
+/** Upstream: GET {base}/dokument/{dokumentId}. Override with BV_HVD_DOCUMENT_PATH=/dokument for legacy POST+body. */
+const DEFAULT_HVD_DOCUMENT_PATH = '/dokument/{dokumentId}';
 const TOKEN_REFRESH_SKEW_MS = 60_000;
 const BEARER_PREFIX_PATTERN = /^Bearer\s+/i;
 
@@ -550,16 +552,19 @@ export class BolagsverketClient {
     return { requestPayload: payload, responsePayload: responseData, requestId };
   }
 
-  /** POST /vardefulla-datamangder/v1/dokumentlista – retrieve available documents. */
+  /** POST /vardefulla-datamangder/v1/dokumentlista – list dokumentId for step 2 (GET /dokument/{id}). */
   async fetchDocumentList(
-    identitetsbeteckning: string,
+    request: BvDokumentListaRequest,
     context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
   ): Promise<{
-    requestPayload: { identitetsbeteckning: string };
+    requestPayload: BvDokumentListaRequest;
     responsePayload: DocumentListResponse;
     requestId: string;
   }> {
-    const payload = { identitetsbeteckning };
+    const payload: BvDokumentListaRequest = { identitetsbeteckning: request.identitetsbeteckning };
+    if (request.namnskyddslopnummer !== undefined && request.namnskyddslopnummer !== '') {
+      payload.namnskyddslopnummer = request.namnskyddslopnummer;
+    }
     const { responseData, requestId } = await this.requestWithRetry<DocumentListResponse>(
       'post',
       this.buildUrl(this.getHvdBaseUrl(), '/dokumentlista'),
@@ -569,7 +574,7 @@ export class BolagsverketClient {
     return { requestPayload: payload, responsePayload: responseData, requestId };
   }
 
-  /** GET/POST /vardefulla-datamangder/v1/dokument – download document ZIP. */
+  /** GET or POST /vardefulla-datamangder/v1/dokument – binary annual report (dokumentId from dokumentlista only). */
   async fetchDocument(
     dokumentId: string,
     context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },

@@ -1,6 +1,7 @@
 import {
   AktiekapitalforandringResponse,
   ArendeResponse,
+  BvDokumentListaRequest,
   DocumentListResponse,
   FinansiellaRapporterResponse,
   FirmateckningsalternativResponse,
@@ -82,9 +83,9 @@ export interface DataProvider {
     context?: ProviderRequestContext,
   ): Promise<FinansiellaRapporterResponse>;
 
-  /** Retrieve available document list for an organisation. */
+  /** HVD step 1: POST …/dokumentlista — dokumentId list only. */
   fetchDocumentList(
-    identitetsbeteckning: string,
+    request: BvDokumentListaRequest,
     context?: ProviderRequestContext,
   ): Promise<DocumentListResponse>;
 

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   AktiekapitalforandringResponse,
   ArendeResponse,
+  BvDokumentListaRequest,
   DocumentListResponse,
   FinansiellaRapporterResponse,
   FirmateckningsalternativResponse,
@@ -116,10 +117,10 @@ export class BolagsverketProvider implements DataProvider {
   }
 
   async fetchDocumentList(
-    identitetsbeteckning: string,
+    request: BvDokumentListaRequest,
     context?: ProviderRequestContext,
   ): Promise<DocumentListResponse> {
-    return this.bvService.getDocumentList(identitetsbeteckning, toCtx(context));
+    return this.bvService.getDocumentList(request, toCtx(context));
   }
 
   async isAlive(): Promise<{ status: string }> {

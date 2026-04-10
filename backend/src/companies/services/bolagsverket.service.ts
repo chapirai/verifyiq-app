@@ -5,6 +5,7 @@ import {
   AktiekapitalforandringResponse,
   ArendeResponse,
   BvOfficer,
+  BvDokumentListaRequest,
   DocumentListResponse,
   FinansiellaRapporterResponse,
   FirmateckningsalternativResponse,
@@ -211,7 +212,7 @@ export class BolagsverketService {
     const [hvdResult, richResult, docResult] = await Promise.allSettled([
       this.client.fetchHighValueDataset(identitetsbeteckning, context),
       this.client.fetchOrganisationInformation(identitetsbeteckning, undefined, undefined, context),
-      this.client.fetchDocumentList(identitetsbeteckning, context),
+      this.client.fetchDocumentList({ identitetsbeteckning }, context),
     ]);
 
     const highValueDataset =
@@ -353,16 +354,17 @@ export class BolagsverketService {
   // ── Financial snapshot ──────────────────────────────────────────────────────
 
   async getFinancialSnapshot(
-    identitetsbeteckning: string,
+    dokumentListaRequest: BvDokumentListaRequest,
     context?: BvRequestContext,
   ): Promise<FinancialSnapshot> {
+    const identitetsbeteckning = dokumentListaRequest.identitetsbeteckning;
     const [richResult, docResult] = await Promise.allSettled([
       this.client.fetchOrganisationInformation(identitetsbeteckning, [
         'AKTIEINFORMATION',
         'RAKENSKAPSÅR',
         'FINANSIELLA_RAPPORTER',
       ], undefined, context),
-      this.client.fetchDocumentList(identitetsbeteckning, context),
+      this.client.fetchDocumentList(dokumentListaRequest, context),
     ]);
 
     const orgInfo =
@@ -519,10 +521,11 @@ export class BolagsverketService {
   // ── Document list ────────────────────────────────────────────────────────────
 
   async getDocumentList(
-    identitetsbeteckning: string,
+    request: BvDokumentListaRequest,
     context?: BvRequestContext,
   ): Promise<DocumentListResponse> {
-    const { responsePayload, requestId } = await this.client.fetchDocumentList(identitetsbeteckning, context);
+    const identitetsbeteckning = request.identitetsbeteckning;
+    const { responsePayload, requestId, requestPayload } = await this.client.fetchDocumentList(request, context);
     if (context?.tenantId) {
       const documents = (responsePayload?.dokument ?? []) as Array<{
         dokumentId?: string;
@@ -543,7 +546,7 @@ export class BolagsverketService {
         tenantId: context.tenantId,
         organisationNumber: identitetsbeteckning,
         source: 'hvd.dokumentlista',
-        requestPayload: { identitetsbeteckning },
+        requestPayload: requestPayload as unknown as Record<string, unknown>,
         responsePayload: responsePayload as unknown as Record<string, unknown>,
         requestId: requestId ?? randomUUID(),
       });

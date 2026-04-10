@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
 import { fiClient, hvdClient } from '@/lib/source-clients';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateBlocks';
 import { Table } from '@/components/ui/Table';
 import type { SourceFetchState } from '@/types/source-data';
@@ -82,6 +83,18 @@ export function extractHvdDocuments(payload: unknown): Array<Record<string, unkn
   const deep: Array<Record<string, unknown>> = [];
   collectDokumentRowsDeep(payload, deep, new Set());
   return deep;
+}
+
+function formatHvdDokumentlistaFel(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const fel = (payload as Record<string, unknown>).fel;
+  if (fel === undefined || fel === null) return null;
+  if (typeof fel === 'string') return fel;
+  try {
+    return JSON.stringify(fel);
+  } catch {
+    return String(fel);
+  }
 }
 
 /** FI POST /organisationer returns OrganisationInformationResponse[] (array at root) */
@@ -196,9 +209,19 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
   const [snapshots, setSnapshots] = useState<Array<Record<string, unknown>>>([]);
   const [downloadMsg, setDownloadMsg] = useState('');
   const [refreshingSources, setRefreshingSources] = useState(false);
+  const [namnskyddslopnummer, setNamnskyddslopnummer] = useState('');
+  const namnskyddRef = useRef('');
+  useEffect(() => {
+    namnskyddRef.current = namnskyddslopnummer;
+  }, [namnskyddslopnummer]);
 
   const loadEndpoints = useCallback(async (identitet: string) => {
     setRefreshingSources(true);
+    const ns = namnskyddRef.current.trim();
+    const dokumentListaBody = {
+      identitetsbeteckning: identitet,
+      ...(ns ? { namnskyddslopnummer: ns } : {}),
+    };
     const fiCategories = [
       'ORGANISATIONSADRESSER',
       'FIRMATECKNING',
@@ -218,7 +241,7 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
     ];
     const results = await Promise.allSettled([
       hvdClient.hvdGetOrganisation({ identitetsbeteckning: identitet }),
-      hvdClient.hvdGetDocumentList({ identitetsbeteckning: identitet }),
+      hvdClient.hvdGetDocumentList(dokumentListaBody),
       fiClient.fiGetOrganisation({ identitetsbeteckning: identitet, informationCategories: fiCategories }),
       fiClient.fiGetCases({ organisationIdentitetsbeteckning: identitet }),
       fiClient.fiGetShareCapitalChanges({ identitetsbeteckning: identitet }),
@@ -234,6 +257,19 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
     setFiFinancial(mapSettled(results[6] as PromiseSettledResult<Record<string, unknown>>));
     setRefreshingSources(false);
   }, []);
+
+  const reloadHvdDocumentList = useCallback(async () => {
+    if (!org || org.length < 10) return;
+    setRefreshingSources(true);
+    const ns = namnskyddRef.current.trim();
+    const body = { identitetsbeteckning: org, ...(ns ? { namnskyddslopnummer: ns } : {}) };
+    try {
+      const r = await Promise.allSettled([hvdClient.hvdGetDocumentList(body)]);
+      setHvdDocs(mapSettled(r[0] as PromiseSettledResult<Record<string, unknown>>));
+    } finally {
+      setRefreshingSources(false);
+    }
+  }, [org]);
 
   useEffect(() => {
     if (!org || org.length < 10) {
@@ -281,6 +317,7 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
 
   const hvdEndpointOrg = extractHvdOrganisation(hvdOrg.data);
   const dokumentRows = extractHvdDocuments(hvdDocs.data);
+  const dokumentListaFel = formatHvdDokumentlistaFel(hvdDocs.data);
   const fiBlocks = normalizeFiOrganisationBlocks(fiOrg.data);
 
   const hvdOrgRows = pickStrings(hvdEndpointOrg, [
@@ -489,14 +526,51 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
         <div className="space-y-6">
           <Panel title="POST /bolagsverket/hvd/dokumentlista" badge={hvdDocs.ok ? 'ok' : 'error'}>
             {hvdDocs.error ? <ErrorState title="HVD dokumentlista failed" message={hvdDocs.error} /> : null}
-            <p className="mb-4 text-sm text-muted-foreground">
-              Download uses dokumentId from this list only — GET /bolagsverket/hvd/dokument/:id
-            </p>
+            <div className="mb-4 space-y-2 text-sm text-muted-foreground">
+              <p>
+                <strong>Chained HVD flow (required):</strong> (1) POST{' '}
+                <code className="font-mono text-xs">…/vardefulla-datamangder/v1/dokumentlista</code> with{' '}
+                <code className="font-mono text-xs">identitetsbeteckning</code> → read <code className="font-mono text-xs">dokument[]</code> → (2) GET{' '}
+                <code className="font-mono text-xs">{`…/vardefulla-datamangder/v1/dokument/{dokumentId}`}</code> for the file. Our app proxies these as{' '}
+                <code className="font-mono text-xs">POST /api/v1/bolagsverket/hvd/dokumentlista</code> then{' '}
+                <code className="font-mono text-xs">GET /api/v1/bolagsverket/hvd/dokument/:dokumentId</code> — same binary as upstream; no{' '}
+                <code className="font-mono text-xs">dokumentId</code> is invented and FI report metadata is never used here.
+              </p>
+            </div>
+            <div className="mb-6 flex flex-col gap-3 border-2 border-foreground p-4 md:flex-row md:items-end">
+              <div className="min-w-0 flex-1">
+                <label htmlFor="namnskydd-hvd" className="mono-label mb-1 block text-[10px] text-muted-foreground">
+                  Namnskyddslöpnummer (optional, dokumentlista)
+                </label>
+                <Input
+                  id="namnskydd-hvd"
+                  value={namnskyddslopnummer}
+                  onChange={(e) => setNamnskyddslopnummer(e.target.value)}
+                  placeholder="Only when Bolagsverket requires disambiguation"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                className="min-h-10 shrink-0 text-[10px]"
+                disabled={refreshingSources}
+                onClick={() => void reloadHvdDocumentList()}
+              >
+                Reload dokumentlista
+              </Button>
+            </div>
+            {dokumentListaFel ? (
+              <div className="mb-4 border-2 border-foreground bg-muted p-3 font-mono text-xs">
+                <p className="mono-label mb-1 text-[10px]">fel (from dokumentlista)</p>
+                <p className="break-all">{dokumentListaFel}</p>
+              </div>
+            ) : null}
             {dokumentRows.length === 0 ? (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  No rows with <code className="font-mono text-xs">dokumentId</code> in the dokumentlista response. Bolagsverket only exposes downloads here when
-                  HVD returns document metadata; orchestrated <code className="font-mono text-xs">financialReports</code> are separate (metadata only).
+                  <code className="font-mono text-xs">dokument</code> is empty or has no <code className="font-mono text-xs">dokumentId</code>. That is a valid
+                  upstream outcome: Bolagsverket only lists <strong>digitally submitted</strong> annual reports in HVD. Many companies have FI case metadata but no HVD
+                  downloadable file. Do not use FI <code className="font-mono text-xs">finansiellaRapporter</code> as a substitute for step 1.
                 </p>
                 {hvdDocs.ok && hvdDocs.data ? (
                   <details className="border-2 border-foreground p-4">

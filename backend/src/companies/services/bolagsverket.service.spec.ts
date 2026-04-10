@@ -327,7 +327,7 @@ describe('BolagsverketService', () => {
         expect.objectContaining({ tenantId: 'tenant-ctx' }),
       );
       expect(clientMock.fetchDocumentList).toHaveBeenCalledWith(
-        '5560210261',
+        { identitetsbeteckning: '5560210261' },
         expect.objectContaining({ tenantId: 'tenant-ctx' }),
       );
     });

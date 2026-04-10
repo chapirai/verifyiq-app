@@ -37,6 +37,12 @@ export class BolagsverketDocumentListDto {
     message: 'identitetsbeteckning must be a valid Swedish identity number',
   })
   identitetsbeteckning!: string;
+
+  /** When several orgs share the same org number (e.g. enskild firma); optional on POST …/dokumentlista. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  namnskyddslopnummer?: string;
 }
 
 export class BolagsverketArendeDto {

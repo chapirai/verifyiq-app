@@ -164,14 +164,15 @@ export class BolagsverketController {
   }
 
   /**
-   * POST /bolagsverket/documents
-   * List available annual reports and financial documents for an organisation.
+   * POST /bolagsverket/documents — proxies Bolagsverket HVD step 1:
+   * POST https://gw.api.bolagsverket.se/vardefulla-datamangder/v1/dokumentlista
+   * Response dokument[] yields dokumentId for step 2 only (never merge with FI).
    */
   @Post('documents')
   getDocumentList(@Body() dto: BolagsverketDocumentListDto, @Req() req: any) {
     const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
-    return this.bolagsverketService.getDocumentList(dto.identitetsbeteckning, {
+    return this.bolagsverketService.getDocumentList(dto, {
       tenantId,
       actorId: actorId ?? null,
     });
@@ -183,8 +184,8 @@ export class BolagsverketController {
   }
 
   /**
-   * GET /bolagsverket/documents/:dokumentId/download
-   * Download a document ZIP from Bolagsverket (Värdefulla Datamängder).
+   * HVD step 2 — proxies GET https://gw.api.bolagsverket.se/vardefulla-datamangder/v1/dokument/{dokumentId}
+   * (or POST /dokument + body if BV_HVD_DOCUMENT_PATH=/dokument). dokumentId must come from dokumentlista.
    */
   @Get('documents/:dokumentId/download')
   async downloadDocument(@Param('dokumentId') dokumentId: string, @Req() req: any, @Res({ passthrough: true }) res: Response) {
@@ -333,7 +334,7 @@ export class BolagsverketController {
   getFinancialSnapshot(@Body() dto: BolagsverketDocumentListDto, @Req() req: any) {
     const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
     const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
-    return this.bolagsverketService.getFinancialSnapshot(dto.identitetsbeteckning, {
+    return this.bolagsverketService.getFinancialSnapshot(dto, {
       tenantId,
       actorId: actorId ?? null,
     });

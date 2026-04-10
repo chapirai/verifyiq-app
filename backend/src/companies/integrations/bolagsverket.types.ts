@@ -171,6 +171,12 @@ export interface DocumentListResponse {
   fel?: BvFel;
 }
 
+/** Request body for POST …/vardefulla-datamangder/v1/dokumentlista */
+export interface BvDokumentListaRequest {
+  identitetsbeteckning: string;
+  namnskyddslopnummer?: string;
+}
+
 // ── Organisation information (foretagsinformation/v4) ────────────────────────
 
 export interface BvOfficerRole {

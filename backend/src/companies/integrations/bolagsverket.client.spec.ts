@@ -391,7 +391,7 @@ describe('BolagsverketClient', () => {
 
   describe('fetchDocument', () => {
     const hvdBaseUrl = 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1';
-    const defaultDocumentUrl = `${hvdBaseUrl}/dokument`;
+    const defaultDocumentUrl = `${hvdBaseUrl}/dokument/doc-123`;
 
     const makeDocumentClient = (
       responseHeaders: Record<string, string> = {},
@@ -399,11 +399,14 @@ describe('BolagsverketClient', () => {
     ) => {
       const postMock = jest.fn((url: string) => {
         if (url === tokenUrl) return of({ data: { access_token: 'token-1', expires_in: 3600 } });
-        if (url === defaultDocumentUrl)
-          return of({ data: Buffer.from('ZIP-CONTENT'), headers: { 'content-type': 'application/zip', ...responseHeaders } });
         throw new Error(`Unexpected POST to: ${url}`);
       });
-      return { client: makeClient(postMock, jest.fn(), extraConfig), postMock };
+      const getMock = jest.fn((url: string) => {
+        if (url === defaultDocumentUrl)
+          return of({ data: Buffer.from('ZIP-CONTENT'), headers: { 'content-type': 'application/zip', ...responseHeaders } });
+        throw new Error(`Unexpected GET to: ${url}`);
+      });
+      return { client: makeClient(postMock, getMock, extraConfig), postMock, getMock };
     };
 
     it('returns a Buffer with content-type and no fileName when no Content-Disposition header', async () => {
@@ -438,26 +441,27 @@ describe('BolagsverketClient', () => {
       expect(result.fileName).toBe('rapport.zip');
     });
 
-    it('uses a GET request when BV_HVD_DOCUMENT_PATH contains {dokumentId}', async () => {
-      const getMock = jest.fn((url: string) => {
-        if (url === `${hvdBaseUrl}/dokument/doc-456`)
-          return of({ data: Buffer.alloc(0), headers: { 'content-type': 'application/zip' } });
-        throw new Error(`Unexpected GET to: ${url}`);
-      });
+    it('uses POST with JSON body when BV_HVD_DOCUMENT_PATH is /dokument (no template)', async () => {
+      const legacyUrl = `${hvdBaseUrl}/dokument`;
       const postMock = jest.fn((url: string) => {
         if (url === tokenUrl) return of({ data: { access_token: 'token-1', expires_in: 3600 } });
+        if (url === legacyUrl)
+          return of({ data: Buffer.from('ZIP'), headers: { 'content-type': 'application/zip' } });
         throw new Error(`Unexpected POST to: ${url}`);
       });
+      const getMock = jest.fn();
       const client = makeClient(postMock, getMock, {
-        BV_HVD_DOCUMENT_PATH: '/dokument/{dokumentId}',
+        BV_HVD_DOCUMENT_PATH: '/dokument',
       });
 
       const result = await client.fetchDocument('doc-456');
-      expect(getMock).toHaveBeenCalledWith(
-        `${hvdBaseUrl}/dokument/doc-456`,
+      expect(postMock).toHaveBeenCalledWith(
+        legacyUrl,
+        { dokumentId: 'doc-456' },
         expect.objectContaining({ responseType: 'arraybuffer' }),
       );
-      expect(result.requestPayload).toBeNull();
+      expect(getMock).not.toHaveBeenCalled();
+      expect(result.requestPayload).toEqual({ dokumentId: 'doc-456' });
     });
   });
 
