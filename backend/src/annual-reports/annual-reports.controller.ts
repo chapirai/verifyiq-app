@@ -1,9 +1,11 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Param,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -65,6 +67,23 @@ export class AnnualReportsController {
     return { fileId: file.id, created, jobId };
   }
 
+  /**
+   * Fetch HVD ZIP on the server, store in MinIO, register annual_report_files, queue parse.
+   * Use this from the workspace instead of browser-only download (which never populated the DB).
+   */
+  @Post('ingest-hvd-dokument')
+  async ingestHvdDokument(
+    @TenantId() tenantId: string,
+    @Body() body: { dokumentId?: string; identitetsbeteckning?: string },
+  ) {
+    const dokumentId = body.dokumentId?.trim();
+    const identitetsbeteckning = body.identitetsbeteckning?.trim();
+    if (!dokumentId || !identitetsbeteckning) {
+      throw new BadRequestException('dokumentId_and_identitetsbeteckning_required');
+    }
+    return this.annualReports.ingestHvdDokument(tenantId, identitetsbeteckning, dokumentId);
+  }
+
   @Post('files/:fileId/enqueue-parse')
   async enqueueParse(
     @TenantId() tenantId: string,
@@ -92,9 +111,17 @@ export class AnnualReportsController {
   }
 
   @Get('companies/:organisationNumber/history')
-  async history(@TenantId() tenantId: string, @Param('organisationNumber') organisationNumber: string) {
+  async history(
+    @TenantId() tenantId: string,
+    @Param('organisationNumber') organisationNumber: string,
+    @Query('limit') limitRaw?: string,
+  ) {
     const org = normalizeOrgParam(organisationNumber);
-    const headers = await this.annualReports.getHistory(tenantId, org);
+    const parsed = limitRaw != null ? parseInt(limitRaw, 10) : NaN;
+    const fallbackRaw = Number(process.env.AR_HISTORY_LIMIT ?? 200);
+    const fallback = Number.isFinite(fallbackRaw) ? fallbackRaw : 200;
+    const limit = Number.isFinite(parsed) ? Math.min(500, Math.max(1, parsed)) : Math.min(500, Math.max(1, fallback));
+    const headers = await this.annualReports.getHistory(tenantId, org, limit);
     return { organisationNumber: org, headers };
   }
 
@@ -103,6 +130,22 @@ export class AnnualReportsController {
     const org = normalizeOrgParam(organisationNumber);
     const data = await this.annualReports.getFinancialsForOrg(tenantId, org);
     return { organisationNumber: org, ...data };
+  }
+
+  /** Latest N distinct fiscal years (by filing period end), pivoted canonical metrics. */
+  @Get('companies/:organisationNumber/financial-comparison')
+  async financialComparison(
+    @TenantId() tenantId: string,
+    @Param('organisationNumber') organisationNumber: string,
+    @Query('maxYears') maxYearsRaw?: string,
+  ) {
+    const org = normalizeOrgParam(organisationNumber);
+    const parsed = maxYearsRaw != null ? parseInt(maxYearsRaw, 10) : NaN;
+    const defaultRaw = Number(process.env.AR_FINANCIAL_COMPARISON_MAX_YEARS ?? 30);
+    const defaultMax = Number.isFinite(defaultRaw) ? Math.min(80, Math.max(1, defaultRaw)) : 30;
+    const maxYears = Number.isFinite(parsed) ? Math.min(80, Math.max(1, parsed)) : defaultMax;
+    const data = await this.annualReports.getFinancialComparisonForOrg(tenantId, org, maxYears);
+    return data;
   }
 
   @Get('files/:fileId/meta')

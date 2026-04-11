@@ -59,6 +59,7 @@ import { BV_ENRICHMENT_QUEUE } from './queues/bv-enrichment.queue';
 import { BvPipelineService } from './services/bv-pipeline.service';
 import { BvPipelineWorker } from './services/bv-pipeline.worker';
 import { CompanyServingReadService } from './services/company-serving-read.service';
+import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-report-parse.queue';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { CompanyServingReadService } from './services/company-serving-read.servi
     HttpModule,
     AuditModule,
     BullModule.registerQueue({ name: BV_ENRICHMENT_QUEUE }),
+    BullModule.registerQueue({ name: ANNUAL_REPORT_PARSE_QUEUE }),
   ],
   controllers: [
     CompaniesController,

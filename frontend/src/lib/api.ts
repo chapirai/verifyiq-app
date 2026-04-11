@@ -10,6 +10,11 @@ import type {
   CompanyOverviewServing,
   CompanyShareCapitalServing,
 } from '@/types/company-serving';
+import type {
+  AnnualReportFinancialComparison,
+  CompanyAnnualReportHeader,
+  IngestHvdAnnualReportResult,
+} from '@/types/annual-reports';
 
 const API_BASE_URL = API_V1_BASE_URL;
 
@@ -205,6 +210,27 @@ export const api = {
   },
   async getCompanyServingEngagements(orgNumber: string) {
     return request<CompanyEngagementServing[]>(`/company-serving/${encodeURIComponent(orgNumber)}/engagements`);
+  },
+
+  async ingestHvdAnnualReport(identitetsbeteckning: string, dokumentId: string) {
+    return request<IngestHvdAnnualReportResult>('/annual-reports/ingest-hvd-dokument', {
+      method: 'POST',
+      body: JSON.stringify({ identitetsbeteckning, dokumentId }),
+    });
+  },
+  async getAnnualReportFinancialComparison(orgNumber: string, opts?: { maxYears?: number }) {
+    const q =
+      opts?.maxYears != null && Number.isFinite(opts.maxYears)
+        ? `?maxYears=${encodeURIComponent(String(opts.maxYears))}`
+        : '';
+    return request<AnnualReportFinancialComparison>(
+      `/annual-reports/companies/${encodeURIComponent(orgNumber)}/financial-comparison${q}`,
+    );
+  },
+  async getAnnualReportHistory(orgNumber: string) {
+    return request<{ organisationNumber: string; headers: CompanyAnnualReportHeader[] }>(
+      `/annual-reports/companies/${encodeURIComponent(orgNumber)}/history`,
+    );
   },
   async createCompanyLookup(payload: { identitetsbeteckning: string; force_refresh?: boolean }) {
     return request('/company-lookups', {

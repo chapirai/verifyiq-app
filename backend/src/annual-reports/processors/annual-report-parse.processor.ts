@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { ANNUAL_REPORT_PARSE_QUEUE } from '../queues/annual-report-parse.queue';
 import type {
+  AnnualReportAutoIngestHvdJobData,
   AnnualReportBackfillJobData,
   AnnualReportParseJobData,
   AnnualReportRebuildServingJobData,
@@ -25,12 +26,19 @@ export class AnnualReportParseProcessor extends WorkerHost {
 
   async process(
     job: Job<
-      AnnualReportParseJobData | AnnualReportBackfillJobData | AnnualReportRebuildServingJobData,
+      | AnnualReportParseJobData
+      | AnnualReportBackfillJobData
+      | AnnualReportRebuildServingJobData
+      | AnnualReportAutoIngestHvdJobData,
       unknown,
       string
     >,
   ): Promise<unknown> {
     try {
+      if (job.name === 'auto-ingest-hvd-documents') {
+        const data = job.data as AnnualReportAutoIngestHvdJobData;
+        return await this.annualReports.runAutoIngestHvdDocumentsWorker(data);
+      }
       if (job.name === 'parse') {
         const data = job.data as AnnualReportParseJobData;
         return await this.pipeline.processFileId(data.tenantId, data.annualReportFileId, {

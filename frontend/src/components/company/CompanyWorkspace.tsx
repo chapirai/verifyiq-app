@@ -16,6 +16,7 @@ import {
   StatGrid,
   StatusChip,
 } from '@/components/company/workspace-ui';
+import { AnnualReportsWorkspacePanel } from '@/components/company/AnnualReportsWorkspacePanel';
 import type {
   CompanyEngagementServing,
   CompanyFiCaseServing,
@@ -32,6 +33,7 @@ type TabId =
   | 'hvd'
   | 'fiOrg'
   | 'reports'
+  | 'annualParsed'
   | 'fiReports'
   | 'cases'
   | 'capital'
@@ -133,6 +135,88 @@ function pickStrings(obj: Record<string, unknown> | null | undefined, keys: stri
     if (s && s !== '{}' && s !== '[]') out.push({ label: k, value: s });
   }
   return out;
+}
+
+function scalarHvdDisplay(raw: unknown): string {
+  if (raw == null) return 'Not available';
+  if (typeof raw === 'string') return raw.trim() === '' ? 'Not available' : raw;
+  if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw);
+  if (typeof raw === 'object') {
+    const o = raw as Record<string, unknown>;
+    for (const k of ['klartext', 'beskrivning', 'kod', 'text']) {
+      const v = o[k];
+      if (typeof v === 'string' && v.trim()) return v;
+    }
+  }
+  return 'Not available';
+}
+
+/** Flatten nested HVD organisation objects into labelled rows (no raw JSON blobs). */
+function flattenHvdOrganisationFields(
+  obj: Record<string, unknown>,
+  prefix = '',
+  depth = 0,
+): { label: string; value: string }[] {
+  if (depth > 6) return [{ label: prefix || 'värde', value: '…' }];
+  const out: { label: string; value: string }[] = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === 'organisationer' || k === 'dokument') continue;
+    const label = prefix ? `${prefix} · ${k}` : k;
+    if (v === null || v === undefined) continue;
+    if (Array.isArray(v)) {
+      if (v.length === 0) continue;
+      const allObj = v.every((x) => x && typeof x === 'object' && !Array.isArray(x));
+      if (allObj) continue;
+      out.push({ label, value: v.map((x) => scalarHvdDisplay(x)).join(', ') });
+    } else if (typeof v === 'object') {
+      out.push(...flattenHvdOrganisationFields(v as Record<string, unknown>, label, depth + 1));
+    } else {
+      out.push({ label, value: scalarHvdDisplay(v) });
+    }
+  }
+  return out;
+}
+
+function hvdObjectArrayTables(obj: Record<string, unknown> | null): { key: string; rows: Record<string, unknown>[] }[] {
+  if (!obj) return [];
+  const blocks: { key: string; rows: Record<string, unknown>[] }[] = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (!Array.isArray(v) || v.length === 0) continue;
+    if (!v.every((x) => x && typeof x === 'object' && !Array.isArray(x))) continue;
+    blocks.push({ key: k, rows: v as Record<string, unknown>[] });
+  }
+  return blocks;
+}
+
+type HvdLiveDocRow = { dokumentId: string; periodTom: string; registered: string; format: string; docType: string };
+
+function extractLiveHvdDokumentRows(payload: unknown): HvdLiveDocRow[] {
+  if (!payload || typeof payload !== 'object') return [];
+  const dok = (payload as Record<string, unknown>).dokument;
+  if (!Array.isArray(dok)) return [];
+  const out: HvdLiveDocRow[] = [];
+  for (const item of dok) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+    const dokumentId = String(r.dokumentId ?? '').trim();
+    if (!dokumentId) continue;
+    out.push({
+      dokumentId,
+      periodTom: scalarHvdDisplay(r.rapporteringsperiodTom),
+      registered: scalarHvdDisplay(r.registreringstidpunkt),
+      format: scalarHvdDisplay(r.filformat),
+      docType: scalarHvdDisplay(r.dokumenttyp),
+    });
+  }
+  return out;
+}
+
+function hvdTopLevelFel(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const fel = (payload as Record<string, unknown>).fel;
+  if (fel == null) return null;
+  if (typeof fel === 'string') return fel;
+  return scalarHvdDisplay(fel);
 }
 
 function FieldGrid({ rows }: { rows: { label: string; value: string }[] }) {
@@ -300,17 +384,11 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
   const hvdEndpointOrg = extractHvdOrganisation(hvdOrg.data);
   const servingOverviewRows = serving.overview ? buildServingOverviewSummary(serving.overview) : [];
 
-  const hvdOrgRows = pickStrings(hvdEndpointOrg, [
-    'namn',
-    'identitetsbeteckning',
-    'verksamhetsbeskrivning',
-    'organisationsdatum',
-    'registreringsdatum',
-    'juridiskForm',
-    'organisationsform',
-    'verksamOrganisation',
-    'registreringsland',
-  ]);
+  const hvdOrgFlatRows = hvdEndpointOrg ? flattenHvdOrganisationFields(hvdEndpointOrg) : [];
+  const hvdOrgArrayTables = hvdObjectArrayTables(hvdEndpointOrg);
+  const hvdLiveDokumentRows = extractLiveHvdDokumentRows(hvdDocs.data);
+  const hvdOrgFel = hvdTopLevelFel(hvdOrg.data);
+  const hvdDocsFel = hvdTopLevelFel(hvdDocs.data);
 
   return (
     <section className="space-y-8">
@@ -379,6 +457,9 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
         </TabButton>
         <TabButton active={tab === 'reports'} onClick={() => setTab('reports')}>
           HVD annual files
+        </TabButton>
+        <TabButton active={tab === 'annualParsed'} onClick={() => setTab('annualParsed')}>
+          Årsredovisning (parsed)
         </TabButton>
         <TabButton active={tab === 'fiReports'} onClick={() => setTab('fiReports')}>
           FI finansiella rapporter
@@ -496,11 +577,87 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
       ) : null}
 
       {tab === 'hvd' ? (
-        <Panel title="POST /bolagsverket/hvd/organisationer" badge={hvdOrg.ok ? 'ok' : 'error'}>
-          {hvdOrg.error ? <ErrorState title="HVD organisationer failed" message={hvdOrg.error} /> : null}
-          <FieldGrid rows={hvdOrgRows} />
-          {!hvdOrg.ok && !hvdOrg.error ? <LoadingSkeleton lines={4} /> : null}
-        </Panel>
+        <div className="space-y-6">
+          <Panel title="HVD — organisation (live API)" badge={hvdOrg.ok ? 'hvd.organisationer' : 'error'}>
+            {hvdOrg.error ? <ErrorState title="HVD organisationer failed" message={hvdOrg.error} /> : null}
+            {!hvdOrg.ok && !hvdOrg.error ? <LoadingSkeleton lines={4} /> : null}
+            {hvdOrgFel ? <p className="mb-4 text-sm text-destructive">Bolagsverket: {hvdOrgFel}</p> : null}
+            {hvdOrgFlatRows.length > 0 ? (
+              <SectionCard title="Uppgifter">
+                <FieldGridPro rows={hvdOrgFlatRows.map(({ label, value }) => ({ label, value }))} />
+              </SectionCard>
+            ) : null}
+            {hvdOrg.ok && !hvdOrg.error && hvdOrgFlatRows.length === 0 && !hvdOrgFel ? (
+              <p className="text-sm text-muted-foreground">No scalar fields in the organisation payload.</p>
+            ) : null}
+            {hvdOrgArrayTables.map(({ key, rows }) => {
+              const keys = [...new Set(rows.flatMap((r) => Object.keys(r)))].slice(0, 12);
+              return (
+                <SectionCard key={key} title={key}>
+                  <Table>
+                    <thead>
+                      <tr>
+                        {keys.map((k) => (
+                          <th key={k} className="text-left">
+                            {k}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r, i) => (
+                        <tr key={i}>
+                          {keys.map((k) => (
+                            <td key={k} className="text-xs">
+                              {scalarHvdDisplay(r[k])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </SectionCard>
+              );
+            })}
+          </Panel>
+          <Panel title="HVD — dokumentlista (live API)" badge={hvdDocs.ok ? 'hvd.dokumentlista' : 'error'}>
+            {hvdDocs.error ? <ErrorState title="HVD dokumentlista failed" message={hvdDocs.error} /> : null}
+            {!hvdDocs.ok && !hvdDocs.error ? <LoadingSkeleton lines={3} /> : null}
+            {hvdDocsFel ? <p className="mb-4 text-sm text-destructive">Bolagsverket: {hvdDocsFel}</p> : null}
+            <p className="mb-4 text-sm text-muted-foreground">
+              When this list is fetched through the API, the backend queues server-side ZIP download, storage, and iXBRL
+              parsing for each eligible annual-report package. Open <strong>Årsredovisning (parsed)</strong> to watch
+              extracted figures appear; that view refreshes on its own.
+            </p>
+            {hvdLiveDokumentRows.length === 0 && hvdDocs.ok && !hvdDocsFel ? (
+              <p className="text-sm text-muted-foreground">No documents in the response.</p>
+            ) : null}
+            {hvdLiveDokumentRows.length > 0 ? (
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Period (tom)</th>
+                    <th>Registrerad</th>
+                    <th>Format</th>
+                    <th>Dokumenttyp</th>
+                    <th>Dokument-ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {hvdLiveDokumentRows.map((row) => (
+                    <tr key={row.dokumentId}>
+                      <td className="text-sm">{row.periodTom}</td>
+                      <td className="text-sm">{row.registered}</td>
+                      <td className="text-sm">{row.format}</td>
+                      <td className="text-sm">{row.docType}</td>
+                      <td className="font-mono text-xs">{row.dokumentId}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            ) : null}
+          </Panel>
+        </div>
       ) : null}
 
       {tab === 'fiOrg' ? (
@@ -618,8 +775,10 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
         <div className="space-y-6">
           <Panel title="HVD annual files (read model)" badge="bv_read.company_hvd_documents_current">
             <p className="mb-4 text-sm text-muted-foreground">
-              Rows are served from parsed dokumentlista. Download uses only each row&apos;s <strong>dokumentId</strong> against{' '}
-              <code className="font-mono text-xs">GET …/hvd/dokument/:dokumentId</code>.
+              Rows are from the read model (parsed dokumentlista). <strong>Download</strong> saves the ZIP in your browser only.
+              Ingest and parsing run automatically when the live dokumentlista is loaded from the API; use{' '}
+              <strong>Årsredovisning (parsed)</strong> for figures. Digital annual reports are usually{' '}
+              <code className="font-mono text-xs">application/zip</code>.
             </p>
             <div className="mb-6 flex flex-col gap-3 border-2 border-foreground p-4 md:flex-row md:items-end">
               <div className="min-w-0 flex-1">
@@ -657,7 +816,7 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                     <th>Registrerad</th>
                     <th>Format</th>
                     <th>Dokument-ID</th>
-                    <th />
+                    <th>Download</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -700,6 +859,12 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
             {downloadMsg ? <p className="mt-4 text-sm text-muted-foreground">{downloadMsg}</p> : null}
           </Panel>
         </div>
+      ) : null}
+
+      {tab === 'annualParsed' ? (
+        <Panel title="Årsredovisning — extraherade nyckeltal (iXBRL)" badge="annual_report_xbrl + serving">
+          <AnnualReportsWorkspacePanel orgNumber={org} />
+        </Panel>
       ) : null}
 
       {tab === 'fiReports' ? (

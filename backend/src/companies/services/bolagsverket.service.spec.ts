@@ -1,5 +1,7 @@
 import { BadGatewayException } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ANNUAL_REPORT_PARSE_QUEUE } from '../../annual-reports/queues/annual-report-parse.queue';
 import { BolagsverketService, DataValidationResult } from './bolagsverket.service';
 import { BvPipelineService } from './bv-pipeline.service';
 import { BolagsverketClient } from '../integrations/bolagsverket.client';
@@ -103,6 +105,10 @@ describe('BolagsverketService', () => {
         { provide: SnapshotChainService, useValue: snapshotChainService },
         { provide: SnapshotComparisonService, useValue: snapshotComparisonService },
         { provide: AuditService, useValue: auditService },
+        {
+          provide: getQueueToken(ANNUAL_REPORT_PARSE_QUEUE),
+          useValue: { add: jest.fn().mockResolvedValue({}) },
+        },
       ],
     }).compile();
 
@@ -251,6 +257,10 @@ describe('BolagsverketService', () => {
           { provide: SnapshotChainService, useValue: { linkSnapshot: jest.fn() } },
           { provide: SnapshotComparisonService, useValue: { compareSnapshots: jest.fn() } },
           { provide: AuditService, useValue: { emitAuditEvent: jest.fn().mockResolvedValue(null) } },
+          {
+            provide: getQueueToken(ANNUAL_REPORT_PARSE_QUEUE),
+            useValue: { add: jest.fn().mockResolvedValue({}) },
+          },
         ],
       }).compile();
 

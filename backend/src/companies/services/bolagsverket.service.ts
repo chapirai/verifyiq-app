@@ -1,4 +1,6 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { BolagsverketClient } from '../integrations/bolagsverket.client';
 import { BolagsverketMapper, DEFAULT_COMPANY_NAME, NormalisedCompany } from '../integrations/bolagsverket.mapper';
 import {
@@ -26,6 +28,10 @@ import { SnapshotComparisonService } from './snapshot-comparison.service';
 import { AuditEventType } from '../../audit/audit-event.entity';
 import { AuditService } from '../../audit/audit.service';
 import { randomUUID } from 'crypto';
+import {
+  ANNUAL_REPORT_PARSE_QUEUE,
+  type AnnualReportAutoIngestHvdJobData,
+} from '../../annual-reports/queues/annual-report-parse.queue';
 
 /** Allowed tolerance when validating share-capital arithmetic (1 %). */
 const SHARE_CAPITAL_TOLERANCE = 0.01;
@@ -97,6 +103,8 @@ export class BolagsverketService {
     private readonly snapshotChainService: SnapshotChainService,
     private readonly snapshotComparisonService: SnapshotComparisonService,
     private readonly auditService: AuditService,
+    @InjectQueue(ANNUAL_REPORT_PARSE_QUEUE)
+    private readonly annualReportParseQueue: Queue<AnnualReportAutoIngestHvdJobData>,
   ) {}
 
   // ── Health ──────────────────────────────────────────────────────────────────
@@ -535,13 +543,19 @@ export class BolagsverketService {
         filformat?: string;
         rapporteringsperiodTom?: string;
         registreringstidpunkt?: string;
-        dokumenttyp?: string;
+        dokumenttyp?: unknown;
       }>;
       void this.bvPersistenceService.storeDocumentList(
         context.tenantId,
         identitetsbeteckning,
         new Date(),
-        documents,
+        documents as Array<{
+          dokumentId?: string;
+          filformat?: string;
+          rapporteringsperiodTom?: string;
+          registreringstidpunkt?: string;
+          dokumenttyp?: string;
+        }>,
         requestId ?? null,
         null,
       );
@@ -553,8 +567,82 @@ export class BolagsverketService {
         responsePayload: responsePayload as unknown as Record<string, unknown>,
         requestId: requestId ?? randomUUID(),
       });
+      const orgDigits = String(identitetsbeteckning ?? '').replace(/\D/g, '');
+      if (orgDigits.length >= 10) {
+        this.scheduleAutoIngestHvdDocuments(context.tenantId, orgDigits, documents);
+      }
     }
     return responsePayload;
+  }
+
+  /** Pull text from HVD kod/klartext-style fields for filtering. */
+  private stringifyHvdScalar(raw: unknown): string {
+    if (raw == null) return '';
+    if (typeof raw === 'string') return raw;
+    if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw);
+    if (typeof raw === 'object') {
+      const o = raw as Record<string, unknown>;
+      for (const k of ['klartext', 'beskrivning', 'kod', 'text']) {
+        const v = o[k];
+        if (typeof v === 'string' && v.trim()) return v;
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Prefer ZIP / årsredovisning rows; skip obvious PDFs. Unknown shape still queued so ingest can validate.
+   */
+  private shouldAutoIngestHvdDocument(doc: {
+    dokumentId?: string;
+    filformat?: string;
+    dokumenttyp?: unknown;
+  }): boolean {
+    const id = doc.dokumentId?.trim();
+    if (!id) return false;
+    const fmt = String(doc.filformat ?? '').toLowerCase();
+    if (fmt.includes('pdf')) return false;
+    if (fmt.includes('zip')) return true;
+    const typ = this.stringifyHvdScalar(doc.dokumenttyp).toLowerCase();
+    if (typ.includes('årsredovisning') || typ.includes('arsredovisning')) return true;
+    if (!fmt && !typ) return true;
+    return false;
+  }
+
+  private scheduleAutoIngestHvdDocuments(
+    tenantId: string,
+    organisationNumber: string,
+    documents: Array<{ dokumentId?: string; filformat?: string; dokumenttyp?: unknown }>,
+  ): void {
+    if (process.env.AR_AUTO_INGEST_HVD === 'false') {
+      return;
+    }
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const d of documents) {
+      if (!this.shouldAutoIngestHvdDocument(d)) continue;
+      const id = d.dokumentId!.trim();
+      if (seen.has(id)) continue;
+      seen.add(id);
+      ids.push(id);
+    }
+    if (ids.length === 0) return;
+    const payload: AnnualReportAutoIngestHvdJobData = {
+      tenantId,
+      organisationNumber,
+      dokumentIds: ids,
+    };
+    const jobId = `ar-auto-hvd-${tenantId}-${organisationNumber}-${Date.now()}`;
+    void this.annualReportParseQueue
+      .add('auto-ingest-hvd-documents', payload, {
+        jobId,
+        attempts: 1,
+        removeOnComplete: { count: 120 },
+        removeOnFail: { count: 40 },
+      })
+      .catch(err => {
+        this.logger.warn(`Failed to queue auto-ingest HVD: ${err instanceof Error ? err.message : String(err)}`);
+      });
   }
 
   // ── Data validation ──────────────────────────────────────────────────────────

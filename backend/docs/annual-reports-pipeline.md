@@ -4,8 +4,8 @@ Deterministic ingestion for Bolagsverket-style **ZIP** packages containing **Inl
 
 ## Flow
 
-1. **Register** a ZIP (`POST /api/v1/annual-reports/upload`) or link from a stored Bolagsverket document (`POST .../from-bv-document/:documentId`). Files are deduplicated by `(tenant_id, content_sha256)` and stored in object storage (`annual-reports/{tenantId}/{sha256}.zip`).
-2. **Queue** `annual-report-parse` BullMQ job (`parse` by default after upload).
+1. **Register** a ZIP (`POST /api/v1/annual-reports/upload`), link an existing MinIO row (`POST .../from-bv-document/:documentId`), or **pull from HVD** with `POST /api/v1/annual-reports/ingest-hvd-dokument` `{ dokumentId, identitetsbeteckning }` (this is what the workspace “Extract to database” button uses — it replaces browser-only download, which never wrote to MinIO). Files are deduplicated by `(tenant_id, content_sha256)` and stored under `annual-reports/{tenantId}/{sha256}.zip`.
+2. **Queue** `annual-report-parse` BullMQ job (`parse` by default after upload / ingest).
 3. **Worker** downloads bytes, **safely unzips** (zip-slip and size limits), writes `annual_report_file_entries`, picks the best **iXBRL** candidate, runs **Arelle**, persists **raw** rows (`annual_report_xbrl_*`), then builds **normalized** serving rows (`company_annual_report_*`).
 4. **Statuses** on `annual_report_files`: `pending` → `extracting` → `extracted` → `normalized`, or `failed`.
 
@@ -42,7 +42,9 @@ pip install -r requirements-arelle.txt
 ## API (JWT tenant)
 
 - `POST /api/v1/annual-reports/upload` — multipart field `file`, optional `organisationsnummer`, optional `enqueue=false`
+- `POST /api/v1/annual-reports/ingest-hvd-dokument` — JSON `{ dokumentId, identitetsbeteckning }` (server download → `bolagsverket_stored_documents` → annual report pipeline)
 - `POST /api/v1/annual-reports/from-bv-document/:documentId`
+- `GET /api/v1/annual-reports/companies/:organisationNumber/financial-comparison` — up to 5 fiscal years, pivoted canonical metrics (for workspace comparison UI)
 - `POST /api/v1/annual-reports/files/:fileId/enqueue-parse` — body `{ "force": true }` to reparse
 - `POST /api/v1/annual-reports/jobs/backfill` — enqueue ZIP BV documents (body `limit`)
 - `POST /api/v1/annual-reports/files/:fileId/rebuild-serving` — re-run normalization from latest raw parse

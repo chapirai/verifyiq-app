@@ -16,3 +16,10 @@ export type AnnualReportRebuildServingJobData = {
   tenantId: string;
   annualReportFileId: string;
 };
+
+/** After HVD dokumentlista: download each ZIP, store, queue iXBRL parse (worker runs sequentially). */
+export type AnnualReportAutoIngestHvdJobData = {
+  tenantId: string;
+  organisationNumber: string;
+  dokumentIds: string[];
+};

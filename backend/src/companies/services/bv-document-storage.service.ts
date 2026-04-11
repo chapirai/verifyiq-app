@@ -11,6 +11,17 @@ import { BvStoredDocumentEntity } from '../entities/bv-stored-document.entity';
 /** Pre-signed URL expiry in seconds (15 minutes). */
 const PRESIGNED_URL_EXPIRY_SECONDS = 900;
 
+function storageExtensionFromHints(contentType?: string, upstreamFileName?: string): string {
+  const fn = (upstreamFileName ?? '').toLowerCase();
+  if (fn.endsWith('.zip')) return '.zip';
+  if (fn.endsWith('.pdf')) return '.pdf';
+  if (fn.endsWith('.xhtml') || fn.endsWith('.html')) return '.xhtml';
+  const ct = (contentType ?? '').toLowerCase();
+  if (ct.includes('zip')) return '.zip';
+  if (ct.includes('pdf')) return '.pdf';
+  return '.bin';
+}
+
 @Injectable()
 export class BvDocumentStorageService {
   private readonly logger = new Logger(BvDocumentStorageService.name);
@@ -46,6 +57,8 @@ export class BvDocumentStorageService {
     sourceUrl?: string;
     contentType?: string;
     fileBuffer?: Buffer;
+    /** Original filename from upstream (e.g. HVD Content-Disposition) — drives .zip vs .pdf in MinIO key */
+    upstreamFileName?: string;
   }): Promise<BvStoredDocumentEntity> {
     const {
       tenantId,
@@ -56,7 +69,12 @@ export class BvDocumentStorageService {
       documentYear,
       sourceUrl,
       contentType = 'application/pdf',
+      upstreamFileName,
     } = params;
+
+    const ext = storageExtensionFromHints(contentType, upstreamFileName);
+    const baseName =
+      (documentIdSource ?? 'document') + (documentYear ? `-${documentYear}` : '');
 
     let fileBuffer = params.fileBuffer;
 
@@ -76,7 +94,7 @@ export class BvDocumentStorageService {
           documentIdSource,
           documentType,
           documentYear,
-          fileName: `${documentIdSource ?? 'document'}.pdf`,
+          fileName: `${baseName}${ext}`,
           contentType,
           sourceUrl,
           storageBucket: this.bucket,
@@ -96,7 +114,7 @@ export class BvDocumentStorageService {
         documentIdSource,
         documentType,
         documentYear,
-        fileName: `${documentIdSource ?? 'document'}.pdf`,
+        fileName: `${baseName}${ext}`,
         contentType,
         sourceUrl,
         storageBucket: this.bucket,
@@ -123,7 +141,7 @@ export class BvDocumentStorageService {
         documentIdSource,
         documentType,
         documentYear,
-        fileName: `${documentIdSource ?? 'document'}.pdf`,
+        fileName: upstreamFileName?.trim() || `${baseName}${ext}`,
         contentType,
         sourceUrl,
         storageBucket: this.bucket,
@@ -140,8 +158,9 @@ export class BvDocumentStorageService {
     // to prevent collisions between documents with missing metadata.
     const docId = documentIdSource ?? randomUUID();
     const yearSegment = documentYear ?? randomUUID().slice(0, 8);
-    const storageKey = `bolagsverket/${tenantId}/${organisationsnummer}/${docId}-${yearSegment}.pdf`;
-    const fileName = `${documentIdSource ?? 'document'}-${documentYear ?? ''}.pdf`;
+    const storageKey = `bolagsverket/${tenantId}/${organisationsnummer}/${docId}-${yearSegment}${ext}`;
+    const fileName =
+      upstreamFileName?.trim() || `${documentIdSource ?? 'document'}-${documentYear ?? 'file'}${ext}`;
 
     // Ensure bucket exists
     try {
