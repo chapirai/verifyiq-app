@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AppController } from './app.controller';
 import { ApiKeysModule } from './api-keys/api-keys.module';
+import { AnnualReportsModule } from './annual-reports/annual-reports.module';
 import { AuditModule } from './audit/audit.module';
 import { BillingModule } from './billing/billing.module';
 import { BulkModule } from './bulk/bulk.module';
@@ -90,6 +91,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     PersonEnrichmentModule,
     PropertyModule,
     RiskIndicatorsModule,
+    AnnualReportsModule,
   ],
   controllers: [AppController],
 })

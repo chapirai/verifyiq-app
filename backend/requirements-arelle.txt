@@ -1,0 +1,4 @@
+# Optional: used by tools/ixbrl_arelle_extract.py for deterministic iXBRL parsing.
+# Install in venv or system Python referenced by ARELLE_PYTHON (default: python3 / python).
+# Python >= 3.10 recommended (see https://pypi.org/project/arelle-release/).
+arelle-release>=2.31.0

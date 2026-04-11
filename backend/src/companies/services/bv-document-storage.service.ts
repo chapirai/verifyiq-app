@@ -220,4 +220,15 @@ export class BvDocumentStorageService {
     );
     return { url, expiresInSeconds: PRESIGNED_URL_EXPIRY_SECONDS };
   }
+
+  /** Full object bytes (e.g. annual report ZIP in object storage). */
+  async getObjectBuffer(storageBucket: string, storageKey: string): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    const stream = await this.minioClient.getObject(storageBucket, storageKey);
+    return await new Promise((resolve, reject) => {
+      stream.on('data', (c: Buffer) => chunks.push(c));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
+  }
 }
