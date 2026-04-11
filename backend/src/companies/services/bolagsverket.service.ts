@@ -19,6 +19,7 @@ import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
 import { BvFetchSnapshotEntity, SnapshotPolicyDecision } from '../entities/bv-fetch-snapshot.entity';
 import { RawPayloadStorageService } from './raw-payload-storage.service';
+import { BvPipelineService } from './bv-pipeline.service';
 import { CachePolicyEvaluationService } from './cache-policy-evaluation.service';
 import { SnapshotChainService } from './snapshot-chain.service';
 import { SnapshotComparisonService } from './snapshot-comparison.service';
@@ -91,6 +92,7 @@ export class BolagsverketService {
     private readonly bvCacheService: BvCacheService,
     private readonly bvPersistenceService: BvPersistenceService,
     private readonly rawPayloadStorageService: RawPayloadStorageService,
+    private readonly bvPipelineService: BvPipelineService,
     private readonly cachePolicyEvaluationService: CachePolicyEvaluationService,
     private readonly snapshotChainService: SnapshotChainService,
     private readonly snapshotComparisonService: SnapshotComparisonService,
@@ -890,11 +892,13 @@ export class BolagsverketService {
       // 4. Store raw payload with checksum-based deduplication (P02-T02)
       let rawPayloadId: string | null = null;
       try {
+        const docList = result.documents as { dokument?: unknown[] } | null | undefined;
         const rawContent: Record<string, unknown> = {
           highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
           organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
+          ...(Array.isArray(docList?.dokument) ? { dokument: docList!.dokument } : {}),
         };
-        const { rawPayload } = await this.rawPayloadStorageService.storeRawPayload({
+        const { rawPayload, isDeduplicated } = await this.rawPayloadStorageService.storeRawPayload({
           tenantId,
           providerSource: 'bolagsverket',
           organisationsnummer: identitetsbeteckning,
@@ -909,6 +913,16 @@ export class BolagsverketService {
           // snapshotId will be backfilled after snapshot creation below
         });
         rawPayloadId = rawPayload.id;
+        if (!isDeduplicated && rawPayloadId) {
+          void this.bvPipelineService
+            .enqueueRawPayloadForParse(rawPayloadId, null, 0)
+            .then(() => this.bvPipelineService.drainQueues())
+            .catch((e: unknown) =>
+              this.logger.warn(
+                `BV pipeline enqueue/drain failed for ${identitetsbeteckning}: ${e instanceof Error ? e.message : String(e)}`,
+              ),
+            );
+        }
       } catch (rawPayloadErr) {
         // Storage failure is non-blocking — snapshot creation continues
         this.logger.warn(

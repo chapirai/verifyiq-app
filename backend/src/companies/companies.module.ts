@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { AuditModule } from '../audit/audit.module';
 import { CompaniesController } from './companies.controller';
+import { CompanyLookupsController } from './controllers/company-lookups.controller';
+import { CompanyServingController } from './controllers/company-serving.controller';
 import { CompaniesService } from './companies.service';
 import { CompanyEntity } from './entities/company.entity';
 import { CompanyRawPayloadEntity } from './entities/company-raw-payload.entity';
@@ -54,6 +56,9 @@ import { HvdAggregatorService } from './services/hvd-aggregator.service';
 import { BolagsverketProvider } from './providers/bolagsverket.provider';
 import { BvEnrichmentProcessor } from './processors/bv-enrichment.processor';
 import { BV_ENRICHMENT_QUEUE } from './queues/bv-enrichment.queue';
+import { BvPipelineService } from './services/bv-pipeline.service';
+import { BvPipelineWorker } from './services/bv-pipeline.worker';
+import { CompanyServingReadService } from './services/company-serving-read.service';
 
 @Module({
   imports: [
@@ -81,7 +86,15 @@ import { BV_ENRICHMENT_QUEUE } from './queues/bv-enrichment.queue';
     AuditModule,
     BullModule.registerQueue({ name: BV_ENRICHMENT_QUEUE }),
   ],
-  controllers: [CompaniesController, BolagsverketController, CachePolicyController, LineageController, ChangeEventController],
+  controllers: [
+    CompaniesController,
+    BolagsverketController,
+    CachePolicyController,
+    LineageController,
+    ChangeEventController,
+    CompanyLookupsController,
+    CompanyServingController,
+  ],
   providers: [
     CompaniesService,
     BolagsverketClient,
@@ -110,6 +123,9 @@ import { BV_ENRICHMENT_QUEUE } from './queues/bv-enrichment.queue';
     HvdAggregatorService,
     BolagsverketProvider,
     BvEnrichmentProcessor,
+    BvPipelineService,
+    BvPipelineWorker,
+    CompanyServingReadService,
   ],
   exports: [
     CompaniesService,

@@ -1,6 +1,7 @@
 import { BadGatewayException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BolagsverketService, DataValidationResult } from './bolagsverket.service';
+import { BvPipelineService } from './bv-pipeline.service';
 import { BolagsverketClient } from '../integrations/bolagsverket.client';
 import { BolagsverketMapper, DEFAULT_COMPANY_NAME, NormalisedCompany } from '../integrations/bolagsverket.mapper';
 import { BvCacheService } from './bv-cache.service';
@@ -64,6 +65,10 @@ describe('BolagsverketService', () => {
     cacheService = { checkFreshness: jest.fn(), createSnapshot: jest.fn() };
     persistenceService = { upsertOrganisation: jest.fn(), storeHvdPayload: jest.fn().mockResolvedValue({ id: 'hvd-payload-1' }), storeForetagsinfoPayload: jest.fn().mockResolvedValue({ id: 'v4-payload-1' }), storeDocumentList: jest.fn().mockResolvedValue({ id: 'doc-list-1' }) };
     rawPayloadStorageService = { storeRawPayload: jest.fn() };
+    const bvPipelineService = {
+      enqueueRawPayloadForParse: jest.fn().mockResolvedValue('1'),
+      drainQueues: jest.fn().mockResolvedValue(undefined),
+    };
     snapshotChainService = { linkSnapshot: jest.fn() };
     snapshotComparisonService = { compareSnapshots: jest.fn() };
     auditService = { emitAuditEvent: jest.fn().mockResolvedValue(null) };
@@ -93,6 +98,7 @@ describe('BolagsverketService', () => {
         { provide: BvCacheService, useValue: cacheService },
         { provide: BvPersistenceService, useValue: persistenceService },
         { provide: RawPayloadStorageService, useValue: rawPayloadStorageService },
+        { provide: BvPipelineService, useValue: bvPipelineService },
         { provide: CachePolicyEvaluationService, useValue: policyService },
         { provide: SnapshotChainService, useValue: snapshotChainService },
         { provide: SnapshotComparisonService, useValue: snapshotComparisonService },
@@ -217,6 +223,13 @@ describe('BolagsverketService', () => {
           { provide: BvCacheService, useValue: {} },
           { provide: BvPersistenceService, useValue: {} },
           { provide: RawPayloadStorageService, useValue: { storeRawPayload: jest.fn() } },
+          {
+            provide: BvPipelineService,
+            useValue: {
+              enqueueRawPayloadForParse: jest.fn().mockResolvedValue('1'),
+              drainQueues: jest.fn().mockResolvedValue(undefined),
+            },
+          },
           {
             provide: CachePolicyEvaluationService,
             useValue: {

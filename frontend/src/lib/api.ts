@@ -1,6 +1,15 @@
 import { clearSession, getAccessToken, getRefreshToken, setSession } from '@/lib/auth';
 import { API_V1_BASE_URL } from '@/lib/api-base-url';
 import type { ApiEnvelope, ApiKey, AuthTokens, BillingPlan, BulkJob, CompanyListResponse } from '@/types/api';
+import type {
+  CompanyEngagementServing,
+  CompanyFiCaseServing,
+  CompanyFiReportServing,
+  CompanyHvdDocumentServing,
+  CompanyOfficerServing,
+  CompanyOverviewServing,
+  CompanyShareCapitalServing,
+} from '@/types/company-serving';
 
 const API_BASE_URL = API_V1_BASE_URL;
 
@@ -174,5 +183,36 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ identitetsbeteckning: orgNumber, fromdatum, tomdatum }),
     });
+  },
+
+  async getCompanyServingOverview(orgNumber: string) {
+    return request<CompanyOverviewServing | null>(`/company-serving/${encodeURIComponent(orgNumber)}/overview`);
+  },
+  async getCompanyServingOfficers(orgNumber: string) {
+    return request<CompanyOfficerServing[]>(`/company-serving/${encodeURIComponent(orgNumber)}/officers`);
+  },
+  async getCompanyServingFinancialReports(orgNumber: string) {
+    return request<CompanyFiReportServing[]>(`/company-serving/${encodeURIComponent(orgNumber)}/financial-reports`);
+  },
+  async getCompanyServingDocuments(orgNumber: string) {
+    return request<CompanyHvdDocumentServing[]>(`/company-serving/${encodeURIComponent(orgNumber)}/documents`);
+  },
+  async getCompanyServingFiCases(orgNumber: string) {
+    return request<CompanyFiCaseServing[]>(`/company-serving/${encodeURIComponent(orgNumber)}/fi-cases`);
+  },
+  async getCompanyServingShareCapital(orgNumber: string) {
+    return request<CompanyShareCapitalServing | null>(`/company-serving/${encodeURIComponent(orgNumber)}/share-capital`);
+  },
+  async getCompanyServingEngagements(orgNumber: string) {
+    return request<CompanyEngagementServing[]>(`/company-serving/${encodeURIComponent(orgNumber)}/engagements`);
+  },
+  async createCompanyLookup(payload: { identitetsbeteckning: string; force_refresh?: boolean }) {
+    return request('/company-lookups', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  async getCompanyLookupStatus(lookupRequestId: string) {
+    return request(`/company-lookups/${encodeURIComponent(lookupRequestId)}/status`);
   },
 };

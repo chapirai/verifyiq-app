@@ -3,13 +3,28 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
-import { pickDokumentIdFromListRow } from '@/lib/hvd-dokument';
-import { fiClient, hvdClient } from '@/lib/source-clients';
+import { hvdClient } from '@/lib/source-clients';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateBlocks';
 import { Table } from '@/components/ui/Table';
+import {
+  EmptyStatePro,
+  FieldGridPro,
+  SectionCard,
+  StatGrid,
+  StatusChip,
+} from '@/components/company/workspace-ui';
+import type {
+  CompanyEngagementServing,
+  CompanyFiCaseServing,
+  CompanyFiReportServing,
+  CompanyHvdDocumentServing,
+  CompanyOfficerServing,
+  CompanyOverviewServing,
+  CompanyShareCapitalServing,
+} from '@/types/company-serving';
 import type { SourceFetchState } from '@/types/source-data';
 
 type TabId =
@@ -43,75 +58,69 @@ function extractHvdOrganisation(payload: unknown): Record<string, unknown> | nul
   return o;
 }
 
-function dokumentArrayFromRoot(payload: unknown): Array<Record<string, unknown>> {
-  if (!payload || typeof payload !== 'object') return [];
-  const o = payload as Record<string, unknown>;
-  const raw =
-    o.dokument ??
-    o.Dokument ??
-    (typeof o.data === 'object' && o.data !== null
-      ? (o.data as Record<string, unknown>).dokument ?? (o.data as Record<string, unknown>).Dokument
-      : undefined);
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((x) => x && typeof x === 'object') as Array<Record<string, unknown>>;
+function displayValue(v: string | number | null | undefined): string {
+  if (v === null || v === undefined) return 'Not available';
+  const s = typeof v === 'number' ? String(v) : v;
+  if (s.trim() === '') return 'Not available';
+  return s;
 }
 
-/**
- * Only the root `dokument` array from dokumentlista (never deep-search nested dokumentId — those may be FI or other contexts).
- */
-export function extractHvdDocuments(payload: unknown): Array<Record<string, unknown>> {
-  return dokumentArrayFromRoot(payload);
+function formatDateOnly(v: string | null | undefined): string {
+  if (!v) return 'Not available';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString();
 }
 
-function formatHvdDokumentlistaFel(payload: unknown): string | null {
-  if (!payload || typeof payload !== 'object') return null;
-  const fel = (payload as Record<string, unknown>).fel;
-  if (fel === undefined || fel === null) return null;
-  if (typeof fel === 'string') return fel;
-  try {
-    return JSON.stringify(fel);
-  } catch {
-    return String(fel);
-  }
+function formatMoneyAmount(amount: string | null | undefined, currency: string | null | undefined): string {
+  if (amount == null || amount === '') return 'Not available';
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return `${amount} ${currency ?? ''}`.trim();
+  return `${n.toLocaleString()} ${currency ?? ''}`.trim();
 }
 
-/** FI POST /organisationer returns OrganisationInformationResponse[] (array at root) */
-function normalizeFiOrganisationBlocks(data: unknown): Array<Record<string, unknown>> {
-  if (Array.isArray(data)) return data as Array<Record<string, unknown>>;
-  if (data && typeof data === 'object') {
-    const o = data as Record<string, unknown>;
-    const wrapped = o.organisationInformation;
-    if (Array.isArray(wrapped)) return wrapped as Array<Record<string, unknown>>;
-  }
-  return [];
-}
+type ServingBundle = {
+  overview: CompanyOverviewServing | null;
+  officers: CompanyOfficerServing[];
+  reports: CompanyFiReportServing[];
+  documents: CompanyHvdDocumentServing[];
+  cases: CompanyFiCaseServing[];
+  shareCapital: CompanyShareCapitalServing | null;
+  engagements: CompanyEngagementServing[];
+};
 
-function flattenOrchestratedFinancialReports(blocks: Array<Record<string, unknown>>) {
-  const rows: { key: string; arende: string; period: string; typ: string; datum: string }[] = [];
-  blocks.forEach((block, bi) => {
-    const arende = block.arende as Record<string, unknown> | undefined;
-    const arendeStr = arende ? String(arende.arendenummer ?? '—') : '—';
-    const rapporter = block.rapporter;
-    if (!Array.isArray(rapporter)) return;
-    rapporter.forEach((rep, ri) => {
-      if (!rep || typeof rep !== 'object') return;
-      const r = rep as Record<string, unknown>;
-      const period = r.rapporteringsperiod as Record<string, unknown> | undefined;
-      const typ = r.rapportTyp as Record<string, unknown> | undefined;
-      const periodStr =
-        period && (period.periodFrom != null || period.periodTom != null)
-          ? `${String(period.periodFrom ?? '')}–${String(period.periodTom ?? '')}`
-          : '—';
-      rows.push({
-        key: `${bi}-${ri}`,
-        arende: arendeStr,
-        period: periodStr,
-        typ: typ ? String(typ.klartext ?? typ.kod ?? '—') : '—',
-        datum: String(r.registreradDatum ?? r.ankomDatum ?? r.handlaggningAvslutadDatum ?? '—'),
-      });
-    });
-  });
-  return rows;
+const emptyServing = (): ServingBundle => ({
+  overview: null,
+  officers: [],
+  reports: [],
+  documents: [],
+  cases: [],
+  shareCapital: null,
+  engagements: [],
+});
+
+function buildServingOverviewSummary(o: CompanyOverviewServing): { label: string; value: string }[] {
+  return [
+    { label: 'Bolagsnamn', value: displayValue(o.organisationsnamn) },
+    { label: 'Organisationsform', value: displayValue(o.organisationsformKlartext) },
+    { label: 'Organisationsnummer', value: displayValue(o.organisationsnummer) },
+    { label: 'Identitetstyp', value: displayValue(o.identitetTypKlartext) },
+    { label: 'Registreringsdatum', value: formatDateOnly(o.organisationsdatumRegistreringsdatum) },
+    { label: 'Bildat datum', value: formatDateOnly(o.organisationsdatumBildatDatum) },
+    { label: 'Hemvist kommun', value: displayValue(o.hemvistKommunKlartext) },
+    { label: 'Län', value: displayValue(o.hemvistLanKlartext) },
+    { label: 'Räkenskapsår', value: `${displayValue(o.rakenskapsarInleds)} – ${displayValue(o.rakenskapsarAvslutas)}` },
+    { label: 'Verksamhetsbeskrivning', value: displayValue(o.verksamhetsbeskrivning) },
+    { label: 'Adress', value: displayValue(o.organisationsadressPostadress) },
+    { label: 'Postnummer / ort', value: [o.organisationsadressPostnummer, o.organisationsadressPostort].filter(Boolean).join(' ') || 'Not available' },
+    { label: 'E-post', value: displayValue(o.organisationsadressEpost) },
+    { label: 'Firmateckning', value: displayValue(o.firmateckningKlartext) },
+    { label: 'Ledamöter / suppleanter', value: `${o.antalValdaLedamoter ?? '—'} / ${o.antalValdaSuppleanter ?? '—'}` },
+    { label: 'Aktiekapital (översikt)', value: formatMoneyAmount(o.aktiekapitalBelopp, o.aktiekapitalValuta) },
+    { label: 'Antal aktier (översikt)', value: displayValue(o.antalAktier) },
+    { label: 'HVD verksam organisation', value: displayValue(o.verksamOrganisationKod) },
+    { label: 'Registreringsland', value: displayValue(o.registreringslandKlartext) },
+    { label: 'Read model refreshed', value: formatDateOnly(o.dataRefreshedAt) },
+  ];
 }
 
 function pickStrings(obj: Record<string, unknown> | null | undefined, keys: string[]): { label: string; value: string }[] {
@@ -179,11 +188,11 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
 
   const [hvdOrg, setHvdOrg] = useState(sourceState<Record<string, unknown>>());
   const [hvdDocs, setHvdDocs] = useState(sourceState<Record<string, unknown>>());
-  const [fiOrg, setFiOrg] = useState(sourceState<unknown>());
-  const [fiCases, setFiCases] = useState(sourceState<Record<string, unknown>>());
-  const [fiCapital, setFiCapital] = useState(sourceState<Record<string, unknown>>());
-  const [fiEngagements, setFiEngagements] = useState(sourceState<Record<string, unknown>>());
-  const [fiFinancial, setFiFinancial] = useState(sourceState<Record<string, unknown>>());
+  const [serving, setServing] = useState<ServingBundle>(() => emptyServing());
+  const [servingMeta, setServingMeta] = useState<{ loading: boolean; error: string | null }>({
+    loading: false,
+    error: null,
+  });
   const [snapshots, setSnapshots] = useState<Array<Record<string, unknown>>>([]);
   const [downloadMsg, setDownloadMsg] = useState('');
   const [refreshingSources, setRefreshingSources] = useState(false);
@@ -193,6 +202,28 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
     namnskyddRef.current = namnskyddslopnummer;
   }, [namnskyddslopnummer]);
 
+  const loadServing = useCallback(async (identitet: string) => {
+    setServingMeta({ loading: true, error: null });
+    try {
+      const [overview, officers, reports, documents, cases, shareCapital, engagements] = await Promise.all([
+        api.getCompanyServingOverview(identitet),
+        api.getCompanyServingOfficers(identitet),
+        api.getCompanyServingFinancialReports(identitet),
+        api.getCompanyServingDocuments(identitet),
+        api.getCompanyServingFiCases(identitet),
+        api.getCompanyServingShareCapital(identitet),
+        api.getCompanyServingEngagements(identitet),
+      ]);
+      setServing({ overview, officers, reports, documents, cases, shareCapital, engagements });
+      setServingMeta({ loading: false, error: null });
+    } catch (e) {
+      setServingMeta({
+        loading: false,
+        error: e instanceof Error ? e.message : 'Read model request failed',
+      });
+    }
+  }, []);
+
   const loadEndpoints = useCallback(async (identitet: string) => {
     setRefreshingSources(true);
     const ns = namnskyddRef.current.trim();
@@ -200,39 +231,12 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
       identitetsbeteckning: identitet,
       ...(ns ? { namnskyddslopnummer: ns } : {}),
     };
-    const fiCategories = [
-      'ORGANISATIONSADRESSER',
-      'FIRMATECKNING',
-      'FUNKTIONARER',
-      'HEMVISTKOMMUN',
-      'RAKENSKAPSAR',
-      'ORGANISATIONSDATUM',
-      'VERKSAMHETSBESKRIVNING',
-      'AKTIEINFORMATION',
-      'SAMTLIGA_ORGANISATIONSNAMN',
-      'ORGANISATIONSENGAGEMANG',
-      'TILLSTAND',
-      'FINANSIELLA_RAPPORTER',
-      'OVRIG_ORGANISATIONSINFORMATION',
-      'ORGANISATIONSMARKERINGAR',
-      'BESTAMMELSER',
-    ];
     const results = await Promise.allSettled([
-      hvdClient.hvdGetOrganisation({ identitetsbeteckning: identitet }),
+      hvdClient.hvdGetOrganisation({ identitetsbeteckning: identitet, ...(ns ? { namnskyddslopnummer: ns } : {}) }),
       hvdClient.hvdGetDocumentList(dokumentListaBody),
-      fiClient.fiGetOrganisation({ identitetsbeteckning: identitet, informationCategories: fiCategories }),
-      fiClient.fiGetCases({ organisationIdentitetsbeteckning: identitet }),
-      fiClient.fiGetShareCapitalChanges({ identitetsbeteckning: identitet }),
-      fiClient.fiGetOrganisationEngagements({ identitetsbeteckning: identitet, paginering: { sida: 1, antalPerSida: 25 } }),
-      fiClient.fiGetFinancialReports({ identitetsbeteckning: identitet }),
     ]);
     setHvdOrg(mapSettled(results[0] as PromiseSettledResult<Record<string, unknown>>));
     setHvdDocs(mapSettled(results[1] as PromiseSettledResult<Record<string, unknown>>));
-    setFiOrg(mapSettled(results[2] as PromiseSettledResult<unknown>));
-    setFiCases(mapSettled(results[3] as PromiseSettledResult<Record<string, unknown>>));
-    setFiCapital(mapSettled(results[4] as PromiseSettledResult<Record<string, unknown>>));
-    setFiEngagements(mapSettled(results[5] as PromiseSettledResult<Record<string, unknown>>));
-    setFiFinancial(mapSettled(results[6] as PromiseSettledResult<Record<string, unknown>>));
     setRefreshingSources(false);
   }, []);
 
@@ -244,10 +248,11 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
     try {
       const r = await Promise.allSettled([hvdClient.hvdGetDocumentList(body)]);
       setHvdDocs(mapSettled(r[0] as PromiseSettledResult<Record<string, unknown>>));
+      await loadServing(org);
     } finally {
       setRefreshingSources(false);
     }
-  }, [org]);
+  }, [org, loadServing]);
 
   useEffect(() => {
     if (!org || org.length < 10) {
@@ -276,7 +281,8 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
   useEffect(() => {
     if (!org || org.length < 10) return;
     void loadEndpoints(org);
-  }, [org, loadEndpoints]);
+    void loadServing(org);
+  }, [org, loadEndpoints, loadServing]);
 
   if (!org || org.length < 10) {
     return <ErrorState title="Invalid organisation number" message="Use a 10- or 12-digit identitetsbeteckning in the URL." />;
@@ -290,13 +296,9 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
   const metadata = (lookupResult?.metadata as Record<string, unknown> | undefined) ?? {};
   const hvdSection = company.hvdSection as Record<string, unknown> | undefined;
   const v4Section = company.v4Section as Record<string, unknown> | undefined;
-  const financialReports = (company.financialReports as Array<Record<string, unknown>> | undefined) ?? [];
-  const financialReportRows = flattenOrchestratedFinancialReports(financialReports);
 
   const hvdEndpointOrg = extractHvdOrganisation(hvdOrg.data);
-  const dokumentRows = extractHvdDocuments(hvdDocs.data);
-  const dokumentListaFel = formatHvdDokumentlistaFel(hvdDocs.data);
-  const fiBlocks = normalizeFiOrganisationBlocks(fiOrg.data);
+  const servingOverviewRows = serving.overview ? buildServingOverviewSummary(serving.overview) : [];
 
   const hvdOrgRows = pickStrings(hvdEndpointOrg, [
     'namn',
@@ -323,8 +325,12 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
             variant="secondary"
             className="min-h-10 text-[10px]"
             onClick={() => {
-              void api.lookupCompany(org, true).then((r) => setLookupResult(r as Record<string, unknown>)).catch(() => undefined);
+              void api
+                .lookupCompany(org, true)
+                .then((r) => setLookupResult(r as Record<string, unknown>))
+                .catch(() => undefined);
               void loadEndpoints(org);
+              void loadServing(org);
             }}
             disabled={refreshingSources}
           >
@@ -356,6 +362,10 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
       </div>
 
       {lookupError ? <ErrorState title="Lookup unavailable" message={lookupError} /> : null}
+      {servingMeta.error ? <ErrorState title="Read model unavailable" message={servingMeta.error} /> : null}
+      {servingMeta.loading ? (
+        <p className="text-sm text-muted-foreground">Updating read-model tables…</p>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <TabButton active={tab === 'overview'} onClick={() => setTab('overview')}>
@@ -397,8 +407,19 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
               ])}
             />
           </Panel>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Panel title="HVD section (from orchestrated response)" badge="hvdSection">
+          <Panel title="Company read model" badge="bv_read.company_overview_current">
+            {servingOverviewRows.length === 0 ? (
+              <EmptyStatePro
+                title="No read-model row yet"
+                message="Run a lookup or wait for the parse/refresh pipeline. Data is served from physical bv_read tables, not raw JSON."
+              />
+            ) : (
+              <FieldGridPro rows={servingOverviewRows} />
+            )}
+          </Panel>
+          <details className="border-2 border-foreground p-4">
+            <summary className="cursor-pointer mono-label text-[10px]">Legacy orchestrated HVD / FI blocks (debug)</summary>
+            <div className="mt-4 grid gap-6 lg:grid-cols-2">
               <FieldGrid
                 rows={pickStrings(hvdSection ?? null, [
                   'verksamhetsbeskrivning',
@@ -409,8 +430,6 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                   'verksamOrganisation',
                 ])}
               />
-            </Panel>
-            <Panel title="FI v4 section (from orchestrated response)" badge="v4Section">
               <FieldGrid
                 rows={pickStrings(v4Section ?? null, [
                   'organisationsnamn',
@@ -419,31 +438,41 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                   'verksamhetsbeskrivning',
                 ])}
               />
-            </Panel>
-          </div>
-          <Panel title="Financial reports (orchestrated)" badge="FI metadata — not file download">
-            {financialReportRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No rows in <code className="font-mono text-xs">company.financialReports</code>. Årsredovisning files are listed under the{' '}
-                <strong>HVD annual files</strong> tab (dokumentlista).
-              </p>
+            </div>
+          </details>
+          <Panel title="Financial reports (read model)" badge="bv_read.company_fi_reports_current">
+            {serving.reports.length === 0 ? (
+              <EmptyStatePro
+                title="No financial report rows"
+                message="These rows come from parsed FI data in the serving layer. Årsredovisning files (ZIP) are listed under HVD annual files."
+              />
             ) : (
               <Table>
                 <thead>
                   <tr>
-                    <th>Ärende</th>
-                    <th>Period</th>
                     <th>Typ</th>
-                    <th>Registrerad / ankom</th>
+                    <th>Period</th>
+                    <th>Ankom</th>
+                    <th>Registrerad</th>
+                    <th>Koncern</th>
+                    <th>Utdelning</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {financialReportRows.map((r) => (
-                    <tr key={r.key}>
-                      <td className="font-mono text-xs">{r.arende}</td>
-                      <td className="text-sm">{r.period}</td>
-                      <td className="text-sm">{r.typ}</td>
-                      <td className="text-sm">{r.datum}</td>
+                  {serving.reports.map((r) => (
+                    <tr key={r.reportId}>
+                      <td className="text-sm">{displayValue(r.rapporttypKlartext ?? r.rapporttypKod)}</td>
+                      <td className="text-sm">
+                        {formatDateOnly(r.periodFrom)} – {formatDateOnly(r.periodTom)}
+                      </td>
+                      <td className="text-sm">{formatDateOnly(r.ankomDatum)}</td>
+                      <td className="text-sm">{formatDateOnly(r.registreradDatum)}</td>
+                      <td className="text-sm">
+                        {r.innehallerKoncernredovisning === null ? '—' : r.innehallerKoncernredovisning ? 'Ja' : 'Nej'}
+                      </td>
+                      <td className="text-sm tabular-nums">
+                        {formatMoneyAmount(r.vinstutdelningBelopp, r.vinstutdelningValutaKod)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -476,25 +505,110 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
 
       {tab === 'fiOrg' ? (
         <div className="space-y-6">
-          <Panel title="POST /bolagsverket/fi/organisationer" badge={fiOrg.ok ? 'ok' : 'error'}>
-            {fiOrg.error ? <ErrorState title="FI organisationer failed" message={fiOrg.error} /> : null}
-            {fiBlocks.length === 0 && fiOrg.ok ? (
-              <p className="text-sm text-muted-foreground">Empty response array.</p>
+          <Panel title="FI organisation (read model)" badge="bv_read">
+            {!serving.overview ? (
+              <EmptyStatePro
+                title="No organisation row in serving layer"
+                message="Complete a lookup so raw payloads are parsed and bv_read.company_overview_current is refreshed."
+              />
             ) : (
-              fiBlocks.map((block, idx) => (
-                <div key={idx} className="mb-6 border-2 border-foreground p-4 last:mb-0">
-                  <p className="mono-label mb-3 text-[10px]">Block {idx + 1}</p>
-                  <FieldGrid
-                    rows={Object.entries(block)
-                      .filter(([, v]) => v !== null && v !== undefined)
-                      .slice(0, 40)
-                      .map(([k, v]) => ({
-                        label: k,
-                        value: typeof v === 'string' ? v : JSON.stringify(v),
-                      }))}
+              <div className="grid gap-6 lg:grid-cols-2">
+                <SectionCard title="Identity">
+                  <FieldGridPro
+                    rows={[
+                      { label: 'Organisationsnummer', value: displayValue(serving.overview.organisationsnummer) },
+                      { label: 'Namn', value: displayValue(serving.overview.organisationsnamn) },
+                      { label: 'Identitetstyp', value: displayValue(serving.overview.identitetTypKlartext) },
+                      { label: 'Organisationsform', value: displayValue(serving.overview.organisationsformKlartext) },
+                    ]}
                   />
-                </div>
-              ))
+                </SectionCard>
+                <SectionCard title="Registration">
+                  <FieldGridPro
+                    rows={[
+                      { label: 'Registreringsdatum', value: formatDateOnly(serving.overview.organisationsdatumRegistreringsdatum) },
+                      { label: 'Bildat datum', value: formatDateOnly(serving.overview.organisationsdatumBildatDatum) },
+                    ]}
+                  />
+                </SectionCard>
+                <SectionCard title="Status / domicile">
+                  <FieldGridPro
+                    rows={[
+                      { label: 'Kommun', value: displayValue(serving.overview.hemvistKommunKlartext) },
+                      { label: 'Län', value: displayValue(serving.overview.hemvistLanKlartext) },
+                      {
+                        label: 'Räkenskapsår',
+                        value: `${displayValue(serving.overview.rakenskapsarInleds)} – ${displayValue(serving.overview.rakenskapsarAvslutas)}`,
+                      },
+                      { label: 'Registreringsland', value: displayValue(serving.overview.registreringslandKlartext) },
+                    ]}
+                  />
+                </SectionCard>
+                <SectionCard title="Operations">
+                  <FieldGridPro
+                    rows={[
+                      { label: 'Verksamhetsbeskrivning', value: displayValue(serving.overview.verksamhetsbeskrivning) },
+                      { label: 'Firmateckning', value: displayValue(serving.overview.firmateckningKlartext) },
+                    ]}
+                  />
+                </SectionCard>
+                <SectionCard title="Contact">
+                  <FieldGridPro
+                    rows={[
+                      { label: 'Adress', value: displayValue(serving.overview.organisationsadressPostadress) },
+                      {
+                        label: 'Postnummer / ort',
+                        value:
+                          [serving.overview.organisationsadressPostnummer, serving.overview.organisationsadressPostort]
+                            .filter(Boolean)
+                            .join(' ') || 'Not available',
+                      },
+                      { label: 'E-post', value: displayValue(serving.overview.organisationsadressEpost) },
+                    ]}
+                  />
+                </SectionCard>
+                <SectionCard title="Board summary">
+                  <FieldGridPro
+                    rows={[
+                      { label: 'Valda ledamöter', value: displayValue(serving.overview.antalValdaLedamoter) },
+                      { label: 'Valda suppleanter', value: displayValue(serving.overview.antalValdaSuppleanter) },
+                    ]}
+                  />
+                </SectionCard>
+              </div>
+            )}
+          </Panel>
+          <Panel title="Officers / funktionärer" badge="bv_read.company_officers_current">
+            {serving.officers.length === 0 ? (
+              <EmptyStatePro title="No officers in read model" message="Parsed FI funktionärer will appear here after refresh." />
+            ) : (
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Namn</th>
+                    <th>Personnummer</th>
+                    <th>Roll</th>
+                    <th>Postadress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {serving.officers.map((o) => (
+                    <tr key={`${o.funktionarId}-${o.fiFunktionarRollId}`}>
+                      <td className="text-sm">
+                        {[o.fornamn, o.efternamn].filter(Boolean).join(' ') || 'Not available'}
+                      </td>
+                      <td className="font-mono text-xs">{displayValue(o.identitetsbeteckning)}</td>
+                      <td className="text-sm">
+                        <StatusChip>{displayValue(o.rollKlartext ?? o.rollKod)}</StatusChip>
+                      </td>
+                      <td className="text-sm">
+                        {[o.postadressAdress, o.postadressPostnummer, o.postadressPostort].filter(Boolean).join(', ') ||
+                          'Not available'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
             )}
           </Panel>
         </div>
@@ -502,23 +616,15 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
 
       {tab === 'reports' ? (
         <div className="space-y-6">
-          <Panel title="POST /bolagsverket/hvd/dokumentlista" badge={hvdDocs.ok ? 'ok' : 'error'}>
-            {hvdDocs.error ? <ErrorState title="HVD dokumentlista failed" message={hvdDocs.error} /> : null}
-            <div className="mb-4 space-y-2 text-sm text-muted-foreground">
-              <p>
-                <strong>Automatic HVD chain (per company):</strong> (1) POST{' '}
-                <code className="font-mono text-xs">…/dokumentlista</code> for this org → each row’s{' '}
-                <code className="font-mono text-xs">dokumentId</code> is unique to that document (and differs by company); (2) Download runs GET{' '}
-                <code className="font-mono text-xs">{`…/dokument/{dokumentId}`}</code> using <strong>only</strong> the id from that table — nothing to type or
-                configure. Backend uses the same upstream URLs (HVD OAuth on server); browser calls{' '}
-                <code className="font-mono text-xs">POST …/hvd/dokumentlista</code> and{' '}
-                <code className="font-mono text-xs">GET …/hvd/dokument/:dokumentId</code>. FI metadata is never used for ids.
-              </p>
-            </div>
+          <Panel title="HVD annual files (read model)" badge="bv_read.company_hvd_documents_current">
+            <p className="mb-4 text-sm text-muted-foreground">
+              Rows are served from parsed dokumentlista. Download uses only each row&apos;s <strong>dokumentId</strong> against{' '}
+              <code className="font-mono text-xs">GET …/hvd/dokument/:dokumentId</code>.
+            </p>
             <div className="mb-6 flex flex-col gap-3 border-2 border-foreground p-4 md:flex-row md:items-end">
               <div className="min-w-0 flex-1">
                 <label htmlFor="namnskydd-hvd" className="mono-label mb-1 block text-[10px] text-muted-foreground">
-                  Namnskyddslöpnummer (optional, dokumentlista)
+                  Namnskyddslöpnummer (optional)
                 </label>
                 <Input
                   id="namnskydd-hvd"
@@ -534,122 +640,197 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                 disabled={refreshingSources}
                 onClick={() => void reloadHvdDocumentList()}
               >
-                Reload dokumentlista
+                Reload live lista + read model
               </Button>
             </div>
-            {dokumentListaFel ? (
-              <div className="mb-4 border-2 border-foreground bg-muted p-3 font-mono text-xs">
-                <p className="mono-label mb-1 text-[10px]">fel (from dokumentlista)</p>
-                <p className="break-all">{dokumentListaFel}</p>
-              </div>
-            ) : null}
-            {dokumentRows.length === 0 ? (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  <code className="font-mono text-xs">dokument</code> is empty or has no <code className="font-mono text-xs">dokumentId</code>. That is a valid
-                  upstream outcome: Bolagsverket only lists <strong>digitally submitted</strong> annual reports in HVD. Many companies have FI case metadata but no HVD
-                  downloadable file. Do not use FI <code className="font-mono text-xs">finansiellaRapporter</code> as a substitute for step 1.
-                </p>
-                {hvdDocs.ok && hvdDocs.data ? (
-                  <details className="border-2 border-foreground p-4">
-                    <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-widest">Raw dokumentlista response (debug)</summary>
-                    <pre className="mt-4 max-h-96 overflow-auto font-mono text-xs">{JSON.stringify(hvdDocs.data, null, 2)}</pre>
-                  </details>
-                ) : null}
-              </div>
+            {hvdDocs.error ? <ErrorState title="Live dokumentlista request failed" message={hvdDocs.error} /> : null}
+            {serving.documents.length === 0 ? (
+              <EmptyStatePro
+                title="No HVD documents in serving layer"
+                message="Bolagsverket only lists digitally submitted annual reports. After a successful lookup, dokument rows are merged into raw payloads and parsed into bv_read."
+              />
             ) : (
               <Table>
                 <thead>
                   <tr>
                     <th>Period (tom)</th>
-                    <th>Registered</th>
+                    <th>Registrerad</th>
                     <th>Format</th>
-                    <th>dokumentId</th>
+                    <th>Dokument-ID</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {dokumentRows.map((row, idx) => {
-                    const docId = pickDokumentIdFromListRow(row) ?? '';
-                    return (
-                      <tr key={`${docId}-${idx}`}>
-                        <td>{String(row.rapporteringsperiodTom ?? '—')}</td>
-                        <td>{String(row.registreringstidpunkt ?? '—')}</td>
-                        <td>{String(row.filformat ?? '—')}</td>
-                        <td className="font-mono text-xs">{docId || '—'}</td>
-                        <td>
-                          {docId ? (
-                            <Button
-                              variant="primary"
-                              className="min-h-9 px-3 py-1 text-[10px]"
-                              onClick={async () => {
-                                setDownloadMsg(`Downloading ${docId}…`);
-                                try {
-                                  const file = await hvdClient.hvdDownloadDocument(docId);
-                                  const url = URL.createObjectURL(file.blob);
-                                  const a = document.createElement('a');
-                                  a.href = url;
-                                  a.download = file.fileName;
-                                  a.click();
-                                  URL.revokeObjectURL(url);
-                                  setDownloadMsg(`Saved: ${file.fileName}`);
-                                } catch (e) {
-                                  setDownloadMsg(e instanceof Error ? e.message : 'Download failed');
-                                }
-                              }}
-                            >
-                              Download
-                            </Button>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {serving.documents.map((row) => (
+                    <tr key={row.dokumentId}>
+                      <td className="text-sm">{formatDateOnly(row.rapporteringsperiodTom)}</td>
+                      <td className="text-sm">{formatDateOnly(row.registreringstidpunkt)}</td>
+                      <td className="text-sm">{displayValue(row.filformat)}</td>
+                      <td className="font-mono text-xs">{row.dokumentId}</td>
+                      <td>
+                        <Button
+                          variant="primary"
+                          className="min-h-9 px-3 py-1 text-[10px]"
+                          onClick={async () => {
+                            const docId = row.dokumentId?.trim();
+                            if (!docId) return;
+                            setDownloadMsg(`Downloading ${docId}…`);
+                            try {
+                              const file = await hvdClient.hvdDownloadDocument(docId);
+                              const url = URL.createObjectURL(file.blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = file.fileName;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                              setDownloadMsg(`Saved: ${file.fileName}`);
+                            } catch (e) {
+                              setDownloadMsg(e instanceof Error ? e.message : 'Download failed');
+                            }
+                          }}
+                        >
+                          Download
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </Table>
             )}
-            {downloadMsg ? <p className="mt-4 font-mono text-xs text-muted-foreground">{downloadMsg}</p> : null}
+            {downloadMsg ? <p className="mt-4 text-sm text-muted-foreground">{downloadMsg}</p> : null}
           </Panel>
         </div>
       ) : null}
 
       {tab === 'fiReports' ? (
-        <Panel title="POST /bolagsverket/fi/finansiella-rapporter" badge={fiFinancial.ok ? 'ok' : 'error'}>
-          {fiFinancial.error ? <ErrorState title="FI finansiella-rapporter failed" message={fiFinancial.error} /> : null}
-          {fiFinancial.data ? (
-            <pre className="overflow-x-auto border-2 border-foreground p-4 font-mono text-xs">{JSON.stringify(fiFinancial.data, null, 2)}</pre>
+        <Panel title="FI finansiella rapporter (read model)" badge="bv_read.company_fi_reports_current">
+          {serving.reports.length === 0 ? (
+            <EmptyStatePro title="No rows" message="Parsed FI financial reports will appear here." />
           ) : (
-            !fiFinancial.error && <p className="text-sm text-muted-foreground">No data.</p>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Typ</th>
+                  <th>Period</th>
+                  <th>Ankom / registrerad</th>
+                  <th>Koncern</th>
+                  <th>Utdelning</th>
+                </tr>
+              </thead>
+              <tbody>
+                {serving.reports.map((r) => (
+                  <tr key={r.reportId}>
+                    <td className="text-sm">{displayValue(r.rapporttypKlartext ?? r.rapporttypKod)}</td>
+                    <td className="text-sm">
+                      {formatDateOnly(r.periodFrom)} – {formatDateOnly(r.periodTom)}
+                    </td>
+                    <td className="text-sm">
+                      {formatDateOnly(r.ankomDatum)} / {formatDateOnly(r.registreradDatum)}
+                    </td>
+                    <td className="text-sm">
+                      {r.innehallerKoncernredovisning === null ? '—' : r.innehallerKoncernredovisning ? 'Ja' : 'Nej'}
+                    </td>
+                    <td className="text-sm tabular-nums">
+                      {formatMoneyAmount(r.vinstutdelningBelopp, r.vinstutdelningValutaKod)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
           )}
         </Panel>
       ) : null}
 
       {tab === 'cases' ? (
-        <Panel title="POST /bolagsverket/fi/arenden" badge={fiCases.ok ? 'ok' : 'error'}>
-          {fiCases.error ? <ErrorState title="FI ärenden failed" message={fiCases.error} /> : null}
-          {fiCases.data ? (
-            <pre className="overflow-x-auto border-2 border-foreground p-4 font-mono text-xs">{JSON.stringify(fiCases.data, null, 2)}</pre>
-          ) : null}
+        <Panel title="FI ärenden (read model)" badge="bv_read.company_fi_cases_current">
+          {serving.cases.length === 0 ? (
+            <EmptyStatePro title="No cases" message="Ärenden from the organisation snapshot and financial-report blocks are merged in the serving layer." />
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <th>Ärendenummer</th>
+                  <th>Avslutat</th>
+                  <th>Typ</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {serving.cases.map((c) => (
+                  <tr key={`${c.arendeRank}-${c.arendenummer ?? ''}`}>
+                    <td className="font-mono text-xs">{displayValue(c.arendenummer)}</td>
+                    <td className="text-sm">{formatDateOnly(c.avslutatTidpunkt)}</td>
+                    <td className="text-sm">{displayValue(c.arendetyp)}</td>
+                    <td className="text-sm">{displayValue(c.status)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
         </Panel>
       ) : null}
 
       {tab === 'capital' ? (
-        <Panel title="POST /bolagsverket/fi/aktiekapitalforandringar" badge={fiCapital.ok ? 'ok' : 'error'}>
-          {fiCapital.error ? <ErrorState title="FI aktiekapital failed" message={fiCapital.error} /> : null}
-          {fiCapital.data ? (
-            <pre className="overflow-x-auto border-2 border-foreground p-4 font-mono text-xs">{JSON.stringify(fiCapital.data, null, 2)}</pre>
-          ) : null}
+        <Panel title="FI aktiekapital (read model)" badge="bv_read.company_share_capital_current">
+          {!serving.shareCapital ? (
+            <EmptyStatePro title="No share-capital row" message="Aktieinformation from the latest FI organisation snapshot is surfaced here." />
+          ) : (
+            <div className="space-y-6">
+              <StatGrid
+                stats={[
+                  { label: 'Aktiekapital', value: formatMoneyAmount(serving.shareCapital.aktiekapitalBelopp, serving.shareCapital.aktiekapitalValuta) },
+                  { label: 'Antal aktier', value: displayValue(serving.shareCapital.antalAktier) },
+                  {
+                    label: 'Kvotvärde',
+                    value: formatMoneyAmount(serving.shareCapital.kvotvardeBelopp, serving.shareCapital.kvotvardeValuta),
+                  },
+                ]}
+              />
+              <SectionCard title="Gränser (aktiekapital / antal aktier)">
+                <FieldGridPro
+                  rows={[
+                    { label: 'Aktiekapital min / max', value: `${displayValue(serving.shareCapital.aktiekapitalGransLagst)} / ${displayValue(serving.shareCapital.aktiekapitalGransHogst)}` },
+                    { label: 'Antal aktier min / max', value: `${displayValue(serving.shareCapital.antalAktierGransLagst)} / ${displayValue(serving.shareCapital.antalAktierGransHogst)}` },
+                    { label: 'Valuta (gränser)', value: displayValue(serving.shareCapital.aktiegranserValuta) },
+                  ]}
+                />
+              </SectionCard>
+            </div>
+          )}
         </Panel>
       ) : null}
 
       {tab === 'engagements' ? (
-        <Panel title="POST /bolagsverket/fi/organisationsengagemang" badge={fiEngagements.ok ? 'ok' : 'error'}>
-          {fiEngagements.error ? <ErrorState title="FI engagemang failed" message={fiEngagements.error} /> : null}
-          {fiEngagements.data ? (
-            <pre className="overflow-x-auto border-2 border-foreground p-4 font-mono text-xs">{JSON.stringify(fiEngagements.data, null, 2)}</pre>
-          ) : null}
+        <Panel title="FI engagemang (read model)" badge="bv_read.company_engagements_current">
+          {serving.engagements.length === 0 ? (
+            <EmptyStatePro
+              title="No engagements"
+              message="When FI organisation payloads include organisationsengagemang, rows are extracted into the serving table."
+            />
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <th>Relaterad organisation</th>
+                  <th>Org.nr</th>
+                  <th>Roll / typ</th>
+                  <th>Person / namn</th>
+                </tr>
+              </thead>
+              <tbody>
+                {serving.engagements.map((e) => (
+                  <tr key={e.engagementRank}>
+                    <td className="text-sm">{displayValue(e.relatedOrganisationName)}</td>
+                    <td className="font-mono text-xs">{displayValue(e.relatedOrganisationNumber)}</td>
+                    <td className="text-sm">
+                      <StatusChip>{displayValue(e.engagementTypeKlartext ?? e.roleKlartext ?? e.roleKod)}</StatusChip>
+                    </td>
+                    <td className="text-sm">{displayValue(e.personOrOrganisationName)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
         </Panel>
       ) : null}
     </section>

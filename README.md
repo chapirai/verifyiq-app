@@ -121,6 +121,9 @@ All routes are under the `/api/v1` prefix.
 | `GET` | `/api/v1/audit` | yes | Audit log |
 | `GET` | `/api/v1/webhooks/endpoints` | yes | List webhook endpoints |
 | `POST` | `/api/v1/bolagsverket/company` | yes | Swedish company lookup |
+| `POST` | `/api/v1/company-lookups` | yes | Tracked lookup + enqueue parse/refresh (`bv_pipeline`) |
+| `GET` | `/api/v1/company-lookups/:lookupRequestId/status` | yes | Lookup lifecycle status |
+| `GET` | `/api/v1/company-serving/:organisationNumber/overview` | yes | Row from `bv_read.company_overview_current` (and sibling paths for officers, reports, documents, etc.) |
 
 > **Note:** `GET /api/v1` is the health check route. Previously, visiting this URL returned a
 > `404 Not Found` error because there was no root handler. This is now fixed — you should
@@ -272,6 +275,17 @@ Set `forceRefresh: true` in the request body to bypass the cache.
 | `GET` | `/api/v1/bolagsverket/stored-documents?orgNr=…` | List MinIO-stored documents for an org |
 | `GET` | `/api/v1/bolagsverket/stored-documents/:id/download` | Pre-signed 15-minute download URL |
 
+### Queue-driven read pipeline (`bv_pipeline` / `bv_read`)
+
+Raw Bolagsverket payloads land in `public.bv_raw_payloads`. Parsing is **not** trigger-driven: the backend enqueues jobs (`bv_pipeline.enqueue_raw_payload_for_parse`) and workers run `CALL bv_pipeline.process_parse_queue(batch, worker)` then `CALL bv_pipeline.process_refresh_queue(batch, worker)` (also on a 15s Nest interval, configurable with `BV_PIPELINE_WORKER_ENABLED`).
+
+- **Parsed history:** `bv_parsed.*` (+ `v_*_latest` views).
+- **Serving tables (physical):** `bv_read.company_overview_current`, `company_officers_current`, `company_fi_reports_current`, `company_hvd_documents_current`, `company_fi_cases_current`, `company_share_capital_current`, `company_engagements_current`.
+- **Lookup tracking:** `POST /api/v1/company-lookups` creates `bv_pipeline.lookup_requests`, runs orchestrated lookup, enqueues parse, drains queues, returns `lookupRequestId`; `GET /api/v1/company-lookups/:id/status` reads status.
+- **Read API (JWT tenant):** `GET /api/v1/company-serving/:organisationNumber/{overview|officers|financial-reports|documents|fi-cases|share-capital|engagements}` returns structured JSON from those tables.
+
+Migration: `1000000000028-BvPipelineQueueServingTables` (replaces former `bv_read` views from `1000000000027`).
+
 #### HVD annual reports: app URL vs Bolagsverket URL
 
 The browser calls **your API** (JWT). The backend then calls **Bolagsverket** with HVD OAuth. These pairs are equivalent (default `BV_HVD_BASE_URL` = `https://gw.api.bolagsverket.se/vardefulla-datamangder/v1`):
@@ -318,6 +332,7 @@ Important: the Bolagsverket resource is **`…/v1/dokument/{dokumentId}`** (the 
 | `BV_FORETAGSINFO_AUTH_TOKEN` / `BV_FORETAGSINFO_TOKEN` | Backward-compatible aliases for `BV_FORETAGSINFO_BEARER_TOKEN` |
 | `BV_FORETAGSINFO_AUTH_HEADER` | Custom header name (default: `Authorization`) |
 | `BV_FORETAGSINFO_AUTH_VALUE` | Full auth header value override (use instead of bearer token) |
+| `BV_PIPELINE_WORKER_ENABLED` | `true` (default) to run the parse/refresh queue drain interval in the API process |
 | `BULLMQ_SKIP_REDIS_VERSION_CHECK` | Set `true` only in local/dev if Redis is older than 5.0 |
 | `MINIO_ENDPOINT` | MinIO hostname (default: `localhost`) |
 | `MINIO_PORT` | MinIO port (default: `9000`) |
