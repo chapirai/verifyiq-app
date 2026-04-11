@@ -58,6 +58,8 @@ services:
     build:
       context: .
       dockerfile: ./backend/Dockerfile
+      args:
+        SRC_PREFIX: backend/
     container_name: verifyiq-backend
     restart: unless-stopped
     env_file:
