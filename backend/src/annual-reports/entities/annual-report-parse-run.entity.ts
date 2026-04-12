@@ -8,11 +8,14 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { AnnualReportFileEntity } from './annual-report-file.entity';
+import { AnnualReportImportEntity } from './annual-report-import.entity';
+import { AnnualReportSourceFileEntity } from './annual-report-source-file.entity';
 
 export type AnnualReportParseRunStatus = 'running' | 'completed' | 'failed';
 
 @Entity({ name: 'annual_report_parse_runs' })
 @Index(['fileId', 'startedAt'])
+@Index(['annualReportImportId'])
 export class AnnualReportParseRunEntity {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id!: string;
@@ -53,4 +56,21 @@ export class AnnualReportParseRunEntity {
 
   @Column({ name: 'raw_model_summary', type: 'jsonb', default: () => "'{}'::jsonb" })
   rawModelSummary!: Record<string, unknown>;
+
+  @Column({ name: 'annual_report_import_id', type: 'uuid', nullable: true })
+  annualReportImportId?: string | null;
+
+  @ManyToOne(() => AnnualReportImportEntity, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'annual_report_import_id' })
+  annualReportImport?: AnnualReportImportEntity | null;
+
+  @Column({ name: 'source_file_id', type: 'uuid', nullable: true })
+  sourceFileId?: string | null;
+
+  @ManyToOne(() => AnnualReportSourceFileEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'source_file_id' })
+  sourceFile?: AnnualReportSourceFileEntity | null;
+
+  @Column({ name: 'document_type', type: 'varchar', length: 32, nullable: true })
+  documentType?: string | null;
 }

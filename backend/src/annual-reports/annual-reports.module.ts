@@ -19,12 +19,22 @@ import { CompanyAnnualReportFinancialEntity } from './entities/company-annual-re
 import { CompanyAnnualReportHeaderEntity } from './entities/company-annual-report-header.entity';
 import { CompanyAnnualReportNotesIndexEntity } from './entities/company-annual-report-notes-index.entity';
 import { CompanyAnnualReportPeriodEntity } from './entities/company-annual-report-period.entity';
+import { AnnualReportImportEntity } from './entities/annual-report-import.entity';
+import { AnnualReportMappedValueEntity } from './entities/annual-report-mapped-value.entity';
+import { AnnualReportSectionEntity } from './entities/annual-report-section.entity';
+import { AnnualReportSourceFileEntity } from './entities/annual-report-source-file.entity';
+import { AnnualReportSummaryEntity } from './entities/annual-report-summary.entity';
 import { AnnualReportParseProcessor } from './processors/annual-report-parse.processor';
 import { ANNUAL_REPORT_PARSE_QUEUE } from './queues/annual-report-parse.queue';
 import { AnnualReportArelleService } from './services/annual-report-arelle.service';
+import { AnnualReportMappedSummaryService } from './services/annual-report-mapped-summary.service';
 import { AnnualReportNormalizeService } from './services/annual-report-normalize.service';
 import { AnnualReportPipelineService } from './services/annual-report-pipeline.service';
+import { AnnualReportPrimaryContextService } from './services/annual-report-primary-context.service';
+import { AnnualReportSectionExtractorService } from './services/annual-report-section-extractor.service';
 import { AnnualReportsService } from './services/annual-reports.service';
+import { AnnualReportXhtmlClassifierService } from './services/annual-report-xhtml-classifier.service';
+import { AnnualReportWorkspaceReadModelService } from './services/annual-report-workspace-read-model.service';
 import { AnnualReportZipService } from './services/annual-report-zip.service';
 
 const annualReportEntities = [
@@ -32,6 +42,11 @@ const annualReportEntities = [
   AnnualReportFileEntryEntity,
   AnnualReportParseRunEntity,
   AnnualReportParseErrorEntity,
+  AnnualReportImportEntity,
+  AnnualReportSourceFileEntity,
+  AnnualReportSectionEntity,
+  AnnualReportMappedValueEntity,
+  AnnualReportSummaryEntity,
   AnnualReportXbrlContextEntity,
   AnnualReportXbrlUnitEntity,
   AnnualReportXbrlFactEntity,
@@ -56,7 +71,12 @@ const annualReportEntities = [
   providers: [
     AnnualReportZipService,
     AnnualReportArelleService,
+    AnnualReportPrimaryContextService,
+    AnnualReportXhtmlClassifierService,
+    AnnualReportSectionExtractorService,
     AnnualReportNormalizeService,
+    AnnualReportMappedSummaryService,
+    AnnualReportWorkspaceReadModelService,
     AnnualReportPipelineService,
     AnnualReportsService,
     AnnualReportParseProcessor,

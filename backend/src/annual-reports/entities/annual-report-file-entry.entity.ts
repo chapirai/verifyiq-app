@@ -37,6 +37,9 @@ export class AnnualReportFileEntryEntity {
   @Column({ name: 'is_candidate_ixbrl', type: 'boolean', default: false })
   isCandidateIxbrl!: boolean;
 
+  @Column({ name: 'source_file_id', type: 'uuid', nullable: true })
+  sourceFileId?: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 }

@@ -132,6 +132,16 @@ export class AnnualReportsController {
     return { organisationNumber: org, ...data };
   }
 
+  /** Dashboard/workspace read model: import, source files, statements, audit, capped raw facts. */
+  @Get('companies/:organisationNumber/workspace-read-model')
+  async workspaceReadModel(
+    @TenantId() tenantId: string,
+    @Param('organisationNumber') organisationNumber: string,
+  ) {
+    const org = normalizeOrgParam(organisationNumber);
+    return this.annualReports.getWorkspaceReadModel(tenantId, org);
+  }
+
   /** Latest N distinct fiscal years (by filing period end), pivoted canonical metrics. */
   @Get('companies/:organisationNumber/financial-comparison')
   async financialComparison(

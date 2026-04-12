@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { AnnualReportFileEntity } from './annual-report-file.entity';
 import { AnnualReportParseRunEntity } from './annual-report-parse-run.entity';
+import { AnnualReportImportEntity } from './annual-report-import.entity';
 
 @Entity({ name: 'company_annual_report_headers' })
 @Index(['tenantId', 'organisationsnummer', 'extractedAt'])
@@ -86,4 +87,20 @@ export class CompanyAnnualReportHeaderEntity {
 
   @Column({ name: 'metadata', type: 'jsonb', default: () => "'{}'::jsonb" })
   metadata!: Record<string, unknown>;
+
+  @Column({ name: 'annual_report_import_id', type: 'uuid', nullable: true })
+  annualReportImportId?: string | null;
+
+  @ManyToOne(() => AnnualReportImportEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'annual_report_import_id' })
+  annualReportImport?: AnnualReportImportEntity | null;
+
+  @Column({ name: 'primary_context_id', type: 'varchar', length: 512, nullable: true })
+  primaryContextId?: string | null;
+
+  @Column({ name: 'primary_source_file_id', type: 'uuid', nullable: true })
+  primarySourceFileId?: string | null;
+
+  @Column({ name: 'fiscal_year', type: 'int', nullable: true })
+  fiscalYear?: number | null;
 }

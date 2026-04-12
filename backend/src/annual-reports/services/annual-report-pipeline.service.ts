@@ -1,16 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { Repository } from 'typeorm';
 import { CompanyEntity } from '../../companies/entities/company.entity';
 import { BvDocumentStorageService } from '../../companies/services/bv-document-storage.service';
 import type { ArelleExtractResult } from './annual-report-arelle.service';
 import { AnnualReportArelleService } from './annual-report-arelle.service';
+import { AnnualReportMappedSummaryService } from './annual-report-mapped-summary.service';
 import { AnnualReportNormalizeService } from './annual-report-normalize.service';
+import { AnnualReportSectionExtractorService } from './annual-report-section-extractor.service';
+import { AnnualReportXhtmlClassifierService } from './annual-report-xhtml-classifier.service';
 import { AnnualReportZipError, AnnualReportZipService } from './annual-report-zip.service';
 import { AnnualReportFileEntity } from '../entities/annual-report-file.entity';
 import { AnnualReportFileEntryEntity } from '../entities/annual-report-file-entry.entity';
+import { AnnualReportImportEntity } from '../entities/annual-report-import.entity';
 import { AnnualReportParseErrorEntity } from '../entities/annual-report-parse-error.entity';
 import { AnnualReportParseRunEntity } from '../entities/annual-report-parse-run.entity';
+import { AnnualReportSectionEntity } from '../entities/annual-report-section.entity';
+import type { AnnualReportDocumentType } from '../entities/annual-report-source-file.entity';
+import { AnnualReportSourceFileEntity } from '../entities/annual-report-source-file.entity';
 import { AnnualReportXbrlContextEntity } from '../entities/annual-report-xbrl-context.entity';
 import { AnnualReportXbrlDimensionEntity } from '../entities/annual-report-xbrl-dimension.entity';
 import { AnnualReportXbrlFactEntity } from '../entities/annual-report-xbrl-fact.entity';
@@ -39,6 +48,12 @@ export class AnnualReportPipelineService {
     private readonly fileRepo: Repository<AnnualReportFileEntity>,
     @InjectRepository(AnnualReportFileEntryEntity)
     private readonly entryRepo: Repository<AnnualReportFileEntryEntity>,
+    @InjectRepository(AnnualReportImportEntity)
+    private readonly importRepo: Repository<AnnualReportImportEntity>,
+    @InjectRepository(AnnualReportSourceFileEntity)
+    private readonly sourceFileRepo: Repository<AnnualReportSourceFileEntity>,
+    @InjectRepository(AnnualReportSectionEntity)
+    private readonly sectionRepo: Repository<AnnualReportSectionEntity>,
     @InjectRepository(AnnualReportParseRunEntity)
     private readonly parseRunRepo: Repository<AnnualReportParseRunEntity>,
     @InjectRepository(AnnualReportParseErrorEntity)
@@ -60,7 +75,10 @@ export class AnnualReportPipelineService {
     private readonly zipService: AnnualReportZipService,
     private readonly arelle: AnnualReportArelleService,
     private readonly normalize: AnnualReportNormalizeService,
+    private readonly mappedSummary: AnnualReportMappedSummaryService,
     private readonly bvDocs: BvDocumentStorageService,
+    private readonly classifier: AnnualReportXhtmlClassifierService,
+    private readonly sectionExtractor: AnnualReportSectionExtractorService,
   ) {}
 
   async processFileId(
@@ -79,13 +97,10 @@ export class AnnualReportPipelineService {
       return { ok: true, skipped: true };
     }
 
-    await this.fileRepo.update(
-      { id: fileId },
-      { status: 'extracting', updatedAt: new Date() },
-    );
+    await this.fileRepo.update({ id: fileId }, { status: 'extracting', updatedAt: new Date() });
 
     let workDir: string | null = null;
-    let parseRun: AnnualReportParseRunEntity | null = null;
+    let importRow: AnnualReportImportEntity | null = null;
 
     try {
       const buffer = await this.loadZipBuffer(file);
@@ -93,7 +108,7 @@ export class AnnualReportPipelineService {
       workDir = extracted.workDir;
 
       await this.entryRepo.delete({ fileId: file.id });
-      const entries = extracted.manifest.map(m =>
+      const entryEntities = extracted.manifest.map(m =>
         this.entryRepo.create({
           fileId: file.id,
           pathInArchive: m.pathInArchive,
@@ -103,74 +118,227 @@ export class AnnualReportPipelineService {
           isCandidateIxbrl: m.isCandidateIxbrl,
         }),
       );
-      if (entries.length) {
-        await this.entryRepo.save(entries);
-      }
+      const savedEntries =
+        entryEntities.length > 0 ? await this.entryRepo.save(entryEntities) : [];
 
-      const ixPath = this.zipService.pickIxbrlPath(extracted.ixbrlCandidates);
-      if (!ixPath) {
-        throw new AnnualReportZipError('No Inline XBRL / XHTML entry found in archive', 'missing_ixbrl');
-      }
-
-      const ixAbs = this.zipService.resolvePath(workDir, ixPath);
-      const parserVersion = process.env.AR_PARSER_VERSION ?? '1.0.0';
-
-      parseRun = await this.parseRunRepo.save(
-        this.parseRunRepo.create({
-          fileId: file.id,
-          parserName: 'arelle',
-          parserVersion,
-          status: 'running',
-          sourceIxbrlPath: ixPath,
-          rawModelSummary: {},
+      importRow = await this.importRepo.save(
+        this.importRepo.create({
+          tenantId: file.tenantId,
+          companyId: file.companyId ?? null,
+          organisationsnummer: file.organisationsnummer ?? null,
+          annualReportFileId: file.id,
+          sourceZipFilename: file.originalFilename,
+          sourceZipStorageKey: file.storageKey ?? null,
+          importStatus: 'parsing',
+          importedAt: new Date(),
+          validationFlags: {},
         }),
       );
 
-      const arelleOut = await this.arelle.extractIxbrl(ixAbs);
+      const sortedIx = [...extracted.ixbrlCandidates].sort((a, b) => b.score - a.score);
+      const parserVersion = process.env.AR_PARSER_VERSION ?? '2.0.0';
+      let anySuccess = false;
+      let anyFailure = false;
+      let lastParseRunId: string | undefined;
 
-      await this.persistRawModel(parseRun.id, arelleOut);
+      for (let idx = 0; idx < sortedIx.length; idx++) {
+        const cand = sortedIx[idx]!;
+        const abs = this.zipService.resolvePath(workDir, cand.pathInArchive);
+        const xhtml = await fs.readFile(abs, 'utf8');
+        let classification = this.classifier.classifyXhtmlDocument(
+          { pathInArchive: cand.pathInArchive, originalFilename: path.basename(cand.pathInArchive) },
+          xhtml,
+        );
+        let docType: AnnualReportDocumentType = classification.documentType;
+        if (docType === 'unknown' && sortedIx.length === 1) {
+          docType = 'annual_report';
+          classification = {
+            documentType: docType,
+            score: classification.score + 2,
+            reasons: [...classification.reasons, 'fallback_single_ixbrl_package'],
+          };
+        }
 
-      parseRun.status = 'completed';
-      parseRun.completedAt = new Date();
-      parseRun.factCount = arelleOut.facts.length;
-      parseRun.contextCount = arelleOut.contexts.length;
-      parseRun.unitCount = arelleOut.units.length;
-      parseRun.rawModelSummary = {
-        arelleVersion: arelleOut.arelle_version ?? null,
-        labelCount: arelleOut.labels.length,
-      };
-      await this.parseRunRepo.save(parseRun);
+        const entryRow = savedEntries.find(e => e.pathInArchive === cand.pathInArchive);
+
+        const sourceFile = await this.sourceFileRepo.save(
+          this.sourceFileRepo.create({
+            annualReportImportId: importRow.id,
+            annualReportFileId: file.id,
+            fileEntryId: entryRow?.id ?? null,
+            documentType: docType,
+            originalFilename: path.basename(cand.pathInArchive),
+            pathInArchive: cand.pathInArchive,
+            mimeType: 'application/xhtml+xml',
+            classificationScore: classification.score,
+            classificationReasons: classification.reasons,
+            parseStatus: docType === 'unknown' ? 'skipped' : 'pending',
+          }),
+        );
+
+        if (entryRow) {
+          await this.entryRepo.update({ id: entryRow.id }, { sourceFileId: sourceFile.id });
+        }
+
+        const sections = this.sectionExtractor.extractSections(xhtml);
+        if (sections.length) {
+          await this.sectionRepo.save(
+            sections.map(s =>
+              this.sectionRepo.create({
+                sourceFileId: sourceFile.id,
+                sectionOrder: s.sectionOrder,
+                headingText: s.headingText,
+                headingLevel: s.headingLevel,
+                normalizedHeading: s.normalizedHeading,
+                textContent: s.textContent,
+              }),
+            ),
+          );
+        }
+
+        if (docType === 'unknown') {
+          this.logger.log(
+            `Skip Arelle for unknown-classified IXBRL import=${importRow.id} path=${cand.pathInArchive}`,
+          );
+          continue;
+        }
+
+        await this.sourceFileRepo.update({ id: sourceFile.id }, { parseStatus: 'running' });
+
+        const parseRun = await this.parseRunRepo.save(
+          this.parseRunRepo.create({
+            fileId: file.id,
+            annualReportImportId: importRow.id,
+            sourceFileId: sourceFile.id,
+            documentType: docType,
+            parserName: 'arelle',
+            parserVersion,
+            status: 'running',
+            sourceIxbrlPath: cand.pathInArchive,
+            rawModelSummary: {},
+          }),
+        );
+        lastParseRunId = parseRun.id;
+
+        try {
+          const arelleOut = await this.arelle.extractIxbrl(abs);
+          await this.persistRawModel(parseRun.id, arelleOut, {
+            sourceFileId: sourceFile.id,
+            documentType: docType,
+          });
+
+          parseRun.status = 'completed';
+          parseRun.completedAt = new Date();
+          parseRun.factCount = arelleOut.facts.length;
+          parseRun.contextCount = arelleOut.contexts.length;
+          parseRun.unitCount = arelleOut.units.length;
+          parseRun.rawModelSummary = {
+            arelleVersion: arelleOut.arelle_version ?? null,
+            labelCount: arelleOut.labels.length,
+            documentType: docType,
+          };
+          await this.parseRunRepo.save(parseRun);
+          anySuccess = true;
+
+          await this.sourceFileRepo.update(
+            { id: sourceFile.id },
+            { parseStatus: 'completed', parseError: null },
+          );
+        } catch (pe) {
+          const msg = pe instanceof Error ? pe.message : String(pe);
+          anyFailure = true;
+          parseRun.status = 'failed';
+          parseRun.completedAt = new Date();
+          await this.parseRunRepo.save(parseRun);
+          await this.sourceFileRepo.update({ id: sourceFile.id }, { parseStatus: 'failed', parseError: msg });
+          await this.errRepo.save(
+            this.errRepo.create({
+              parseRunId: parseRun.id,
+              fileId: file.id,
+              phase: 'arelle',
+              code: 'parse_error',
+              message: msg,
+              detail: { path: cand.pathInArchive, documentType: docType },
+            }),
+          );
+          this.logger.warn(`Parse failed for ${cand.pathInArchive}: ${msg}`);
+        }
+      }
+
+      if (!anySuccess) {
+        throw new AnnualReportZipError('No Inline XBRL document could be parsed successfully', 'all_sources_failed');
+      }
 
       await this.fileRepo.update(
         { id: file.id },
-        { ixbrlEntryPath: ixPath, status: 'extracted', updatedAt: new Date() },
+        {
+          ixbrlEntryPath: sortedIx[0]?.pathInArchive ?? null,
+          status: 'extracted',
+          updatedAt: new Date(),
+        },
       );
 
-      const savedHeader = await this.normalize.normalizeServingData({
+      const savedHeader = await this.normalize.normalizeServingFromZipImport({
         tenantId: file.tenantId,
-        file: await this.fileRepo.findOneOrFail({ where: { id: file.id } }),
-        parseRun: await this.parseRunRepo.findOneOrFail({ where: { id: parseRun.id } }),
-        sourceFilename: ixPath,
+        file,
+        importId: importRow.id,
+      });
+
+      const primaryAnnual = await this.parseRunRepo
+        .createQueryBuilder('r')
+        .where('r.annual_report_import_id = :i', { i: importRow.id })
+        .andWhere('r.status = :s', { s: 'completed' })
+        .andWhere('(r.document_type IS NULL OR r.document_type <> :aud)', { aud: 'audit_report' })
+        .orderBy('r.fact_count', 'DESC')
+        .addOrderBy('r.started_at', 'DESC')
+        .getOne();
+
+      const primarySourceId = primaryAnnual?.sourceFileId ?? savedHeader.primarySourceFileId ?? null;
+      const primaryContextId = savedHeader.primaryContextId ?? null;
+
+      await this.importRepo.update(
+        { id: importRow.id },
+        {
+          importStatus: anyFailure ? 'partial' : 'completed',
+          periodStart: savedHeader.filingPeriodStart ?? null,
+          periodEnd: savedHeader.filingPeriodEnd ?? null,
+          fiscalYear: savedHeader.fiscalYear ?? null,
+          primarySourceFileId: primarySourceId,
+          primaryContextId,
+          primaryParseRunId: primaryAnnual?.id ?? null,
+          updatedAt: new Date(),
+        },
+      );
+
+      await this.mappedSummary.rebuildMappedAndSummary({
+        annualReportImportId: importRow.id,
+        tenantId: file.tenantId,
+        orgNumber: savedHeader.organisationsnummer ?? savedHeader.organisationNumberFiling ?? null,
+        fiscalYear: savedHeader.fiscalYear ?? null,
+        documentTypeForFinancial: 'annual_report',
+        headerId: savedHeader.id,
+        primaryParseRunId: primaryAnnual?.id ?? null,
+        primarySourceFileId: primarySourceId,
       });
 
       await this.linkCompanyRecord(file.tenantId, file.id, savedHeader.id);
-
       await this.fileRepo.update({ id: file.id }, { status: 'normalized', updatedAt: new Date() });
 
-      return { ok: true, parseRunId: String(parseRun.id) };
+      return { ok: true, parseRunId: lastParseRunId };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       this.logger.warn(`Annual report pipeline failed file=${fileId}: ${message}`);
 
-      if (parseRun) {
-        parseRun.status = 'failed';
-        parseRun.completedAt = new Date();
-        await this.parseRunRepo.save(parseRun);
+      if (importRow) {
+        await this.importRepo.update(
+          { id: importRow.id },
+          { importStatus: 'failed', errorMessage: message, updatedAt: new Date() },
+        );
       }
 
       await this.errRepo.save(
         this.errRepo.create({
-          parseRunId: parseRun?.id ?? null,
+          parseRunId: null,
           fileId: file.id,
           phase: 'pipeline',
           code: e instanceof AnnualReportZipError ? e.code : 'pipeline_error',
@@ -195,7 +363,11 @@ export class AnnualReportPipelineService {
     throw new Error('annual_report_file_missing_storage');
   }
 
-  private async persistRawModel(parseRunId: string, data: ArelleExtractResult): Promise<void> {
+  private async persistRawModel(
+    parseRunId: string,
+    data: ArelleExtractResult,
+    opts: { sourceFileId: string; documentType: string },
+  ): Promise<void> {
     const ctxRows = data.contexts.map(c =>
       this.ctxRepo.create({
         parseRunId,
@@ -236,6 +408,8 @@ export class AnnualReportPipelineService {
           precisionValue: f.precision_value ?? null,
           isNil: f.is_nil === true,
           footnotes: f.footnotes ?? [],
+          sourceFileId: opts.sourceFileId,
+          documentType: opts.documentType,
           rawJson: {
             ...(f.raw_json ?? {}),
             dimensions: f.dimensions ?? undefined,

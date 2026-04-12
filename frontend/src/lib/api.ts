@@ -12,6 +12,7 @@ import type {
 } from '@/types/company-serving';
 import type {
   AnnualReportFinancialComparison,
+  AnnualReportWorkspaceReadModel,
   CompanyAnnualReportHeader,
   IngestHvdAnnualReportResult,
 } from '@/types/annual-reports';
@@ -230,6 +231,11 @@ export const api = {
   async getAnnualReportHistory(orgNumber: string) {
     return request<{ organisationNumber: string; headers: CompanyAnnualReportHeader[] }>(
       `/annual-reports/companies/${encodeURIComponent(orgNumber)}/history`,
+    );
+  },
+  async getAnnualReportWorkspaceReadModel(orgNumber: string) {
+    return request<AnnualReportWorkspaceReadModel>(
+      `/annual-reports/companies/${encodeURIComponent(orgNumber)}/workspace-read-model`,
     );
   },
   async createCompanyLookup(payload: { identitetsbeteckning: string; force_refresh?: boolean }) {

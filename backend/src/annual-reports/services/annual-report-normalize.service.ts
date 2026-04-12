@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { matchConceptToRule } from '../config/canonical-xbrl-matching';
 import {
   AUDITOR_RULES,
@@ -23,6 +23,7 @@ import { CompanyAnnualReportHeaderEntity } from '../entities/company-annual-repo
 import { CompanyAnnualReportNotesIndexEntity } from '../entities/company-annual-report-notes-index.entity';
 import { CompanyAnnualReportPeriodEntity } from '../entities/company-annual-report-period.entity';
 import type { AnnualReportPeriodKind } from '../entities/company-annual-report-financial.entity';
+import { AnnualReportPrimaryContextService } from './annual-report-primary-context.service';
 
 type PeriodEndMap = Map<string, { end?: Date | null; start?: Date | null; instant?: Date | null }>;
 
@@ -47,7 +48,24 @@ export class AnnualReportNormalizeService {
     private readonly periodRepo: Repository<CompanyAnnualReportPeriodEntity>,
     @InjectRepository(AnnualReportParseRunEntity)
     private readonly parseRunRepo: Repository<AnnualReportParseRunEntity>,
+    private readonly primaryContext: AnnualReportPrimaryContextService,
   ) {}
+
+  private ctxMapKey(parseRunId: string, contextRef: string | null | undefined): string {
+    return `${parseRunId}::${contextRef ?? ''}`;
+  }
+
+  private buildCompositeCtxMap(contexts: AnnualReportXbrlContextEntity[]): PeriodEndMap {
+    const m: PeriodEndMap = new Map();
+    for (const c of contexts) {
+      m.set(this.ctxMapKey(c.parseRunId, c.xbrlContextId), {
+        end: c.periodEnd ?? null,
+        start: c.periodStart ?? null,
+        instant: c.periodInstant ?? null,
+      });
+    }
+    return m;
+  }
 
   /**
    * Build serving rows from persisted raw XBRL for a completed parse run.
@@ -65,14 +83,7 @@ export class AnnualReportNormalizeService {
     const facts = await this.factRepo.find({ where: { parseRunId } });
     const units = await this.unitRepo.find({ where: { parseRunId } });
 
-    const ctxById: PeriodEndMap = new Map();
-    for (const c of contexts) {
-      ctxById.set(c.xbrlContextId, {
-        end: c.periodEnd ?? null,
-        start: c.periodStart ?? null,
-        instant: c.periodInstant ?? null,
-      });
-    }
+    const ctxById = this.buildCompositeCtxMap(contexts);
 
     const { currentEnd, priorEnd } = this.inferReportingEnds(contexts);
     const currencyCode = this.inferCurrency(units);
@@ -197,12 +208,12 @@ export class AnnualReportNormalizeService {
 
   private periodKindForFact(
     ctxById: PeriodEndMap,
-    contextRef: string | null | undefined,
+    fact: AnnualReportXbrlFactEntity,
     currentEnd: Date | null,
     priorEnd: Date | null,
   ): AnnualReportPeriodKind {
-    if (!contextRef) return 'unknown';
-    const c = ctxById.get(contextRef);
+    const key = this.ctxMapKey(fact.parseRunId, fact.contextRef);
+    const c = ctxById.get(key);
     if (!c) return 'unknown';
     if (c.instant && currentEnd && c.instant.getTime() === currentEnd.getTime()) return 'instant';
     if (c.end && currentEnd && c.end.getTime() === currentEnd.getTime()) return 'current';
@@ -244,7 +255,7 @@ export class AnnualReportNormalizeService {
     for (const f of facts) {
       const rule = this.matchRule(f.conceptQname, FINANCIAL_RULES);
       if (!rule) continue;
-      const periodKind = this.periodKindForFact(ctxById, f.contextRef, currentEnd, priorEnd);
+      const periodKind = this.periodKindForFact(ctxById, f, currentEnd, priorEnd);
       if (periodKind === 'unknown' && !f.isNil) {
         /* still allow unknown bucket for comparative edge cases */
       }
@@ -294,7 +305,7 @@ export class AnnualReportNormalizeService {
       for (const f of facts) {
         const rule = this.matchRule(f.conceptQname, rules);
         if (!rule) continue;
-        const pk = this.periodKindForFact(ctxById, f.contextRef, currentEnd, priorEnd);
+        const pk = this.periodKindForFact(ctxById, f, currentEnd, priorEnd);
         const sc = this.scoreFact(rule, f, pk);
         if (!best || sc > best.score) best = { f, score: sc };
       }
@@ -429,5 +440,169 @@ export class AnnualReportNormalizeService {
       parseRun,
       sourceFilename: parseRun.sourceIxbrlPath ?? null,
     });
+  }
+
+  /**
+   * Build serving rows from all completed parse runs for one ZIP import (annual + audit separated).
+   */
+  async normalizeServingFromZipImport(params: {
+    tenantId: string;
+    file: AnnualReportFileEntity;
+    importId: string;
+  }): Promise<CompanyAnnualReportHeaderEntity> {
+    const { tenantId, file, importId } = params;
+
+    const runs = await this.parseRunRepo.find({
+      where: { annualReportImportId: importId, status: 'completed' },
+      order: { factCount: 'DESC', startedAt: 'DESC' },
+    });
+    if (!runs.length) {
+      throw new Error('no_completed_parse_runs_for_import');
+    }
+
+    const auditRunIds = runs.filter(r => r.documentType === 'audit_report').map(r => r.id);
+    const annualRuns = runs.filter(r => r.documentType !== 'audit_report');
+    const annualRunIds = annualRuns.map(r => r.id);
+
+    if (!annualRunIds.length) {
+      const ar = runs[0]!;
+      const contexts = await this.ctxRepo.find({ where: { parseRunId: ar.id } });
+      const facts = await this.factRepo.find({ where: { parseRunId: ar.id } });
+      const units = await this.unitRepo.find({ where: { parseRunId: ar.id } });
+      const ctxById = this.buildCompositeCtxMap(contexts);
+      const { currentEnd, priorEnd } = this.inferReportingEnds(contexts);
+      const currencyCode = this.inferCurrency(units);
+      const primaryPick = this.primaryContext.selectPrimaryDurationContext(contexts, facts);
+      const filingEnd = primaryPick.periodEnd ?? currentEnd;
+      const filingStart = primaryPick.periodStart ?? (filingEnd ? this.findPeriodStartForEnd(contexts, filingEnd) : null);
+      const fiscalYear =
+        primaryPick.fiscalYear ?? (filingEnd ? filingEnd.getUTCFullYear() : null);
+
+      const orgFromFacts = this.pickHeaderText(facts, HEADER_ORG_RULES);
+      const nameFromFacts = this.pickHeaderText(facts, HEADER_NAME_RULES);
+      const orgNorm = this.normalizeOrgNumber(orgFromFacts ?? file.organisationsnummer ?? undefined);
+
+      const header = this.headerRepo.create({
+        tenantId,
+        companyId: file.companyId ?? null,
+        organisationsnummer: orgNorm ?? file.organisationsnummer ?? null,
+        annualReportFileId: file.id,
+        parseRunId: ar.id,
+        annualReportImportId: importId,
+        companyNameFromFiling: nameFromFacts,
+        organisationNumberFiling: orgNorm,
+        filingPeriodStart: filingStart,
+        filingPeriodEnd: filingEnd,
+        fiscalYear,
+        currencyCode,
+        sourceFilename: ar.sourceIxbrlPath ?? file.originalFilename,
+        parserName: ar.parserName,
+        parserVersion: ar.parserVersion,
+        primaryContextId: primaryPick.primaryContextId,
+        primarySourceFileId: ar.sourceFileId ?? null,
+        metadata: {
+          importId,
+          auditOnlyImport: true,
+          factCount: facts.length,
+          contextCount: contexts.length,
+          unitCount: units.length,
+          primaryContext: primaryPick,
+        },
+      });
+      const savedHeader = await this.headerRepo.save(header);
+
+      await this.replaceFinancials(savedHeader.id, [], ctxById, currentEnd, priorEnd);
+      const auditEnds = this.inferReportingEnds(contexts);
+      await this.replaceAuditor(
+        savedHeader.id,
+        facts,
+        ctxById,
+        auditEnds.currentEnd ?? currentEnd,
+        auditEnds.priorEnd ?? priorEnd,
+      );
+      await this.replaceNotes(savedHeader.id, []);
+      await this.replacePeriods(savedHeader.id, contexts, currentEnd, priorEnd);
+      await this.supersedeOlderHeaders(file.id, savedHeader.id);
+      return savedHeader;
+    }
+
+    const annualFacts = await this.factRepo.find({ where: { parseRunId: In(annualRunIds) } });
+    const annualContexts = await this.ctxRepo.find({ where: { parseRunId: In(annualRunIds) } });
+    const annualUnits = await this.unitRepo.find({ where: { parseRunId: In(annualRunIds) } });
+    const auditFacts =
+      auditRunIds.length > 0
+        ? await this.factRepo.find({ where: { parseRunId: In(auditRunIds) } })
+        : [];
+    const auditContexts =
+      auditRunIds.length > 0
+        ? await this.ctxRepo.find({ where: { parseRunId: In(auditRunIds) } })
+        : [];
+
+    const ctxByAnnual = this.buildCompositeCtxMap(annualContexts);
+    const ctxByAudit = this.buildCompositeCtxMap(auditContexts);
+
+    const primaryAnnualRun =
+      annualRuns.find(r => r.documentType === 'annual_report') ?? annualRuns[0]!;
+    const primaryContexts = await this.ctxRepo.find({
+      where: { parseRunId: primaryAnnualRun.id },
+    });
+    const primaryFacts = annualFacts.filter(f => String(f.parseRunId) === String(primaryAnnualRun.id));
+    const primaryPick = this.primaryContext.selectPrimaryDurationContext(primaryContexts, primaryFacts);
+
+    const { currentEnd, priorEnd } = this.inferReportingEnds(annualContexts);
+    const filingEnd = primaryPick.periodEnd ?? currentEnd;
+    const filingStart =
+      primaryPick.periodStart ?? (filingEnd ? this.findPeriodStartForEnd(annualContexts, filingEnd) : null);
+    const fiscalYear =
+      primaryPick.fiscalYear ?? (filingEnd ? filingEnd.getUTCFullYear() : null);
+
+    const currencyCode = this.inferCurrency(annualUnits);
+    const orgFromFacts = this.pickHeaderText(annualFacts, HEADER_ORG_RULES);
+    const nameFromFacts = this.pickHeaderText(annualFacts, HEADER_NAME_RULES);
+    const orgNorm = this.normalizeOrgNumber(orgFromFacts ?? file.organisationsnummer ?? undefined);
+
+    const header = this.headerRepo.create({
+      tenantId,
+      companyId: file.companyId ?? null,
+      organisationsnummer: orgNorm ?? file.organisationsnummer ?? null,
+      annualReportFileId: file.id,
+      parseRunId: primaryAnnualRun.id,
+      annualReportImportId: importId,
+      companyNameFromFiling: nameFromFacts,
+      organisationNumberFiling: orgNorm,
+      filingPeriodStart: filingStart,
+      filingPeriodEnd: filingEnd,
+      fiscalYear,
+      currencyCode,
+      sourceFilename: primaryAnnualRun.sourceIxbrlPath ?? file.originalFilename,
+      parserName: primaryAnnualRun.parserName,
+      parserVersion: primaryAnnualRun.parserVersion,
+      primaryContextId: primaryPick.primaryContextId,
+      primarySourceFileId: primaryAnnualRun.sourceFileId ?? null,
+      metadata: {
+        importId,
+        factCountAnnual: annualFacts.length,
+        factCountAudit: auditFacts.length,
+        contextCountAnnual: annualContexts.length,
+        contextCountAudit: auditContexts.length,
+        primaryContext: primaryPick,
+        inferredCurrentEnd: currentEnd?.toISOString().slice(0, 10),
+        inferredPriorEnd: priorEnd?.toISOString().slice(0, 10),
+      },
+    });
+    const savedHeader = await this.headerRepo.save(header);
+
+    await this.replaceFinancials(savedHeader.id, annualFacts, ctxByAnnual, currentEnd, priorEnd);
+
+    const auditEnds = this.inferReportingEnds(auditContexts);
+    const audCurrent = auditEnds.currentEnd ?? currentEnd;
+    const audPrior = auditEnds.priorEnd ?? priorEnd;
+    await this.replaceAuditor(savedHeader.id, auditFacts, ctxByAudit, audCurrent, audPrior);
+
+    await this.replaceNotes(savedHeader.id, annualFacts);
+    await this.replacePeriods(savedHeader.id, annualContexts, currentEnd, priorEnd);
+    await this.supersedeOlderHeaders(file.id, savedHeader.id);
+
+    return savedHeader;
   }
 }

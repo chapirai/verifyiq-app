@@ -24,6 +24,10 @@ import { CompanyAnnualReportFinancialEntity } from '../entities/company-annual-r
 import { CompanyAnnualReportHeaderEntity } from '../entities/company-annual-report-header.entity';
 import { CANONICAL_FINANCIAL_LABELS } from '../config/canonical-field-labels';
 import { AnnualReportNormalizeService } from './annual-report-normalize.service';
+import {
+  AnnualReportWorkspaceReadModelService,
+  type AnnualReportWorkspaceReadModel,
+} from './annual-report-workspace-read-model.service';
 
 function normalizeOrgNumber(raw: string): string {
   return raw.replace(/\D/g, '') || raw;
@@ -64,6 +68,7 @@ export class AnnualReportsService {
     private readonly bvDocs: BvDocumentStorageService,
     private readonly bolagsverket: BolagsverketService,
     private readonly normalize: AnnualReportNormalizeService,
+    private readonly workspaceReadModel: AnnualReportWorkspaceReadModelService,
     private readonly config: ConfigService,
     @InjectQueue(ANNUAL_REPORT_PARSE_QUEUE)
     private readonly parseQueue: Queue<
@@ -473,6 +478,15 @@ export class AnnualReportsService {
     if (!header) return null;
     const financials = await this.finRepo.find({ where: { headerId: header.id } });
     return { header, financials };
+  }
+
+  async getWorkspaceReadModel(
+    tenantId: string,
+    organisationNumber: string,
+  ): Promise<AnnualReportWorkspaceReadModel> {
+    const org = normalizeOrgNumber(organisationNumber);
+    const header = await this.getLatestHeader(tenantId, org);
+    return this.workspaceReadModel.buildFromHeader(tenantId, org, header);
   }
 
   async getFileMeta(tenantId: string, fileId: string) {

@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { AnnualReportParseRunEntity } from './annual-report-parse-run.entity';
+import { AnnualReportSourceFileEntity } from './annual-report-source-file.entity';
 
 @Entity({ name: 'annual_report_xbrl_facts' })
 @Index(['parseRunId'])
@@ -54,4 +55,17 @@ export class AnnualReportXbrlFactEntity {
 
   @Column({ name: 'raw_json', type: 'jsonb', default: () => "'{}'::jsonb" })
   rawJson!: Record<string, unknown>;
+
+  @Column({ name: 'source_file_id', type: 'uuid', nullable: true })
+  sourceFileId?: string | null;
+
+  @ManyToOne(() => AnnualReportSourceFileEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'source_file_id' })
+  sourceFile?: AnnualReportSourceFileEntity | null;
+
+  @Column({ name: 'document_type', type: 'varchar', length: 32, nullable: true })
+  documentType?: string | null;
+
+  @Column({ name: 'section_heading', type: 'text', nullable: true })
+  sectionHeading?: string | null;
 }

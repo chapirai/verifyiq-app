@@ -1,0 +1,38 @@
+-- Optional one-off backfill: attach legacy rows to the new import/source model.
+-- Run only after migration 1000000000030. Review counts before committing.
+--
+-- 1) Create one annual_report_imports row per annual_report_files row that has
+--    completed parse runs but no import yet (adjust WHERE to match your data).
+--
+-- INSERT INTO annual_report_imports (
+--   id, tenant_id, company_id, organisationsnummer, annual_report_file_id,
+--   source_zip_filename, source_zip_storage_key, import_status,
+--   imported_at, created_at, updated_at
+-- )
+-- SELECT gen_random_uuid(), f.tenant_id, f.company_id, f.organisationsnummer, f.id,
+--        f.original_filename, f.storage_key, 'completed',
+--        NOW(), NOW(), NOW()
+-- FROM annual_report_files f
+-- WHERE NOT EXISTS (
+--   SELECT 1 FROM annual_report_imports i WHERE i.annual_report_file_id = f.id
+-- );
+--
+-- 2) Point parse runs at the new import (match file_id → import id you created).
+--
+-- UPDATE annual_report_parse_runs r
+-- SET annual_report_import_id = i.id
+-- FROM annual_report_imports i
+-- WHERE i.annual_report_file_id = r.file_id
+--   AND r.annual_report_import_id IS NULL;
+--
+-- 3) Create a single source_file per parse run (simplified; real backfill should
+--    use path from source_ixbrl_path and classification from filename).
+--
+-- 4) Set company_annual_report_headers.annual_report_import_id from parse run’s import.
+--
+-- UPDATE company_annual_report_headers h
+-- SET annual_report_import_id = r.annual_report_import_id
+-- FROM annual_report_parse_runs r
+-- WHERE h.parse_run_id = r.id
+--   AND h.annual_report_import_id IS NULL
+--   AND r.annual_report_import_id IS NOT NULL;
