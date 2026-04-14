@@ -1,7 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiQuotaBucket } from '../common/decorators/api-quota-bucket.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequiredScopes } from '../common/decorators/required-scopes.decorator';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
+import { ScopeGuard } from '../common/guards/scope.guard';
+import { ApiQuotaInterceptor } from '../common/interceptors/api-quota.interceptor';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { CompaniesService } from './companies.service';
 import { CompanyMetadataService } from './services/company-metadata.service';
@@ -9,7 +13,10 @@ import { ListCompaniesDto } from './dto/list-companies.dto';
 import { LookupCompanyDto } from './dto/lookup-company.dto';
 
 @Controller('companies')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard)
+@RequiredScopes('companies:read')
+@UseInterceptors(ApiQuotaInterceptor)
+@ApiQuotaBucket('companies')
 export class CompaniesController {
   constructor(
     private readonly companiesService: CompaniesService,

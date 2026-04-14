@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { AuditModule } from '../audit/audit.module';
+import { ApiQuotaModule } from '../common/api-quota.module';
 import { CompaniesController } from './companies.controller';
 import { CompanyLookupsController } from './controllers/company-lookups.controller';
 import { CompanyServingController } from './controllers/company-serving.controller';
@@ -63,6 +64,7 @@ import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-repor
 
 @Module({
   imports: [
+    ApiQuotaModule,
     TypeOrmModule.forFeature([
       CompanyEntity,
       CompanyRawPayloadEntity,

@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
+import Redis from 'ioredis';
 import * as Minio from 'minio';
 import { Brackets, Repository } from 'typeorm';
 import { BvStoredDocumentEntity } from '../../companies/entities/bv-stored-document.entity';
@@ -49,6 +50,7 @@ function bufferLooksLikeZip(buf: Buffer): boolean {
 export class AnnualReportsService {
   private readonly logger = new Logger(AnnualReportsService.name);
   private readonly minioClient: Minio.Client;
+  private readonly redis: Redis;
   private readonly bucket: string;
   private readonly region: string;
 
@@ -91,6 +93,87 @@ export class AnnualReportsService {
       accessKey: this.config.get<string>('AWS_ACCESS_KEY_ID', 'minioadmin'),
       secretKey: this.config.get<string>('AWS_SECRET_ACCESS_KEY', 'minioadmin'),
     });
+    this.redis = new Redis({
+      host: this.config.getOrThrow<string>('REDIS_HOST'),
+      port: this.config.getOrThrow<number>('REDIS_PORT'),
+      password: this.config.get<string>('REDIS_PASSWORD') || undefined,
+      lazyConnect: true,
+      maxRetriesPerRequest: 2,
+    });
+  }
+
+  private async ensureRedisConnected(): Promise<void> {
+    if (this.redis.status !== 'ready' && this.redis.status !== 'connect') {
+      await this.redis.connect();
+    }
+  }
+
+  private staleThresholdMs(): number {
+    const days = Number(this.config.get<string>('AR_FINANCIAL_STALE_DAYS') ?? '31');
+    return Math.max(1, days) * 24 * 60 * 60 * 1000;
+  }
+
+  async getApiFinancialTableWithFreshness(
+    tenantId: string,
+    organisationNumber: string,
+  ): Promise<{
+    status: 'fresh' | 'stale_rebuild_started' | 'processing';
+    rows: AnnualReportApiFinancialRowEntity[];
+    stale: boolean;
+    lastUpdatedAt: string | null;
+  }> {
+    const org = normalizeOrgNumber(organisationNumber);
+    const rows = await this.getApiFinancialTable(tenantId, org, { ensureBuilt: false });
+    const threshold = this.staleThresholdMs();
+    const latest = rows.reduce<Date | null>((acc, r) => {
+      if (!acc) return r.updatedAt;
+      return r.updatedAt > acc ? r.updatedAt : acc;
+    }, null);
+    const stale = !latest || Date.now() - latest.getTime() > threshold;
+
+    if (!rows.length) {
+      await this.triggerAsyncRebuildForOrg(tenantId, org);
+      return {
+        status: 'processing',
+        rows: [],
+        stale: true,
+        lastUpdatedAt: null,
+      };
+    }
+
+    if (stale) {
+      await this.triggerAsyncRebuildForOrg(tenantId, org);
+      return {
+        status: 'stale_rebuild_started',
+        rows,
+        stale: true,
+        lastUpdatedAt: latest ? latest.toISOString() : null,
+      };
+    }
+
+    return {
+      status: 'fresh',
+      rows,
+      stale: false,
+      lastUpdatedAt: latest ? latest.toISOString() : null,
+    };
+  }
+
+  private async triggerAsyncRebuildForOrg(tenantId: string, organisationNumber: string): Promise<void> {
+    await this.ensureRedisConnected();
+    const org = normalizeOrgNumber(organisationNumber);
+    const lockKey = `lock:financial-rebuild:${tenantId}:${org}`;
+    const locked = await this.redis.set(lockKey, '1', 'EX', 20 * 60, 'NX');
+    if (locked !== 'OK') return;
+    void this.rebuildApiFinancialTableForOrg(tenantId, org)
+      .catch(e => this.logger.warn(`Async financial rebuild failed org=${org}: ${e instanceof Error ? e.message : e}`))
+      .finally(async () => {
+        try {
+          await this.redis.del(lockKey);
+        } catch {
+          // ignore
+        }
+      });
   }
 
   /**

@@ -6,13 +6,19 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiQuotaBucket } from '../common/decorators/api-quota-bucket.decorator';
+import { RequiredScopes } from '../common/decorators/required-scopes.decorator';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
+import { ScopeGuard } from '../common/guards/scope.guard';
+import { ApiQuotaInterceptor } from '../common/interceptors/api-quota.interceptor';
 import { AnnualReportsService } from './services/annual-reports.service';
 
 type UploadedZipFile = {
@@ -144,13 +150,33 @@ export class AnnualReportsController {
 
   /** Final API-facing financial table built from normalized annual report data. */
   @Get('companies/:organisationNumber/api-financial-table')
+  @UseGuards(ScopeGuard)
+  @UseInterceptors(ApiQuotaInterceptor)
+  @ApiQuotaBucket('financial-api')
+  @RequiredScopes('financials:read')
   async apiFinancialTable(
     @TenantId() tenantId: string,
     @Param('organisationNumber') organisationNumber: string,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const org = normalizeOrgParam(organisationNumber);
-    const rows = await this.annualReports.getApiFinancialTable(tenantId, org);
-    return { organisationNumber: org, rows };
+    const data = await this.annualReports.getApiFinancialTableWithFreshness(tenantId, org);
+    if (data.status === 'processing') {
+      res.status(202);
+      return {
+        organisationNumber: org,
+        status: data.status,
+        message: 'No financial table exists yet; rebuild has been queued.',
+        rows: [],
+      };
+    }
+    return {
+      organisationNumber: org,
+      status: data.status,
+      stale: data.stale,
+      lastUpdatedAt: data.lastUpdatedAt,
+      rows: data.rows,
+    };
   }
 
   @Post('companies/:organisationNumber/api-financial-table/rebuild')

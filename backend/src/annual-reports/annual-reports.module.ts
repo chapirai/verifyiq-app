@@ -19,6 +19,7 @@ import { CompanyAnnualReportFinancialEntity } from './entities/company-annual-re
 import { CompanyAnnualReportHeaderEntity } from './entities/company-annual-report-header.entity';
 import { CompanyAnnualReportNotesIndexEntity } from './entities/company-annual-report-notes-index.entity';
 import { CompanyAnnualReportPeriodEntity } from './entities/company-annual-report-period.entity';
+import { ApiQuotaModule } from '../common/api-quota.module';
 import { AnnualReportImportEntity } from './entities/annual-report-import.entity';
 import { AnnualReportApiFinancialRowEntity } from './entities/annual-report-api-financial-row.entity';
 import { AnnualReportMappedValueEntity } from './entities/annual-report-mapped-value.entity';
@@ -68,6 +69,7 @@ const annualReportEntities = [
     TypeOrmModule.forFeature(annualReportEntities),
     BullModule.registerQueue({ name: ANNUAL_REPORT_PARSE_QUEUE }),
     CompaniesModule,
+    ApiQuotaModule,
   ],
   controllers: [AnnualReportsController],
   providers: [

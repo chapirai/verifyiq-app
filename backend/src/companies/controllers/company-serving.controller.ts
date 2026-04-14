@@ -1,6 +1,10 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards, UseInterceptors } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { ApiQuotaBucket } from '../../common/decorators/api-quota-bucket.decorator';
+import { RequiredScopes } from '../../common/decorators/required-scopes.decorator';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
+import { ScopeGuard } from '../../common/guards/scope.guard';
+import { ApiQuotaInterceptor } from '../../common/interceptors/api-quota.interceptor';
 import { CompanyServingReadService } from '../services/company-serving-read.service';
 
 function normalizeOrgNumber(raw: string): string {
@@ -12,7 +16,10 @@ function normalizeOrgNumber(raw: string): string {
  * Base path: GET /api/v1/company-serving/:organisationNumber/…
  */
 @Controller('company-serving')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard)
+@RequiredScopes('companies:read')
+@UseInterceptors(ApiQuotaInterceptor)
+@ApiQuotaBucket('company-serving')
 export class CompanyServingController {
   constructor(private readonly serving: CompanyServingReadService) {}
 

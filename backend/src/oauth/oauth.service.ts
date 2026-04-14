@@ -64,7 +64,7 @@ export class OauthService {
       tenantId,
       name: 'Sandbox OAuth client',
       environment: 'sandbox',
-      scopes: ['companies:read'],
+      scopes: ['companies:read', 'financials:read', 'ownership:read', 'ownership:write'],
     });
     return { client: created.client, clientSecret: created.clientSecret };
   }

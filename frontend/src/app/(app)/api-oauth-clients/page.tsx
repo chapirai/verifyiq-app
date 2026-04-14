@@ -30,7 +30,11 @@ export default function ApiOauthClientsPage() {
 
   const onCreate = async (event: FormEvent) => {
     event.preventDefault();
-    const created = await api.createOauthClient({ name, environment, scopes: ['companies:read'] });
+    const created = await api.createOauthClient({
+      name,
+      environment,
+      scopes: ['companies:read', 'financials:read', 'ownership:read', 'ownership:write'],
+    });
     setSecret(created.data.clientSecret ?? null);
     setName('');
     load();

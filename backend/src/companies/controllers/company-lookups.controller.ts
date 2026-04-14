@@ -1,14 +1,31 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { ApiQuotaBucket } from '../../common/decorators/api-quota-bucket.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequiredScopes } from '../../common/decorators/required-scopes.decorator';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
+import { ScopeGuard } from '../../common/guards/scope.guard';
+import { ApiQuotaInterceptor } from '../../common/interceptors/api-quota.interceptor';
 import { TenantContext } from '../../common/interfaces/tenant-context.interface';
 import { LookupCompanyDto } from '../dto/lookup-company.dto';
 import { CompaniesService } from '../companies.service';
 import { BvPipelineService } from '../services/bv-pipeline.service';
 
 @Controller('company-lookups')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard)
+@RequiredScopes('companies:read')
+@UseInterceptors(ApiQuotaInterceptor)
+@ApiQuotaBucket('company-lookups')
 export class CompanyLookupsController {
   constructor(
     private readonly companiesService: CompaniesService,

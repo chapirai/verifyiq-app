@@ -7,14 +7,34 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api, ApiError } from '@/lib/api';
 
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function deriveWorkspaceFromEmail(email: string) {
+  const [localPartRaw, domainRaw] = email.split('@');
+  const localPart = localPartRaw?.trim() || 'user';
+  const domain = domainRaw?.trim() || 'workspace';
+  const domainName = domain.split('.')[0] || 'workspace';
+  const base = slugify(domainName) || 'workspace';
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return {
+    tenantName: `${domainName.charAt(0).toUpperCase()}${domainName.slice(1)} Workspace`,
+    tenantSlug: `${base}-${suffix}`,
+    fullName: localPart.replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+  };
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    tenantSlug: '',
-    tenantName: '',
-    fullName: '',
     email: '',
     password: '',
+    planCode: 'free',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -24,8 +44,27 @@ export default function SignupPage() {
     setError('');
     setSubmitting(true);
     try {
-      await api.signup(form);
-      router.push('/dashboard');
+      const derived = deriveWorkspaceFromEmail(form.email);
+      await api.signup({
+        tenantSlug: derived.tenantSlug,
+        tenantName: derived.tenantName,
+        fullName: derived.fullName,
+        email: form.email,
+        password: form.password,
+      });
+
+      if (form.planCode === 'free') {
+        router.push('/dashboard');
+        return;
+      }
+
+      const checkout = await api.createCheckoutSession(form.planCode);
+      const checkoutUrl = (checkout as { data?: { checkoutUrl?: string } }).data?.checkoutUrl;
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+        return;
+      }
+      router.push('/billing');
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError('Could not create account.');
@@ -41,14 +80,20 @@ export default function SignupPage() {
           <p className="mono-label text-[10px]">Workspace Creation</p>
           <h1 className="font-display mt-4 text-5xl">Sign up</h1>
           <form className="mt-10 grid gap-5" onSubmit={onSubmit}>
-            <Input placeholder="Organization name" value={form.tenantName} onChange={(e) => setForm((v) => ({ ...v, tenantName: e.target.value }))} required />
-            <Input placeholder="Organization slug" value={form.tenantSlug} onChange={(e) => setForm((v) => ({ ...v, tenantSlug: e.target.value }))} required />
-            <Input placeholder="Full name" value={form.fullName} onChange={(e) => setForm((v) => ({ ...v, fullName: e.target.value }))} required />
             <Input placeholder="Work email" type="email" value={form.email} onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))} required />
             <Input placeholder="Password" type="password" value={form.password} onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))} required />
+            <select
+              className="border border-border-light bg-background px-3 py-2 text-sm"
+              value={form.planCode}
+              onChange={(e) => setForm((v) => ({ ...v, planCode: e.target.value }))}
+            >
+              <option value="free">Free - 0 SEK/month</option>
+              <option value="basic">Basic - 49 SEK/month</option>
+              <option value="pro">Pro - 999 SEK/month</option>
+            </select>
             {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? 'Creating...' : 'Create workspace'}
+              {submitting ? 'Creating...' : 'Create account'}
             </Button>
           </form>
           <p className="mt-6 text-sm">
