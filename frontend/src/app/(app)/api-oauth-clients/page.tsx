@@ -2,25 +2,25 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import type { ApiKey } from '@/types/api';
+import type { OauthClient } from '@/types/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateBlocks';
 import { Table } from '@/components/ui/Table';
 
-export default function ApiKeysPage() {
-  const [keys, setKeys] = useState<ApiKey[]>([]);
+export default function ApiOauthClientsPage() {
+  const [clients, setClients] = useState<OauthClient[]>([]);
   const [name, setName] = useState('');
   const [environment, setEnvironment] = useState<'live' | 'sandbox'>('live');
-  const [createdSecret, setCreatedSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [secret, setSecret] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
-    api.listApiKeys()
-      .then((res) => setKeys(res.data))
-      .catch((err: { message?: string }) => setError(err.message ?? 'Failed to load keys'))
+    api.listOauthClients()
+      .then((res) => setClients(res.data))
+      .catch((err: { message?: string }) => setError(err.message ?? 'Failed to load OAuth clients'))
       .finally(() => setLoading(false));
   };
 
@@ -30,20 +30,20 @@ export default function ApiKeysPage() {
 
   const onCreate = async (event: FormEvent) => {
     event.preventDefault();
-    const created = await api.createApiKeyWithEnvironment(name, environment);
-    setCreatedSecret(created.data.key ?? null);
+    const created = await api.createOauthClient({ name, environment, scopes: ['companies:read'] });
+    setSecret(created.data.clientSecret ?? null);
     setName('');
     load();
   };
 
   if (loading) return <LoadingSkeleton lines={6} />;
-  if (error) return <ErrorState title="API keys unavailable" message={error} />;
+  if (error) return <ErrorState title="OAuth clients unavailable" message={error} />;
 
   return (
     <section className="space-y-6">
-      <h1 className="font-display text-5xl">API keys</h1>
+      <h1 className="font-display text-5xl">OAuth clients</h1>
       <form className="flex gap-3" onSubmit={onCreate}>
-        <Input placeholder="Key name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input placeholder="Client name" value={name} onChange={(e) => setName(e.target.value)} required />
         <select
           className="border border-border-light bg-background px-3 py-2 text-sm"
           value={environment}
@@ -52,28 +52,28 @@ export default function ApiKeysPage() {
           <option value="live">Live</option>
           <option value="sandbox">Sandbox</option>
         </select>
-        <Button type="submit">Generate</Button>
+        <Button type="submit">Create client</Button>
       </form>
-      {createdSecret ? (
+      {secret ? (
         <p className="text-sm text-muted-foreground">
-          New key (shown once): <code className="font-mono">{createdSecret}</code>
+          Client secret (shown once): <code className="font-mono">{secret}</code>
         </p>
       ) : null}
       <Table>
-        <thead><tr><th>Name</th><th>Environment</th><th>Created</th><th>Status</th><th /></tr></thead>
+        <thead><tr><th>Name</th><th>Client ID</th><th>Environment</th><th>Status</th><th /></tr></thead>
         <tbody>
-          {keys.map((key) => (
-            <tr key={key.id}>
-              <td>{key.name}</td>
-              <td>{key.environment ?? 'live'}</td>
-              <td>{new Date(key.createdAt).toLocaleDateString()}</td>
-              <td>{key.revokedAt ? 'Revoked' : 'Active'}</td>
+          {clients.map((client) => (
+            <tr key={client.id}>
+              <td>{client.name}</td>
+              <td><code className="font-mono text-xs">{client.clientId}</code></td>
+              <td>{client.environment}</td>
+              <td>{client.revokedAt ? 'Revoked' : 'Active'}</td>
               <td>
-                {!key.revokedAt ? (
+                {!client.revokedAt ? (
                   <button
                     className="underline underline-offset-4"
                     onClick={async () => {
-                      await api.revokeApiKey(key.id);
+                      await api.revokeOauthClient(client.id);
                       load();
                     }}
                   >

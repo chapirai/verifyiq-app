@@ -39,4 +39,11 @@ export default () => ({
   API_BASE_URL: process.env.API_BASE_URL ?? 'http://localhost:4000/api/v1',
   FRONTEND_URL: process.env.FRONTEND_URL,
   FRONTEND_URLS: process.env.FRONTEND_URLS,
+  APP_BASE_URL: process.env.APP_BASE_URL ?? 'http://localhost:3000',
+  DASHBOARD_BASE_URL: process.env.DASHBOARD_BASE_URL ?? process.env.APP_BASE_URL ?? 'http://localhost:3000',
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_PRICE_ID_FREE: process.env.STRIPE_PRICE_ID_FREE,
+  STRIPE_PRICE_ID_BASIC: process.env.STRIPE_PRICE_ID_BASIC,
+  STRIPE_PRICE_ID_PRO: process.env.STRIPE_PRICE_ID_PRO,
 });

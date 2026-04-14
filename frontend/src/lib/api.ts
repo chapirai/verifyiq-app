@@ -1,6 +1,6 @@
 import { clearSession, getAccessToken, getRefreshToken, setSession } from '@/lib/auth';
 import { API_V1_BASE_URL } from '@/lib/api-base-url';
-import type { ApiEnvelope, ApiKey, AuthTokens, BillingPlan, BulkJob, CompanyListResponse } from '@/types/api';
+import type { ApiEnvelope, ApiKey, AuthTokens, BillingPlan, BulkJob, CompanyListResponse, OauthClient } from '@/types/api';
 import type {
   CompanyEngagementServing,
   CompanyFiCaseServing,
@@ -136,6 +136,9 @@ export const api = {
       body: JSON.stringify({ planCode }),
     });
   },
+  async createBillingPortalSession() {
+    return request('/billing/portal-session', { method: 'POST' });
+  },
   async confirmPayment(sessionId: string, planCode: string) {
     return request('/billing/payment/confirm', {
       method: 'POST',
@@ -151,8 +154,34 @@ export const api = {
       body: JSON.stringify({ name }),
     });
   },
+  async createApiKeyWithEnvironment(name: string, environment: 'live' | 'sandbox') {
+    return request<ApiEnvelope<ApiKey>>('/api-keys', {
+      method: 'POST',
+      body: JSON.stringify({ name, environment }),
+    });
+  },
   async revokeApiKey(id: string) {
     return request(`/api-keys/${id}`, { method: 'DELETE' });
+  },
+  async listOauthClients() {
+    return request<ApiEnvelope<OauthClient[]>>('/me/oauth-clients');
+  },
+  async createOauthClient(payload: { name: string; environment?: 'live' | 'sandbox'; scopes?: string[] }) {
+    return request<ApiEnvelope<OauthClient>>('/me/oauth-clients', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  async revokeOauthClient(id: string) {
+    return request(`/me/oauth-clients/${id}`, { method: 'DELETE' });
+  },
+  async getSandboxConnection() {
+    return request<ApiEnvelope<{ environment: string; baseUrl: string; hasActiveKey: boolean; keys: ApiKey[] }>>(
+      '/api-keys/sandbox/connection',
+    );
+  },
+  async provisionSandboxKey() {
+    return request<ApiEnvelope<ApiKey>>('/api-keys/sandbox/provision', { method: 'POST' });
   },
   async listBulkJobs() {
     return request<ApiEnvelope<BulkJob[]>>('/bulk/jobs');

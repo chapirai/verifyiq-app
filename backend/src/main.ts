@@ -25,11 +25,12 @@ async function bootstrap(): Promise<void> {
   const allowedOrigins = new Set([frontendUrl, ...frontendUrls, 'http://localhost:3000']);
 
   const app = await NestFactory.create(AppModule, {
+    rawBody: true,
     cors: {
       origin: [...allowedOrigins],
       credentials: true,
       methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature'],
     },
   });
 

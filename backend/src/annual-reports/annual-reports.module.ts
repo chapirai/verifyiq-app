@@ -20,6 +20,7 @@ import { CompanyAnnualReportHeaderEntity } from './entities/company-annual-repor
 import { CompanyAnnualReportNotesIndexEntity } from './entities/company-annual-report-notes-index.entity';
 import { CompanyAnnualReportPeriodEntity } from './entities/company-annual-report-period.entity';
 import { AnnualReportImportEntity } from './entities/annual-report-import.entity';
+import { AnnualReportApiFinancialRowEntity } from './entities/annual-report-api-financial-row.entity';
 import { AnnualReportMappedValueEntity } from './entities/annual-report-mapped-value.entity';
 import { AnnualReportSectionEntity } from './entities/annual-report-section.entity';
 import { AnnualReportSourceFileEntity } from './entities/annual-report-source-file.entity';
@@ -43,6 +44,7 @@ const annualReportEntities = [
   AnnualReportParseRunEntity,
   AnnualReportParseErrorEntity,
   AnnualReportImportEntity,
+  AnnualReportApiFinancialRowEntity,
   AnnualReportSourceFileEntity,
   AnnualReportSectionEntity,
   AnnualReportMappedValueEntity,

@@ -14,6 +14,8 @@ const navItems = [
   { href: '/bulk', label: 'Bulk' },
   { href: '/billing', label: 'Billing' },
   { href: '/api-keys', label: 'API' },
+  { href: '/api-oauth-clients', label: 'OAuth' },
+  { href: '/api-sandbox', label: 'Sandbox' },
   { href: '/settings', label: 'Settings' },
 ];
 
@@ -33,7 +35,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   const restrictedByPlan: Record<string, string[]> = {
-    starter: ['/bulk', '/api-keys'],
+    starter: ['/bulk'],
     growth: [],
     enterprise: [],
   };

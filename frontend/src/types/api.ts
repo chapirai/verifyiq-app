@@ -29,7 +29,19 @@ export interface ApiKey {
   name: string;
   createdAt: string;
   revokedAt: string | null;
+  environment?: 'live' | 'sandbox';
   key?: string;
+}
+
+export interface OauthClient {
+  id: string;
+  name: string;
+  clientId: string;
+  environment: 'live' | 'sandbox';
+  scopes: string[];
+  createdAt: string;
+  revokedAt: string | null;
+  clientSecret?: string;
 }
 
 export interface BulkJob {

@@ -26,7 +26,21 @@ export class ApiKeysService {
     });
   }
 
-  async createKey(tenantId: string, name: string): Promise<{ key: string; apiKey: ApiKeyEntity }> {
+  async listByTenantAndEnvironment(
+    tenantId: string,
+    environment: 'live' | 'sandbox',
+  ): Promise<ApiKeyEntity[]> {
+    return this.apiKeyRepository.find({
+      where: { tenantId, environment, revokedAt: IsNull() },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async createKey(
+    tenantId: string,
+    name: string,
+    environment: 'live' | 'sandbox' = 'live',
+  ): Promise<{ key: string; apiKey: ApiKeyEntity }> {
     const rawKey = this.generateRawKey();
     const keyHash = this.hashKey(rawKey);
     const keyPrefix = rawKey.slice(0, 12);
@@ -35,6 +49,7 @@ export class ApiKeysService {
       name,
       keyPrefix,
       keyHash,
+      environment,
       revokedAt: null,
       lastUsedAt: null,
     });
@@ -50,5 +65,16 @@ export class ApiKeysService {
     key.revokedAt = new Date();
     await this.apiKeyRepository.save(key);
     return { success: true };
+  }
+
+  async ensureSandboxKey(tenantId: string): Promise<{ key: string | null; apiKey: ApiKeyEntity }> {
+    const existing = await this.apiKeyRepository.findOne({
+      where: { tenantId, environment: 'sandbox', revokedAt: IsNull() },
+      order: { createdAt: 'DESC' },
+    });
+    if (existing) {
+      return { key: null, apiKey: existing };
+    }
+    return this.createKey(tenantId, 'Sandbox key', 'sandbox');
   }
 }

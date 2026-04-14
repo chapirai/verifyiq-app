@@ -7,9 +7,9 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({ name: 'api_keys' })
-@Index(['tenantId', 'revokedAt'])
-export class ApiKeyEntity {
+@Entity({ name: 'oauth_clients' })
+@Index(['tenantId', 'environment', 'revokedAt'])
+export class OauthClientEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
@@ -19,13 +19,16 @@ export class ApiKeyEntity {
   @Column({ type: 'varchar', length: 120 })
   name!: string;
 
-  @Column({ name: 'key_prefix', type: 'varchar', length: 32 })
-  keyPrefix!: string;
+  @Column({ name: 'client_id', type: 'varchar', length: 80, unique: true })
+  clientId!: string;
 
-  @Column({ name: 'key_hash', type: 'varchar', length: 255 })
-  keyHash!: string;
+  @Column({ name: 'client_secret_hash', type: 'varchar', length: 255 })
+  clientSecretHash!: string;
 
-  @Column({ name: 'environment', type: 'varchar', length: 16, default: 'live' })
+  @Column({ type: 'text', array: true, default: '{}' })
+  scopes!: string[];
+
+  @Column({ type: 'varchar', length: 16, default: 'live' })
   environment!: 'live' | 'sandbox';
 
   @Column({ name: 'last_used_at', type: 'timestamptz', nullable: true })

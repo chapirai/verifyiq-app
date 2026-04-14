@@ -49,19 +49,37 @@ export default function BillingPage() {
               onClick={async () => {
                 try {
                   const res = await api.createCheckoutSession(plan.code);
-                  const sessionId = (res as { data?: { sessionId?: string } }).data?.sessionId ?? '';
-                  setMessage(`Checkout session created: ${sessionId || 'ok'}`);
-                  if (sessionId) {
-                    const confirm = await api.confirmPayment(sessionId, plan.code);
-                    const success = (confirm as { data?: { success?: boolean } }).data?.success;
-                    setMessage(success ? `Payment confirmed for ${plan.name}` : 'Payment confirmation failed');
+                  const checkoutUrl = (res as { data?: { checkoutUrl?: string } }).data?.checkoutUrl ?? '';
+                  if (checkoutUrl) {
+                    window.location.href = checkoutUrl;
+                    return;
                   }
+                  setMessage('Checkout session created');
                 } catch (err: unknown) {
                   setMessage(err instanceof Error ? err.message : 'Could not start checkout');
                 }
               }}
             >
               Start checkout
+            </Button>
+            <Button
+              className="mt-2 w-full"
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  const portal = await api.createBillingPortalSession();
+                  const url = (portal as { data?: { url?: string } }).data?.url ?? '';
+                  if (url) {
+                    window.location.href = url;
+                    return;
+                  }
+                  setMessage('Billing portal unavailable');
+                } catch (err: unknown) {
+                  setMessage(err instanceof Error ? err.message : 'Could not open billing portal');
+                }
+              }}
+            >
+              Open billing portal
             </Button>
           </article>
         ))}

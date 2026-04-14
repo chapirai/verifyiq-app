@@ -64,6 +64,13 @@ const envSchema = z.object({
           }),
       { message: 'FRONTEND_URLS must be a comma-separated list of valid URLs' },
     ),
+  APP_BASE_URL: z.string().url().optional(),
+  DASHBOARD_BASE_URL: z.string().url().optional(),
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  STRIPE_PRICE_ID_FREE: z.string().min(1).optional(),
+  STRIPE_PRICE_ID_BASIC: z.string().min(1).optional(),
+  STRIPE_PRICE_ID_PRO: z.string().min(1).optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {

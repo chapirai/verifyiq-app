@@ -18,6 +18,7 @@ import { CompanyCasesModule } from './company-cases/company-cases.module';
 import { DocumentsModule } from './documents/documents.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { OauthModule } from './oauth/oauth.module';
 import { PartiesModule } from './parties/parties.module';
 import { PersonEnrichmentModule } from './person-enrichment/person-enrichment.module';
 import { PropertyModule } from './property/property.module';
@@ -80,6 +81,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     ScreeningModule,
     RiskModule,
     MonitoringModule,
+    OauthModule,
     WebhooksModule,
     DocumentsModule,
     ReportsModule,

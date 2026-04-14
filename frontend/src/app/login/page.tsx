@@ -20,7 +20,11 @@ export default function LoginPage() {
     try {
       await api.login({ tenantId, email, password });
       const params = new URLSearchParams(window.location.search);
-      const nextPath = params.get('next') ?? '/dashboard';
+      const requestedNext = params.get('next') ?? '/dashboard';
+      const nextPath =
+        requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+          ? requestedNext
+          : '/dashboard';
       window.location.href = nextPath;
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);

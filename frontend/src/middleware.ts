@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const protectedPaths = ['/dashboard', '/search', '/companies', '/bulk', '/billing', '/api-keys', '/settings'];
+const protectedPaths = ['/dashboard', '/search', '/companies', '/bulk', '/billing', '/api-keys', '/api-oauth-clients', '/api-sandbox', '/settings'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -17,5 +17,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/search/:path*', '/companies/:path*', '/bulk/:path*', '/billing/:path*', '/api-keys/:path*', '/settings/:path*'],
+  matcher: ['/dashboard/:path*', '/search/:path*', '/companies/:path*', '/bulk/:path*', '/billing/:path*', '/api-keys/:path*', '/api-oauth-clients/:path*', '/api-sandbox/:path*', '/settings/:path*'],
 };

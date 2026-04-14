@@ -5,8 +5,10 @@ import { AnnualReportMappedValueEntity } from '../entities/annual-report-mapped-
 import { AnnualReportSummaryEntity } from '../entities/annual-report-summary.entity';
 import { CompanyAnnualReportFinancialEntity } from '../entities/company-annual-report-financial.entity';
 import { CompanyAnnualReportAuditorEntity } from '../entities/company-annual-report-auditor.entity';
+import { CompanyAnnualReportHeaderEntity } from '../entities/company-annual-report-header.entity';
 import { CANONICAL_FINANCIAL_LABELS } from '../config/canonical-field-labels';
 import { statementTypeForCanonicalField } from '../config/canonical-field-statement-type';
+import { AnnualReportApiFinancialRowEntity } from '../entities/annual-report-api-financial-row.entity';
 
 /** Canonical field → summary entity field (current period only). */
 const SUMMARY_FIELD: Record<string, keyof AnnualReportSummaryEntity> = {
@@ -26,6 +28,10 @@ export class AnnualReportMappedSummaryService {
     private readonly mappedRepo: Repository<AnnualReportMappedValueEntity>,
     @InjectRepository(AnnualReportSummaryEntity)
     private readonly summaryRepo: Repository<AnnualReportSummaryEntity>,
+    @InjectRepository(AnnualReportApiFinancialRowEntity)
+    private readonly apiFinancialRepo: Repository<AnnualReportApiFinancialRowEntity>,
+    @InjectRepository(CompanyAnnualReportHeaderEntity)
+    private readonly headerRepo: Repository<CompanyAnnualReportHeaderEntity>,
   ) {}
 
   async rebuildMappedAndSummary(params: {
@@ -50,9 +56,47 @@ export class AnnualReportMappedSummaryService {
 
     await this.mappedRepo.delete({ annualReportImportId });
 
+    const header = await this.headerRepo.findOne({ where: { id: headerId } });
+    const resolvedOrg =
+      orgNumber ??
+      header?.organisationsnummer ??
+      header?.organisationNumberFiling ??
+      null;
+    const resolvedFiscalYear =
+      fiscalYear ?? header?.fiscalYear ?? header?.filingPeriodEnd?.getUTCFullYear() ?? null;
+
     const financials = await this.mappedRepo.manager.find(CompanyAnnualReportFinancialEntity, {
       where: { headerId },
     });
+
+    if (resolvedOrg) {
+      await this.apiFinancialRepo.delete({
+        tenantId: params.tenantId,
+        organisationsnummer: resolvedOrg,
+        sourceHeaderId: headerId,
+      });
+      const apiRows = financials.map(fin =>
+        this.apiFinancialRepo.create({
+          tenantId: params.tenantId,
+          organisationsnummer: resolvedOrg,
+          fiscalYear: resolvedFiscalYear,
+          statementType: statementTypeForCanonicalField(fin.canonicalField),
+          valueCode: fin.canonicalField,
+          valueLabel: CANONICAL_FINANCIAL_LABELS[fin.canonicalField] ?? fin.canonicalField,
+          periodKind: fin.periodKind,
+          valueNumeric: fin.valueNumeric,
+          valueText: fin.valueText,
+          currencyCode: fin.currencyCode ?? null,
+          sourceHeaderId: headerId,
+          sourceImportId: annualReportImportId,
+          sourceFactIds: fin.sourceFactIds ?? [],
+          rankingScore: fin.rankingScore ?? 0,
+        }),
+      );
+      if (apiRows.length) {
+        await this.apiFinancialRepo.save(apiRows);
+      }
+    }
 
     const rows: Partial<AnnualReportMappedValueEntity>[] = [];
     for (const fin of financials) {
@@ -63,8 +107,8 @@ export class AnnualReportMappedSummaryService {
         sourceFileId: primarySourceFileId,
         parseRunId: primaryParseRunId,
         factId,
-        orgNumber,
-        fiscalYear,
+        orgNumber: resolvedOrg,
+        fiscalYear: resolvedFiscalYear,
         documentType: documentTypeForFinancial,
         statementType: st,
         valueCode: fin.canonicalField,
@@ -87,8 +131,8 @@ export class AnnualReportMappedSummaryService {
           annualReportImportId,
           parseRunId: primaryParseRunId,
           factId: auditor.sourceFactIds?.[0] ?? null,
-          orgNumber,
-          fiscalYear,
+          orgNumber: resolvedOrg,
+          fiscalYear: resolvedFiscalYear,
           documentType: 'audit_report',
           statementType: 'audit',
           valueCode: 'auditor_name',
@@ -103,8 +147,8 @@ export class AnnualReportMappedSummaryService {
           annualReportImportId,
           parseRunId: primaryParseRunId,
           factId: auditor.sourceFactIds?.[1] ?? auditor.sourceFactIds?.[0] ?? null,
-          orgNumber,
-          fiscalYear,
+          orgNumber: resolvedOrg,
+          fiscalYear: resolvedFiscalYear,
           documentType: 'audit_report',
           statementType: 'audit',
           valueCode: 'auditor_firm',
@@ -118,8 +162,8 @@ export class AnnualReportMappedSummaryService {
         rows.push({
           annualReportImportId,
           parseRunId: primaryParseRunId,
-          orgNumber,
-          fiscalYear,
+          orgNumber: resolvedOrg,
+          fiscalYear: resolvedFiscalYear,
           documentType: 'audit_report',
           statementType: 'audit',
           valueCode: 'audit_opinion',
@@ -139,8 +183,11 @@ export class AnnualReportMappedSummaryService {
     if (!summary) {
       summary = this.summaryRepo.create({ annualReportImportId });
     }
-    summary.orgNumber = orgNumber;
-    summary.fiscalYear = fiscalYear;
+    summary.orgNumber = resolvedOrg;
+    summary.fiscalYear = resolvedFiscalYear;
+    summary.periodStart = header?.filingPeriodStart ?? summary.periodStart ?? null;
+    summary.periodEnd = header?.filingPeriodEnd ?? summary.periodEnd ?? null;
+    summary.currency = header?.currencyCode ?? summary.currency ?? null;
     for (const fin of financials) {
       const col = SUMMARY_FIELD[fin.canonicalField];
       if (!col || fin.periodKind !== 'current') continue;

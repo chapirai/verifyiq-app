@@ -5,7 +5,9 @@ import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuditModule } from '../audit/audit.module';
+import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
+import { OauthModule } from '../oauth/oauth.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { UsersModule } from '../users/users.module';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -26,7 +28,9 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
     UsersModule,
     AuditModule,
+    ApiKeysModule,
     EntitlementsModule,
+    OauthModule,
     TenantsModule,
   ],
   controllers: [AuthController],

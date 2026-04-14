@@ -8,6 +8,8 @@ import * as bcrypt from 'bcrypt';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { UsersService } from '../users/users.service';
+import { ApiKeysService } from '../api-keys/api-keys.service';
+import { OauthService } from '../oauth/oauth.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 
 @Injectable()
@@ -18,6 +20,8 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly tenantsService: TenantsService,
     private readonly entitlementsService: EntitlementsService,
+    private readonly apiKeysService: ApiKeysService,
+    private readonly oauthService: OauthService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -100,6 +104,8 @@ export class AuthService {
     });
 
     await this.entitlementsService.initializeDefaultEntitlements(tenant.id);
+    await this.apiKeysService.ensureSandboxKey(tenant.id);
+    await this.oauthService.ensureSandboxClient(tenant.id);
     return this.issueTokens(user);
   }
 

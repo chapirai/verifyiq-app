@@ -23,11 +23,13 @@ import { CompanyAnnualReportAuditorEntity } from '../entities/company-annual-rep
 import { CompanyAnnualReportFinancialEntity } from '../entities/company-annual-report-financial.entity';
 import { CompanyAnnualReportHeaderEntity } from '../entities/company-annual-report-header.entity';
 import { CANONICAL_FINANCIAL_LABELS } from '../config/canonical-field-labels';
+import { statementTypeForCanonicalField } from '../config/canonical-field-statement-type';
 import { AnnualReportNormalizeService } from './annual-report-normalize.service';
 import {
   AnnualReportWorkspaceReadModelService,
   type AnnualReportWorkspaceReadModel,
 } from './annual-report-workspace-read-model.service';
+import { AnnualReportApiFinancialRowEntity } from '../entities/annual-report-api-financial-row.entity';
 
 function normalizeOrgNumber(raw: string): string {
   return raw.replace(/\D/g, '') || raw;
@@ -65,6 +67,8 @@ export class AnnualReportsService {
     private readonly bvDocRepo: Repository<BvStoredDocumentEntity>,
     @InjectRepository(CompanyAnnualReportAuditorEntity)
     private readonly audRepo: Repository<CompanyAnnualReportAuditorEntity>,
+    @InjectRepository(AnnualReportApiFinancialRowEntity)
+    private readonly apiFinancialRepo: Repository<AnnualReportApiFinancialRowEntity>,
     private readonly bvDocs: BvDocumentStorageService,
     private readonly bolagsverket: BolagsverketService,
     private readonly normalize: AnnualReportNormalizeService,
@@ -487,6 +491,81 @@ export class AnnualReportsService {
     const org = normalizeOrgNumber(organisationNumber);
     const header = await this.getLatestHeader(tenantId, org);
     return this.workspaceReadModel.buildFromHeader(tenantId, org, header);
+  }
+
+  async getApiFinancialTable(
+    tenantId: string,
+    organisationNumber: string,
+    opts?: { ensureBuilt?: boolean },
+  ) {
+    const org = normalizeOrgNumber(organisationNumber);
+    const readRows = async () =>
+      this.apiFinancialRepo.find({
+      where: { tenantId, organisationsnummer: org },
+      order: {
+        fiscalYear: 'DESC',
+        statementType: 'ASC',
+        valueCode: 'ASC',
+        periodKind: 'ASC',
+      },
+    });
+    let rows = await readRows();
+    if (opts?.ensureBuilt !== false && rows.length === 0) {
+      await this.rebuildApiFinancialTableForOrg(tenantId, org);
+      rows = await readRows();
+    }
+    return rows;
+  }
+
+  async rebuildApiFinancialTableForOrg(
+    tenantId: string,
+    organisationNumber: string,
+  ): Promise<{ rowsInserted: number; headersProcessed: number }> {
+    const org = normalizeOrgNumber(organisationNumber);
+    const headers = await this.headerRepo
+      .createQueryBuilder('h')
+      .where('h.tenantId = :tenantId', { tenantId })
+      .andWhere('h.isSuperseded = :sup', { sup: false })
+      .andWhere(
+        new Brackets(qb => {
+          qb.where('h.organisationsnummer = :org', { org }).orWhere(
+            "regexp_replace(coalesce(h.organisationNumberFiling, ''), '[^0-9]', '', 'g') = :org",
+            { org },
+          );
+        }),
+      )
+      .orderBy('h.extractedAt', 'DESC')
+      .getMany();
+
+    await this.apiFinancialRepo.delete({ tenantId, organisationsnummer: org });
+
+    let rowsInserted = 0;
+    for (const h of headers) {
+      const fins = await this.finRepo.find({ where: { headerId: h.id } });
+      if (!fins.length) continue;
+      const fiscalYear = h.fiscalYear ?? h.filingPeriodEnd?.getUTCFullYear() ?? null;
+      const rows = fins.map(fin =>
+        this.apiFinancialRepo.create({
+          tenantId,
+          organisationsnummer: org,
+          fiscalYear,
+          statementType: statementTypeForCanonicalField(fin.canonicalField),
+          valueCode: fin.canonicalField,
+          valueLabel: CANONICAL_FINANCIAL_LABELS[fin.canonicalField] ?? fin.canonicalField,
+          periodKind: fin.periodKind,
+          valueNumeric: fin.valueNumeric ?? null,
+          valueText: fin.valueText ?? null,
+          currencyCode: fin.currencyCode ?? h.currencyCode ?? null,
+          sourceHeaderId: h.id,
+          sourceImportId: h.annualReportImportId ?? null,
+          sourceFactIds: fin.sourceFactIds ?? [],
+          rankingScore: fin.rankingScore ?? 0,
+        }),
+      );
+      await this.apiFinancialRepo.save(rows);
+      rowsInserted += rows.length;
+    }
+    return { rowsInserted, headersProcessed: headers.length };
   }
 
   async getFileMeta(tenantId: string, fileId: string) {

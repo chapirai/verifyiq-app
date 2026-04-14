@@ -142,6 +142,27 @@ export class AnnualReportsController {
     return this.annualReports.getWorkspaceReadModel(tenantId, org);
   }
 
+  /** Final API-facing financial table built from normalized annual report data. */
+  @Get('companies/:organisationNumber/api-financial-table')
+  async apiFinancialTable(
+    @TenantId() tenantId: string,
+    @Param('organisationNumber') organisationNumber: string,
+  ) {
+    const org = normalizeOrgParam(organisationNumber);
+    const rows = await this.annualReports.getApiFinancialTable(tenantId, org);
+    return { organisationNumber: org, rows };
+  }
+
+  @Post('companies/:organisationNumber/api-financial-table/rebuild')
+  async rebuildApiFinancialTable(
+    @TenantId() tenantId: string,
+    @Param('organisationNumber') organisationNumber: string,
+  ) {
+    const org = normalizeOrgParam(organisationNumber);
+    const result = await this.annualReports.rebuildApiFinancialTableForOrg(tenantId, org);
+    return { organisationNumber: org, ...result };
+  }
+
   /** Latest N distinct fiscal years (by filing period end), pivoted canonical metrics. */
   @Get('companies/:organisationNumber/financial-comparison')
   async financialComparison(
