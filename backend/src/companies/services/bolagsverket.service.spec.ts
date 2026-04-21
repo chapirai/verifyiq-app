@@ -52,7 +52,14 @@ describe('BolagsverketService', () => {
   let service: BolagsverketService;
   let auditService: { emitAuditEvent: jest.Mock };
   let cacheService: { checkFreshness: jest.Mock; createSnapshot: jest.Mock };
-  let persistenceService: { upsertOrganisation: jest.Mock; storeHvdPayload: jest.Mock; storeForetagsinfoPayload: jest.Mock; storeDocumentList: jest.Mock };
+  let persistenceService: {
+    upsertOrganisation: jest.Mock;
+    findByOrgNr: jest.Mock;
+    storeHvdPayload: jest.Mock;
+    storeForetagsinfoPayload: jest.Mock;
+    storeVhPayload: jest.Mock;
+    storeDocumentList: jest.Mock;
+  };
   let rawPayloadStorageService: { storeRawPayload: jest.Mock };
   let snapshotChainService: { linkSnapshot: jest.Mock };
   let snapshotComparisonService: { compareSnapshots: jest.Mock };
@@ -65,7 +72,14 @@ describe('BolagsverketService', () => {
 
   beforeEach(async () => {
     cacheService = { checkFreshness: jest.fn(), createSnapshot: jest.fn() };
-    persistenceService = { upsertOrganisation: jest.fn(), storeHvdPayload: jest.fn().mockResolvedValue({ id: 'hvd-payload-1' }), storeForetagsinfoPayload: jest.fn().mockResolvedValue({ id: 'v4-payload-1' }), storeDocumentList: jest.fn().mockResolvedValue({ id: 'doc-list-1' }) };
+    persistenceService = {
+      upsertOrganisation: jest.fn(),
+      findByOrgNr: jest.fn().mockResolvedValue(null),
+      storeHvdPayload: jest.fn().mockResolvedValue({ id: 'hvd-payload-1' }),
+      storeForetagsinfoPayload: jest.fn().mockResolvedValue({ id: 'v4-payload-1' }),
+      storeVhPayload: jest.fn().mockResolvedValue({ id: 'vh-payload-1' }),
+      storeDocumentList: jest.fn().mockResolvedValue({ id: 'doc-list-1' }),
+    };
     rawPayloadStorageService = { storeRawPayload: jest.fn() };
     const bvPipelineService = {
       enqueueRawPayloadForParse: jest.fn().mockResolvedValue('1'),
@@ -95,7 +109,12 @@ describe('BolagsverketService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BolagsverketService,
-        { provide: BolagsverketClient, useValue: {} },
+        {
+          provide: BolagsverketClient,
+          useValue: {
+            isVerkligaHuvudmanApiEnabled: jest.fn().mockReturnValue(false),
+          },
+        },
         { provide: BolagsverketMapper, useValue: {} },
         { provide: BvCacheService, useValue: cacheService },
         { provide: BvPersistenceService, useValue: persistenceService },
@@ -220,6 +239,17 @@ describe('BolagsverketService', () => {
               fetchHighValueDataset: jest.fn(),
               fetchOrganisationInformation: jest.fn(),
               fetchDocumentList: jest.fn(),
+              fetchOrganizationEngagements: jest.fn().mockResolvedValue({
+                requestPayload: {},
+                responsePayload: { totaltAntalTraffar: 0, funktionarsOrganisationsengagemang: [] },
+                requestId: 'eng-0',
+              }),
+              fetchPersonInformation: jest.fn().mockResolvedValue({
+                requestPayload: {},
+                responsePayload: [],
+                requestId: 'per-0',
+              }),
+              isVerkligaHuvudmanApiEnabled: jest.fn().mockReturnValue(false),
             },
           },
           {
@@ -311,6 +341,8 @@ describe('BolagsverketService', () => {
       expect(result.normalisedData).toBe(normalisedCompany);
       expect(result.highValueDataset).toBe(hvdPayload);
       expect(result.documents).toBeNull();
+      expect(result.bolagsverketApiCallCount).toBe(4);
+      expect(clientMock.fetchOrganizationEngagements).toHaveBeenCalled();
     });
 
     it('passes tenant context through API client calls', async () => {
@@ -354,6 +386,67 @@ describe('BolagsverketService', () => {
         expect.objectContaining({ tenantId: 'tenant-ctx' }),
       );
     });
+
+    it('loads FI personer for 12-digit funktionär identities and paginates organisationsengagemang', async () => {
+      const hvdPayload = { organisation: { identitetsbeteckning: '5560210261', namn: 'Test AB' } };
+      const richPayload = [
+        {
+          identitetsbeteckning: '5560210261',
+          funktionarer: [{ identitetsbeteckning: '195001012222', namn: 'Anna Exempel' }],
+        },
+      ];
+      clientMock.fetchHighValueDataset.mockResolvedValue({
+        requestPayload: { identitetsbeteckning: '5560210261' },
+        responsePayload: hvdPayload as any,
+        requestId: 'req-1',
+      });
+      clientMock.fetchOrganisationInformation.mockResolvedValue({
+        requestPayload: {},
+        responsePayload: richPayload as any,
+        requestId: 'req-2',
+      });
+      clientMock.fetchDocumentList.mockResolvedValue({
+        requestPayload: { identitetsbeteckning: '5560210261' },
+        responsePayload: null as any,
+        requestId: 'req-3',
+      });
+      const row = { organisation: { identitetsbeteckning: '5590000001' } };
+      clientMock.fetchOrganizationEngagements
+        .mockResolvedValueOnce({
+          requestPayload: {},
+          responsePayload: {
+            totaltAntalTraffar: 150,
+            funktionarsOrganisationsengagemang: Array.from({ length: 100 }, () => ({ ...row })),
+          },
+          requestId: 'e1',
+        })
+        .mockResolvedValueOnce({
+          requestPayload: {},
+          responsePayload: {
+            totaltAntalTraffar: 150,
+            funktionarsOrganisationsengagemang: Array.from({ length: 50 }, () => ({ ...row })),
+          },
+          requestId: 'e2',
+        });
+      clientMock.fetchPersonInformation.mockResolvedValue({
+        requestPayload: {},
+        responsePayload: [{ identitetsbeteckning: '195001012222' }] as any,
+        requestId: 'p1',
+      });
+      mapperMock.map.mockReturnValue(makeNormalisedCompany({ organisationNumber: '5560210261' }));
+
+      const result = await service.getCompleteCompanyData('5560210261');
+
+      expect(clientMock.fetchOrganizationEngagements).toHaveBeenCalledTimes(2);
+      expect(clientMock.fetchPersonInformation).toHaveBeenCalledWith(
+        '195001012222',
+        undefined,
+        undefined,
+      );
+      expect(result.organisationEngagementsAggregated?.funktionarsOrganisationsengagemang?.length).toBe(150);
+      expect(result.relatedPersonInformation?.['195001012222']?.[0]?.identitetsbeteckning).toBe('195001012222');
+      expect(result.bolagsverketApiCallCount).toBe(3 + 2 + 1);
+    });
   });
 
   describe('enrichAndSave audit events', () => {
@@ -369,6 +462,7 @@ describe('BolagsverketService', () => {
       snapshot.isStaleFallback = false;
       snapshot.normalisedSummary = { organisationNumber: '5560000001' } as any;
       snapshot.fetchedAt = new Date();
+      snapshot.apiCallCount = 4;
 
       cacheService.checkFreshness.mockResolvedValue({
         isFresh: true,
@@ -393,7 +487,12 @@ describe('BolagsverketService', () => {
         highValueDataset: null,
         organisationInformation: [],
         documents: null,
+        verkligaHuvudman: null,
         retrievedAt: new Date().toISOString(),
+        vhRequestId: null,
+        organisationEngagementsAggregated: null,
+        relatedPersonInformation: undefined,
+        bolagsverketApiCallCount: 3,
       };
 
       jest

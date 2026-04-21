@@ -34,6 +34,7 @@ import {
   PersonResponse,
   SortAttributeEngagemang,
   SortOrder,
+  VerkligaHuvudmanRegisterResponse,
 } from './bolagsverket.types';
 
 /**
@@ -53,6 +54,10 @@ const RETRY_CONFIG = {
 
 const HVD_BASE_URL = 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1';
 const ORG_BASE_URL = 'https://gw.api.bolagsverket.se/foretagsinformation/v4';
+/** Accept / pre-prod gateway (documented until production launch). */
+const VH_BASE_URL_DEFAULT = 'https://gw-accept2.api.bolagsverket.se/verkliga-huvudman/v1';
+/** Default POST path — align with `BV_VH_POST_PATH` if Bolagsverket changes the contract. */
+const VH_POST_PATH_DEFAULT = '/organisationer';
 const DEFAULT_HVD_SCOPES = 'vardefulla-datamangder:read vardefulla-datamangder:ping';
 const DEFAULT_HVD_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token';
 const DEFAULT_HVD_REVOKE_URL = 'https://portal.api.bolagsverket.se/oauth2/revoke';
@@ -131,6 +136,25 @@ export class BolagsverketClient {
 
   private getOrganisationBaseUrl(): string {
     return this.configService.get<string>('BV_FORETAGSINFO_BASE_URL') ?? ORG_BASE_URL;
+  }
+
+  /**
+   * Register API for beneficial owners (Verkliga huvudmän). Separate gateway from
+   * Företagsinformation v4 and Värdefulla datamängder; uses the same OAuth client flow as FI when enabled.
+   */
+  /** Opt-in: set `BV_VH_ENABLED=true` to call the register API (defaults to accept2 base URL until production). */
+  isVerkligaHuvudmanApiEnabled(): boolean {
+    return this.configService.get<string>('BV_VH_ENABLED')?.toLowerCase() === 'true';
+  }
+
+  private getVerkligaHuvudmanBaseUrl(): string {
+    const configured = this.configService.get<string>('BV_VH_BASE_URL')?.trim();
+    return this.normalizeBaseUrl(configured || VH_BASE_URL_DEFAULT);
+  }
+
+  private getVerkligaHuvudmanPostPath(): string {
+    const p = this.configService.get<string>('BV_VH_POST_PATH')?.trim();
+    return p && p.startsWith('/') ? p : VH_POST_PATH_DEFAULT;
   }
 
   private getHvdTokenUrl(): string {
@@ -330,7 +354,7 @@ export class BolagsverketClient {
         const status: number | undefined = error?.response?.status;
         const isRetryable = status !== undefined && RETRYABLE_STATUS_CODES.has(status);
 
-        if (status === 401 && options?.auth === 'hvd' && attempt === 0) {
+        if (status === 401 && (options?.auth === 'hvd' || options?.auth === 'org') && attempt === 0) {
           attempt++;
           this.invalidateToken();
           continue;
@@ -585,6 +609,62 @@ export class BolagsverketClient {
       auth: 'org',
     });
     return { status: responseData === 'OK' ? 'OK' : 'UNKNOWN' };
+  }
+
+  /**
+   * GET …/verkliga-huvudman/v1/isalive — same pattern as FI/HVD when the gateway exposes it.
+   * When disabled via env, returns `disabled` without calling upstream.
+   */
+  async verkligaHuvudmanHealthCheck(
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+  ): Promise<{ status: string; enabled: boolean }> {
+    if (!this.isVerkligaHuvudmanApiEnabled()) {
+      return { status: 'DISABLED', enabled: false };
+    }
+    try {
+      const { responseData } = await this.requestWithRetry<string>(
+        'get',
+        this.buildUrl(this.getVerkligaHuvudmanBaseUrl(), '/isalive'),
+        undefined,
+        { auth: 'org', context },
+      );
+      return { status: responseData === 'OK' ? 'OK' : 'UNKNOWN', enabled: true };
+    } catch {
+      return { status: 'UNAVAILABLE', enabled: true };
+    }
+  }
+
+  /**
+   * POST register lookup for beneficial owners (Verkliga huvudmän).
+   * Request body matches FI organisation pattern unless overridden by Bolagsverket.
+   */
+  async fetchVerkligaHuvudman(
+    identitetsbeteckning: string,
+    context?: { tenantId?: string; actorId?: string | null; correlationId?: string | null },
+  ): Promise<{
+    requestPayload: { identitetsbeteckning: string };
+    responsePayload: VerkligaHuvudmanRegisterResponse | null;
+    requestId: string;
+  }> {
+    const payload = { identitetsbeteckning };
+    const url = this.buildUrl(this.getVerkligaHuvudmanBaseUrl(), this.getVerkligaHuvudmanPostPath());
+    try {
+      const { responseData, requestId } = await this.requestWithRetry<VerkligaHuvudmanRegisterResponse>(
+        'post',
+        url,
+        payload,
+        { auth: 'org', context, treatHttp404AsEmptyFi: true },
+      );
+      return { requestPayload: payload, responsePayload: responseData, requestId };
+    } catch (err: unknown) {
+      if (this.isFiOptionalEndpointEmptyError(err)) {
+        this.logger.warn(
+          `verkliga-huvudman: no resource for identitetsbeteckning=${identitetsbeteckning} — returning null payload`,
+        );
+        return { requestPayload: payload, responsePayload: null, requestId: randomUUID() };
+      }
+      throw err;
+    }
   }
 
   /** POST /vardefulla-datamangder/v1/organisationer – high-value dataset. */

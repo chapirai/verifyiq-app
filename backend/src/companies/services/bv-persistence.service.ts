@@ -5,6 +5,7 @@ import { BvOrganisationEntity } from '../entities/bv-organisation.entity';
 import { BvHvdPayloadEntity } from '../entities/bv-hvd-payload.entity';
 import { BvForetagsinfoPayloadEntity } from '../entities/bv-foretagsinfo-payload.entity';
 import { BvDocumentListEntity } from '../entities/bv-document-list.entity';
+import { BvVhPayloadEntity } from '../entities/bv-vh-payload.entity';
 import { CompanyRawPayloadEntity } from '../entities/company-raw-payload.entity';
 import { NormalisedCompany } from '../integrations/bolagsverket.mapper';
 
@@ -21,6 +22,8 @@ export class BvPersistenceService {
     private readonly foretagsinfoPayloadRepo: Repository<BvForetagsinfoPayloadEntity>,
     @InjectRepository(BvDocumentListEntity)
     private readonly documentListRepo: Repository<BvDocumentListEntity>,
+    @InjectRepository(BvVhPayloadEntity)
+    private readonly vhPayloadRepo: Repository<BvVhPayloadEntity>,
     @InjectRepository(CompanyRawPayloadEntity)
     private readonly endpointPayloadRepo: Repository<CompanyRawPayloadEntity>,
   ) {}
@@ -141,6 +144,29 @@ export class BvPersistenceService {
    */
   async backfillForetagsinfoSnapshotId(foretagsinfoPayloadId: string, snapshotId: string): Promise<void> {
     await this.foretagsinfoPayloadRepo.update(foretagsinfoPayloadId, { snapshotId });
+  }
+
+  async storeVhPayload(
+    tenantId: string,
+    organisationsnummer: string,
+    fetchedAt: Date,
+    payload: Record<string, unknown>,
+    requestId?: string | null,
+    snapshotId?: string | null,
+  ): Promise<BvVhPayloadEntity> {
+    const entity = this.vhPayloadRepo.create({
+      tenantId,
+      organisationsnummer,
+      fetchedAt,
+      payload,
+      requestId: requestId ?? null,
+      snapshotId: snapshotId ?? null,
+    });
+    return this.vhPayloadRepo.save(entity);
+  }
+
+  async backfillVhSnapshotId(vhPayloadId: string, snapshotId: string): Promise<void> {
+    await this.vhPayloadRepo.update(vhPayloadId, { snapshotId });
   }
 
   /**

@@ -44,6 +44,9 @@ export default function DashboardPage() {
           <p className="mono-label text-[10px]">Quick Actions</p>
           <ul className="mt-3 space-y-2 text-sm">
             <li><a href="/search" className="underline underline-offset-4">Lookup company by org number</a></li>
+            <li><a href="/lists" className="underline underline-offset-4">Build and maintain target lists</a></li>
+            <li><a href="/compare" className="underline underline-offset-4">Compare shortlisted companies</a></li>
+            <li><a href="/alerts" className="underline underline-offset-4">Set up monitoring alerts</a></li>
             <li><a href="/bulk" className="underline underline-offset-4">Create bulk enrichment batch</a></li>
             <li><a href="/billing" className="underline underline-offset-4">Review subscription access</a></li>
           </ul>

@@ -1,5 +1,6 @@
 import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
+import { OwnershipModule } from '../ownership/ownership.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { AuditModule } from '../audit/audit.module';
@@ -7,6 +8,7 @@ import { ApiQuotaModule } from '../common/api-quota.module';
 import { CompaniesController } from './companies.controller';
 import { CompanyLookupsController } from './controllers/company-lookups.controller';
 import { CompanyServingController } from './controllers/company-serving.controller';
+import { TargetListsController } from './controllers/target-lists.controller';
 import { CompaniesService } from './companies.service';
 import { CompanyEntity } from './entities/company.entity';
 import { CompanyRawPayloadEntity } from './entities/company-raw-payload.entity';
@@ -16,6 +18,7 @@ import { BvFetchSnapshotEntity } from './entities/bv-fetch-snapshot.entity';
 import { BvStoredDocumentEntity } from './entities/bv-stored-document.entity';
 import { BvHvdPayloadEntity } from './entities/bv-hvd-payload.entity';
 import { BvForetagsinfoPayloadEntity } from './entities/bv-foretagsinfo-payload.entity';
+import { BvVhPayloadEntity } from './entities/bv-vh-payload.entity';
 import { BvDocumentListEntity } from './entities/bv-document-list.entity';
 import { BolagsverketClient } from './integrations/bolagsverket.client';
 import { BolagsverketMapper } from './integrations/bolagsverket.mapper';
@@ -52,6 +55,8 @@ import { CompanyMetadataService } from './services/company-metadata.service';
 import { IntegrationTokenEntity } from './entities/integration-token.entity';
 import { IntegrationTokenService } from './services/integration-token.service';
 import { DataIngestionLogEntity } from './entities/data-ingestion-log.entity';
+import { TargetListEntity } from './entities/target-list.entity';
+import { TargetListItemEntity } from './entities/target-list-item.entity';
 import { DataIngestionLogService } from './services/data-ingestion-log.service';
 import { HvdAggregatorService } from './services/hvd-aggregator.service';
 import { BolagsverketProvider } from './providers/bolagsverket.provider';
@@ -60,10 +65,12 @@ import { BV_ENRICHMENT_QUEUE } from './queues/bv-enrichment.queue';
 import { BvPipelineService } from './services/bv-pipeline.service';
 import { BvPipelineWorker } from './services/bv-pipeline.worker';
 import { CompanyServingReadService } from './services/company-serving-read.service';
+import { TargetListsService } from './services/target-lists.service';
 import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-report-parse.queue';
 
 @Module({
   imports: [
+    OwnershipModule,
     ApiQuotaModule,
     TypeOrmModule.forFeature([
       CompanyEntity,
@@ -74,6 +81,7 @@ import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-repor
       BvStoredDocumentEntity,
       BvHvdPayloadEntity,
       BvForetagsinfoPayloadEntity,
+      BvVhPayloadEntity,
       BvDocumentListEntity,
       BvRawPayloadEntity,
       NormalizedCompanyEntity,
@@ -84,6 +92,8 @@ import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-repor
       FailureStateEntity,
       IntegrationTokenEntity,
       DataIngestionLogEntity,
+      TargetListEntity,
+      TargetListItemEntity,
     ]),
     HttpModule,
     AuditModule,
@@ -98,6 +108,7 @@ import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-repor
     ChangeEventController,
     CompanyLookupsController,
     CompanyServingController,
+    TargetListsController,
   ],
   providers: [
     CompaniesService,
@@ -130,6 +141,7 @@ import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-repor
     BvPipelineService,
     BvPipelineWorker,
     CompanyServingReadService,
+    TargetListsService,
   ],
   exports: [
     CompaniesService,
@@ -155,6 +167,7 @@ import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-repor
     DataIngestionLogService,
     HvdAggregatorService,
     BolagsverketProvider,
+    TargetListsService,
   ],
 })
 export class CompaniesModule {}

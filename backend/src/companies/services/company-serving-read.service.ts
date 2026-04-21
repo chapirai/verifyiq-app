@@ -113,9 +113,61 @@ export interface CompanyEngagementServingRow {
   dataRefreshedAt: string | null;
 }
 
+export interface CompanyVerkligaHuvudmanServingRow {
+  tenantId: string;
+  organisationsnummer: string;
+  fetchedAt: string | null;
+  requestId: string | null;
+  /** Full Bolagsverket Verkliga huvudmän register JSON (latest stored snapshot). */
+  payload: Record<string, unknown>;
+}
+
+export interface CompanyServingBundleRow {
+  overview: CompanyOverviewServingRow | null;
+  officers: CompanyOfficerServingRow[];
+  reports: CompanyFiReportServingRow[];
+  documents: CompanyHvdDocumentServingRow[];
+  cases: CompanyFiCaseServingRow[];
+  shareCapital: CompanyShareCapitalServingRow | null;
+  engagements: CompanyEngagementServingRow[];
+  verkligaHuvudman: CompanyVerkligaHuvudmanServingRow | null;
+}
+
 @Injectable()
 export class CompanyServingReadService {
   constructor(private readonly dataSource: DataSource) {}
+
+  async getBundle(tenantId: string, org: string): Promise<CompanyServingBundleRow> {
+    const [overview, officers, reports, documents, cases, shareCapital, engagements, verkligaHuvudman] =
+      await Promise.all([
+        this.getOverview(tenantId, org),
+        this.getOfficers(tenantId, org),
+        this.getFiReports(tenantId, org),
+        this.getHvdDocuments(tenantId, org),
+        this.getFiCases(tenantId, org),
+        this.getShareCapital(tenantId, org),
+        this.getEngagements(tenantId, org),
+        this.getVerkligaHuvudmanLatest(tenantId, org),
+      ]);
+    return { overview, officers, reports, documents, cases, shareCapital, engagements, verkligaHuvudman };
+  }
+
+  async getVerkligaHuvudmanLatest(
+    tenantId: string,
+    org: string,
+  ): Promise<CompanyVerkligaHuvudmanServingRow | null> {
+    const rows = await this.dataSource.query(
+      `SELECT tenant_id::text, organisationsnummer, fetched_at::text, request_id, payload
+       FROM bv_vh_payloads
+       WHERE tenant_id = $1::uuid AND organisationsnummer = $2
+       ORDER BY fetched_at DESC NULLS LAST, created_at DESC
+       LIMIT 1`,
+      [tenantId, org],
+    );
+    const r = rows[0] as Record<string, unknown> | undefined;
+    if (!r?.payload) return null;
+    return this.mapVerkligaHuvudman(r);
+  }
 
   async getOverview(tenantId: string, org: string): Promise<CompanyOverviewServingRow | null> {
     const rows = await this.dataSource.query(
@@ -312,6 +364,17 @@ export class CompanyServingReadService {
       roleKlartext: r.role_klartext != null ? String(r.role_klartext) : null,
       personOrOrganisationName: r.person_or_organisation_name != null ? String(r.person_or_organisation_name) : null,
       dataRefreshedAt: r.data_refreshed_at != null ? String(r.data_refreshed_at) : null,
+    };
+  }
+
+  private mapVerkligaHuvudman(r: Record<string, unknown>): CompanyVerkligaHuvudmanServingRow {
+    const payload = r.payload;
+    return {
+      tenantId: String(r.tenant_id),
+      organisationsnummer: String(r.organisationsnummer),
+      fetchedAt: r.fetched_at != null ? String(r.fetched_at) : null,
+      requestId: r.request_id != null ? String(r.request_id) : null,
+      payload: payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {},
     };
   }
 }

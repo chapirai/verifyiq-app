@@ -15,8 +15,10 @@ import {
   OrganisationInformationResponse,
   OrganisationsengagemangResponse,
   PersonResponse,
+  VerkligaHuvudmanRegisterResponse,
 } from '../integrations/bolagsverket.types';
 import { sanitizeBolagsverketFilename } from '../integrations/bolagsverket.utils';
+import { classifyIdentifier } from '../utils/identifier-validator';
 import { BvCacheService } from './bv-cache.service';
 import { BvPersistenceService } from './bv-persistence.service';
 import { BvFetchSnapshotEntity, SnapshotPolicyDecision } from '../entities/bv-fetch-snapshot.entity';
@@ -36,22 +38,44 @@ import {
 /** Allowed tolerance when validating share-capital arithmetic (1 %). */
 const SHARE_CAPITAL_TOLERANCE = 0.01;
 
-/**
- * Number of external Bolagsverket API calls made by getCompleteCompanyData:
- * 1 × fetchHighValueDataset + 1 × fetchOrganisationInformation + 1 × fetchDocumentList.
- */
-const ENRICH_API_CALL_COUNT = 3;
+/** Base Bolagsverket calls in getCompleteCompanyData (HVD + FI + dokumentlista). */
+const ENRICH_API_CALL_COUNT_BASE = 3;
+
+/** Max FI organisationsengagemang pages per company (safety cap). */
+const ORG_ENGAGEMENT_MAX_PAGES = 25;
+
+/** FI personer calls run in small parallel batches. */
+const FI_PERSON_FETCH_CONCURRENCY = 6;
 
 export interface CompleteCompanyProfile {
   normalisedData: NormalisedCompany;
   highValueDataset: HighValueDatasetResponse | null;
   organisationInformation: OrganisationInformationResponse[];
   documents: DocumentListResponse | null;
+  /**
+   * Verkliga huvudmän register (separate Bolagsverket API from FI v4 / HVD).
+   * Null when `BV_VH_ENABLED` is not set or the upstream call failed / returned no resource.
+   */
+  verkligaHuvudman: VerkligaHuvudmanRegisterResponse | null;
   retrievedAt: string;
   /** Request ID returned by the HVD API, if available. */
   hvdRequestId?: string | null;
   /** Request ID returned by the Företagsinformation v4 API, if available. */
   v4RequestId?: string | null;
+  /** Request ID returned by the Verkliga huvudmän API, if available. */
+  vhRequestId?: string | null;
+  /**
+   * Aggregated POST …/organisationsengagemang for this organisation (all pages).
+   * Present after a successful FI org fetch; null when skipped or all pages failed.
+   */
+  organisationEngagementsAggregated?: OrganisationsengagemangResponse | null;
+  /**
+   * FI POST …/personer payloads keyed by normalised identitetsbeteckning (12-digit / GD),
+   * for natural persons referenced from funktionärer and Verkliga huvudmän (when loaded).
+   */
+  relatedPersonInformation?: Record<string, PersonResponse>;
+  /** Total Bolagsverket HTTP calls attempted in this profile fetch (for metering). */
+  bolagsverketApiCallCount: number;
 }
 
 export interface OfficerProfile {
@@ -147,6 +171,21 @@ export class BolagsverketService {
     return response;
   }
 
+  async vhIsAlive(context?: BvRequestContext): Promise<{ status: string; enabled: boolean }> {
+    const response = await this.client.verkligaHuvudmanHealthCheck(context);
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: 'system',
+        source: 'vh.isalive',
+        requestPayload: {},
+        responsePayload: response as unknown as Record<string, unknown>,
+        requestId: randomUUID(),
+      });
+    }
+    return response;
+  }
+
   async isAlive(): Promise<{ status: string }> {
     return this.healthCheck();
   }
@@ -210,6 +249,131 @@ export class BolagsverketService {
     };
   }
 
+  private normaliseIdentityDigits(raw: string | null | undefined): string | null {
+    if (!raw) return null;
+    const d = raw.replace(/\D/g, '');
+    return d.length ? d : null;
+  }
+
+  private isFiNaturalPersonIdentitet(digits: string): boolean {
+    const t = classifyIdentifier(digits);
+    return t === 'personnummer' || t === 'gd_nummer';
+  }
+
+  /**
+   * Collect 12-digit / GD identities that the FI `personer` endpoint accepts,
+   * from funktionärer on the organisation block and from Verkliga huvudmän (when present).
+   */
+  private collectFiPersonIdentitiesFromProfile(
+    organisationInformation: OrganisationInformationResponse[],
+    verkligaHuvudman: VerkligaHuvudmanRegisterResponse | null,
+  ): string[] {
+    const out = new Set<string>();
+    const org = organisationInformation[0];
+    for (const o of org?.funktionarer ?? []) {
+      const id =
+        this.normaliseIdentityDigits(o.identitet?.identitetsbeteckning) ??
+        this.normaliseIdentityDigits(o.identitetsbeteckning) ??
+        this.normaliseIdentityDigits(o.personId);
+      if (id && this.isFiNaturalPersonIdentitet(id)) {
+        out.add(id);
+      }
+    }
+    if (verkligaHuvudman) {
+      const vhPeople = [
+        ...(verkligaHuvudman.verkligHuvudman ?? []),
+        ...(verkligaHuvudman.foretradare ?? []),
+      ];
+      for (const p of vhPeople) {
+        if (p.arAnonym) continue;
+        const id = this.normaliseIdentityDigits(p.identitet?.identitetsbeteckning);
+        if (id && this.isFiNaturalPersonIdentitet(id)) {
+          out.add(id);
+        }
+      }
+    }
+    return [...out];
+  }
+
+  /**
+   * Paginate POST …/organisationsengagemang for the company (or juridical person) identity.
+   * Uses {@link getOrganisationEngagements} so tenant payload logging stays consistent.
+   */
+  private async fetchAllOrganisationEngagementsPages(
+    identitetsbeteckning: string,
+    context?: BvRequestContext,
+  ): Promise<{ merged: OrganisationsengagemangResponse | null; apiAttempts: number }> {
+    const pageSize = 100;
+    let apiAttempts = 0;
+    const mergedRows: NonNullable<OrganisationsengagemangResponse['funktionarsOrganisationsengagemang']> = [];
+    let template: OrganisationsengagemangResponse | null = null;
+    let total: number | undefined;
+
+    for (let page = 1; page <= ORG_ENGAGEMENT_MAX_PAGES; page++) {
+      try {
+        apiAttempts++;
+        const res = await this.getOrganisationEngagements(identitetsbeteckning, page, pageSize, context);
+        if (!template) {
+          template = res;
+        }
+        total = res.totaltAntalTraffar;
+        const slice = res.funktionarsOrganisationsengagemang ?? [];
+        mergedRows.push(...slice);
+        const t = total ?? mergedRows.length;
+        if (mergedRows.length >= t || slice.length < pageSize) {
+          break;
+        }
+      } catch (err: unknown) {
+        this.logger.warn(
+          `organisationsengagemang page ${page} failed for ${identitetsbeteckning}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+        break;
+      }
+    }
+
+    if (apiAttempts === 0) {
+      return { merged: null, apiAttempts: 0 };
+    }
+
+    const merged: OrganisationsengagemangResponse = {
+      ...(template ?? {}),
+      totaltAntalTraffar: total ?? mergedRows.length,
+      funktionarsOrganisationsengagemang: mergedRows,
+      sida: 1,
+      antalPerSida: mergedRows.length,
+    };
+    return { merged, apiAttempts };
+  }
+
+  private async fetchRelatedPersonBatches(
+    personIds: string[],
+    context?: BvRequestContext,
+  ): Promise<{ byId: Record<string, PersonResponse>; apiAttempts: number }> {
+    const byId: Record<string, PersonResponse> = {};
+    let apiAttempts = 0;
+    for (let i = 0; i < personIds.length; i += FI_PERSON_FETCH_CONCURRENCY) {
+      const chunk = personIds.slice(i, i + FI_PERSON_FETCH_CONCURRENCY);
+      const settled = await Promise.allSettled(chunk.map((id) => this.getPersonInformation(id, context)));
+      for (let j = 0; j < chunk.length; j++) {
+        apiAttempts++;
+        const id = chunk[j]!;
+        const r = settled[j]!;
+        if (r.status === 'fulfilled') {
+          byId[id] = r.value;
+        } else {
+          this.logger.warn(
+            `getPersonInformation failed for ${id}: ${
+              r.reason instanceof Error ? r.reason.message : String(r.reason)
+            }`,
+          );
+        }
+      }
+    }
+    return { byId, apiAttempts };
+  }
+
   // ── Complete company profile ─────────────────────────────────────────────────
 
   /**
@@ -220,11 +384,18 @@ export class BolagsverketService {
     identitetsbeteckning: string,
     context?: BvRequestContext,
   ): Promise<CompleteCompanyProfile> {
-    const [hvdResult, richResult, docResult] = await Promise.allSettled([
+    const vhEnabled = this.client.isVerkligaHuvudmanApiEnabled();
+    const settled = await Promise.allSettled([
       this.client.fetchHighValueDataset(identitetsbeteckning, context),
       this.client.fetchOrganisationInformation(identitetsbeteckning, undefined, undefined, context),
       this.client.fetchDocumentList({ identitetsbeteckning }, context),
+      ...(vhEnabled ? [this.client.fetchVerkligaHuvudman(identitetsbeteckning, context)] : []),
     ]);
+
+    const hvdResult = settled[0]!;
+    const richResult = settled[1]!;
+    const docResult = settled[2]!;
+    const vhResult = vhEnabled ? settled[3]! : null;
 
     const highValueDataset =
       hvdResult.status === 'fulfilled' ? hvdResult.value.responsePayload : null;
@@ -232,6 +403,12 @@ export class BolagsverketService {
       richResult.status === 'fulfilled' ? richResult.value.responsePayload : [];
     const documents =
       docResult.status === 'fulfilled' ? docResult.value.responsePayload : null;
+    let verkligaHuvudman: VerkligaHuvudmanRegisterResponse | null = null;
+    let vhRequestId: string | null = null;
+    if (vhResult?.status === 'fulfilled') {
+      verkligaHuvudman = vhResult.value.responsePayload;
+      vhRequestId = vhResult.value.requestId ?? null;
+    }
 
     const failedDatasets: string[] = [];
     if (hvdResult.status === 'rejected') {
@@ -246,30 +423,79 @@ export class BolagsverketService {
       this.logger.warn(`fetchDocumentList failed for ${identitetsbeteckning}: ${docResult.reason}`);
       failedDatasets.push(`documentList: ${docResult.reason}`);
     }
+    if (vhResult?.status === 'rejected') {
+      this.logger.warn(`fetchVerkligaHuvudman failed for ${identitetsbeteckning}: ${vhResult.reason}`);
+      failedDatasets.push(`verkligaHuvudman: ${vhResult.reason}`);
+    }
 
-    if (failedDatasets.length === 3) {
+    const coreFailed =
+      (hvdResult.status === 'rejected' ? 1 : 0) +
+      (richResult.status === 'rejected' ? 1 : 0) +
+      (docResult.status === 'rejected' ? 1 : 0);
+    if (coreFailed === 3) {
       throw new BadGatewayException(
-        `All Bolagsverket API calls failed for ${identitetsbeteckning}: ${failedDatasets.join('; ')}`,
+        `All Bolagsverket core API calls failed for ${identitetsbeteckning}: ${failedDatasets.join('; ')}`,
       );
     }
 
     if (failedDatasets.length > 0) {
       this.logger.warn(
-        `Partial Bolagsverket data for ${identitetsbeteckning}: ${failedDatasets.length}/3 datasets unavailable`,
+        `Partial Bolagsverket data for ${identitetsbeteckning}: ${failedDatasets.length} dataset(s) unavailable`,
       );
     }
 
     const normalisedData = this.mapper.map(highValueDataset, organisationInformation, identitetsbeteckning);
+
+    let bolagsverketApiCallCount = ENRICH_API_CALL_COUNT_BASE + (vhEnabled ? 1 : 0);
+    let organisationEngagementsAggregated: OrganisationsengagemangResponse | null = null;
+    let relatedPersonInformation: Record<string, PersonResponse> | undefined;
+
+    const personIds = this.collectFiPersonIdentitiesFromProfile(organisationInformation, verkligaHuvudman);
+    const [engagementOutcome, personOutcome] = await Promise.all([
+      this.fetchAllOrganisationEngagementsPages(identitetsbeteckning, context),
+      this.fetchRelatedPersonBatches(personIds, context),
+    ]);
+    bolagsverketApiCallCount += engagementOutcome.apiAttempts + personOutcome.apiAttempts;
+    organisationEngagementsAggregated = engagementOutcome.merged;
+    if (personIds.length > 0) {
+      relatedPersonInformation = personOutcome.byId;
+    }
 
     return {
       normalisedData,
       highValueDataset,
       organisationInformation,
       documents,
+      verkligaHuvudman,
       retrievedAt: new Date().toISOString(),
       hvdRequestId: hvdResult.status === 'fulfilled' ? (hvdResult.value.requestId ?? null) : null,
       v4RequestId: richResult.status === 'fulfilled' ? (richResult.value.requestId ?? null) : null,
+      vhRequestId,
+      organisationEngagementsAggregated,
+      relatedPersonInformation,
+      bolagsverketApiCallCount,
     };
+  }
+
+  async getVerkligaHuvudmanRegister(
+    identitetsbeteckning: string,
+    context?: BvRequestContext,
+  ): Promise<VerkligaHuvudmanRegisterResponse | null> {
+    if (!this.client.isVerkligaHuvudmanApiEnabled()) {
+      return null;
+    }
+    const { responsePayload, requestId } = await this.client.fetchVerkligaHuvudman(identitetsbeteckning, context);
+    if (context?.tenantId) {
+      void this.bvPersistenceService.storeEndpointPayload({
+        tenantId: context.tenantId,
+        organisationNumber: identitetsbeteckning,
+        source: 'vh.verkligaHuvudman',
+        requestPayload: { identitetsbeteckning },
+        responsePayload: (responsePayload ?? {}) as Record<string, unknown>,
+        requestId: requestId ?? randomUUID(),
+      });
+    }
+    return responsePayload;
   }
 
   // ── Företagsinformation (organisation data) ─────────────────────────────────
@@ -820,6 +1046,9 @@ export class BolagsverketService {
           let cachedHvd: HighValueDatasetResponse | null = null;
           let cachedOrgInfo: OrganisationInformationResponse[] = [];
           let cachedDocuments: DocumentListResponse | null = null;
+          let cachedVh: VerkligaHuvudmanRegisterResponse | null = null;
+          let cachedOrgEngagements: OrganisationsengagemangResponse | null = null;
+          let cachedRelatedPersons: Record<string, PersonResponse> | undefined;
           try {
             const org = await this.bvPersistenceService.findByOrgNr(tenantId, identitetsbeteckning);
             if (org?.rawPayload) {
@@ -829,6 +1058,16 @@ export class BolagsverketService {
                 ? (rawOrgInfo as OrganisationInformationResponse[])
                 : [];
               cachedDocuments = (org.rawPayload['documents'] as DocumentListResponse) ?? null;
+              cachedVh = (org.rawPayload['verkligaHuvudman'] as VerkligaHuvudmanRegisterResponse) ?? null;
+              const rp = org.rawPayload['relatedPersonInformation'];
+              if (rp && typeof rp === 'object' && !Array.isArray(rp)) {
+                cachedRelatedPersons = rp as Record<string, PersonResponse>;
+              }
+              const eng = org.rawPayload['organisationEngagementsAggregated'] as
+                | OrganisationsengagemangResponse
+                | undefined
+                | null;
+              cachedOrgEngagements = eng ?? null;
             }
           } catch (lookupErr) {
             const detail = lookupErr instanceof Error ? lookupErr.message : String(lookupErr);
@@ -841,7 +1080,12 @@ export class BolagsverketService {
             highValueDataset: cachedHvd,
             organisationInformation: cachedOrgInfo,
             documents: cachedDocuments,
+            verkligaHuvudman: cachedVh,
             retrievedAt: cacheCheck.snapshot.fetchedAt.toISOString(),
+            vhRequestId: null,
+            organisationEngagementsAggregated: cachedOrgEngagements,
+            relatedPersonInformation: cachedRelatedPersons,
+            bolagsverketApiCallCount: cacheCheck.snapshot.apiCallCount ?? 0,
           };
           return {
             result: cachedResult,
@@ -904,28 +1148,27 @@ export class BolagsverketService {
         providerCall: true,
       },
     });
-    void this.auditService.emitAuditEvent({
-      tenantId,
-      userId: actor,
-      eventType: AuditEventType.PROVIDER_CALLED,
-      action: 'company.provider_call',
-      status: 'started',
-      resourceId: identitetsbeteckning,
-      correlationId: correlation,
-      costImpact: { apiCallCount: ENRICH_API_CALL_COUNT },
-      metadata: {
-        ...eventContext,
-        triggerType,
-      },
-    });
-
     try {
       result = await this.getCompleteCompanyData(identitetsbeteckning, {
         tenantId,
         actorId,
         correlationId,
       });
-      apiCallCount = ENRICH_API_CALL_COUNT;
+      apiCallCount = result.bolagsverketApiCallCount;
+      void this.auditService.emitAuditEvent({
+        tenantId,
+        userId: actor,
+        eventType: AuditEventType.PROVIDER_CALLED,
+        action: 'company.provider_call',
+        status: 'completed',
+        resourceId: identitetsbeteckning,
+        correlationId: correlation,
+        costImpact: { apiCallCount },
+        metadata: {
+          ...eventContext,
+          triggerType,
+        },
+      });
     } catch (err) {
       fetchStatus = 'error';
       errorMessage = String(err);
@@ -975,6 +1218,20 @@ export class BolagsverketService {
         highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
         organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
         documents: result.documents as unknown as Record<string, unknown>,
+        ...(result.verkligaHuvudman
+          ? { verkligaHuvudman: result.verkligaHuvudman as unknown as Record<string, unknown> }
+          : {}),
+        ...(result.organisationEngagementsAggregated
+          ? {
+              organisationEngagementsAggregated: result.organisationEngagementsAggregated as unknown as Record<
+                string,
+                unknown
+              >,
+            }
+          : {}),
+        ...(result.relatedPersonInformation
+          ? { relatedPersonInformation: result.relatedPersonInformation as unknown as Record<string, unknown> }
+          : {}),
       });
 
       // 4. Store raw payload with checksum-based deduplication (P02-T02)
@@ -985,6 +1242,20 @@ export class BolagsverketService {
           highValueDataset: result.highValueDataset as unknown as Record<string, unknown>,
           organisationInformation: result.organisationInformation as unknown as Record<string, unknown>,
           ...(Array.isArray(docList?.dokument) ? { dokument: docList!.dokument } : {}),
+          ...(result.verkligaHuvudman
+            ? { verkligaHuvudman: result.verkligaHuvudman as unknown as Record<string, unknown> }
+            : {}),
+          ...(result.organisationEngagementsAggregated
+            ? {
+                organisationEngagementsAggregated: result.organisationEngagementsAggregated as unknown as Record<
+                  string,
+                  unknown
+                >,
+              }
+            : {}),
+          ...(result.relatedPersonInformation
+            ? { relatedPersonInformation: result.relatedPersonInformation as unknown as Record<string, unknown> }
+            : {}),
         };
         const { rawPayload, isDeduplicated } = await this.rawPayloadStorageService.storeRawPayload({
           tenantId,
@@ -1068,6 +1339,20 @@ export class BolagsverketService {
           )
           .catch((err: unknown) =>
             this.logger.warn(`Företagsinformation payload storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
+          );
+      }
+      if (result.verkligaHuvudman) {
+        this.bvPersistenceService
+          .storeVhPayload(
+            tenantId,
+            identitetsbeteckning,
+            fetchedAt,
+            result.verkligaHuvudman as unknown as Record<string, unknown>,
+            result.vhRequestId ?? null,
+            snapshot.id,
+          )
+          .catch((err: unknown) =>
+            this.logger.warn(`Verkliga huvudmän payload storage failed for ${identitetsbeteckning}: ${err instanceof Error ? err.message : String(err)}`),
           );
       }
 

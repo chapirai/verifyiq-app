@@ -2,6 +2,7 @@ import { clearSession, getAccessToken, getRefreshToken, setSession } from '@/lib
 import { API_V1_BASE_URL } from '@/lib/api-base-url';
 import type { ApiEnvelope, ApiKey, AuthTokens, BillingPlan, BulkJob, CompanyListResponse, OauthClient } from '@/types/api';
 import type {
+  CompanyServingBundle,
   CompanyEngagementServing,
   CompanyFiCaseServing,
   CompanyFiReportServing,
@@ -9,6 +10,7 @@ import type {
   CompanyOfficerServing,
   CompanyOverviewServing,
   CompanyShareCapitalServing,
+  CompanyVerkligaHuvudmanServing,
 } from '@/types/company-serving';
 import type {
   AnnualReportFinancialComparison,
@@ -16,6 +18,12 @@ import type {
   CompanyAnnualReportHeader,
   IngestHvdAnnualReportResult,
 } from '@/types/annual-reports';
+import type {
+  CreateMonitoringSubscriptionPayload,
+  MonitoringAlert,
+  MonitoringSubscription,
+} from '@/types/monitoring';
+import type { TargetList } from '@/types/target-lists';
 
 const API_BASE_URL = API_V1_BASE_URL;
 
@@ -69,6 +77,9 @@ export const api = {
   },
   async healthFi() {
     return request('/bolagsverket/fi/isalive');
+  },
+  async healthVh() {
+    return request<{ status: string; enabled: boolean }>('/bolagsverket/vh/isalive');
   },
   async login(payload: { tenantId: string; email: string; password: string }) {
     const data = await request<AuthTokens>('/auth/login', { method: 'POST', body: JSON.stringify(payload) });
@@ -223,6 +234,9 @@ export const api = {
   async getCompanyServingOverview(orgNumber: string) {
     return request<CompanyOverviewServing | null>(`/company-serving/${encodeURIComponent(orgNumber)}/overview`);
   },
+  async getCompanyServingBundle(orgNumber: string) {
+    return request<CompanyServingBundle>(`/company-serving/${encodeURIComponent(orgNumber)}/bundle`);
+  },
   async getCompanyServingOfficers(orgNumber: string) {
     return request<CompanyOfficerServing[]>(`/company-serving/${encodeURIComponent(orgNumber)}/officers`);
   },
@@ -240,6 +254,11 @@ export const api = {
   },
   async getCompanyServingEngagements(orgNumber: string) {
     return request<CompanyEngagementServing[]>(`/company-serving/${encodeURIComponent(orgNumber)}/engagements`);
+  },
+  async getCompanyServingVerkligaHuvudman(orgNumber: string) {
+    return request<CompanyVerkligaHuvudmanServing | null>(
+      `/company-serving/${encodeURIComponent(orgNumber)}/verkliga-huvudman`,
+    );
   },
 
   async ingestHvdAnnualReport(identitetsbeteckning: string, dokumentId: string) {
@@ -275,5 +294,50 @@ export const api = {
   },
   async getCompanyLookupStatus(lookupRequestId: string) {
     return request(`/company-lookups/${encodeURIComponent(lookupRequestId)}/status`);
+  },
+  async listMonitoringSubscriptions() {
+    return request<MonitoringSubscription[]>('/monitoring/subscriptions');
+  },
+  async createMonitoringSubscription(payload: CreateMonitoringSubscriptionPayload) {
+    return request<MonitoringSubscription>('/monitoring/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  async listMonitoringAlerts() {
+    return request<MonitoringAlert[]>('/monitoring/alerts');
+  },
+  async acknowledgeMonitoringAlert(id: string) {
+    return request<MonitoringAlert>(`/monitoring/${encodeURIComponent(id)}/acknowledge`, {
+      method: 'PATCH',
+    });
+  },
+  async listTargetLists() {
+    return request<TargetList[]>('/target-lists');
+  },
+  async createTargetList(name: string) {
+    return request<TargetList>('/target-lists', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  },
+  async deleteTargetList(id: string) {
+    return request<{ id: string; deleted: boolean }>(`/target-lists/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  },
+  async addTargetListItem(id: string, organisationNumber: string) {
+    return request(`/target-lists/${encodeURIComponent(id)}/items`, {
+      method: 'POST',
+      body: JSON.stringify({ organisationNumber }),
+    });
+  },
+  async removeTargetListItem(id: string, organisationNumber: string) {
+    return request(`/target-lists/${encodeURIComponent(id)}/items/${encodeURIComponent(organisationNumber)}`, {
+      method: 'DELETE',
+    });
+  },
+  async getOwnershipGraph(orgNumber: string) {
+    return request(`/ownership/graph/${encodeURIComponent(orgNumber)}`);
   },
 };

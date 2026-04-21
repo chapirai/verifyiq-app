@@ -99,3 +99,13 @@ export const fiClient = {
     return postJson<FiFinancialReportsResponse>('/bolagsverket/fi/finansiella-rapporter', payload);
   },
 };
+
+/** Verkliga huvudmän — separate Bolagsverket product; same app JWT, backend uses FI-class OAuth to upstream. */
+export const vhClient = {
+  async vhIsAlive() {
+    return api.healthVh();
+  },
+  async vhGetRegister(payload: { identitetsbeteckning: string }) {
+    return postJson<Record<string, unknown>>('/bolagsverket/vh/organisationer', payload);
+  },
+};

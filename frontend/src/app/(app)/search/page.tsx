@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateBlocks';
 
+const LOOKUP_CACHE_PREFIX = 'verifyiq:lookup:';
+
 export default function SearchPage() {
   const router = useRouter();
   const [orgNumber, setOrgNumber] = useState('');
@@ -27,7 +29,8 @@ export default function SearchPage() {
         setLoading(false);
         return;
       }
-      await api.lookupCompany(normalized, forceRefresh === 'true');
+      const lookup = await api.lookupCompany(normalized, forceRefresh === 'true');
+      sessionStorage.setItem(`${LOOKUP_CACHE_PREFIX}${normalized}`, JSON.stringify(lookup));
       router.push(`/companies/workspace/${normalized}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Lookup failed');

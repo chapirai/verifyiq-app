@@ -17,13 +17,17 @@ export class MonitoringService {
     private readonly auditService: AuditService,
   ) {}
 
-  async createSubscription(dto: CreateMonitoringSubscriptionDto, actorUserId?: string) {
-    const tenantId = '00000000-0000-0000-0000-000000000001';
+  async createSubscription(tenantId: string, dto: CreateMonitoringSubscriptionDto, actorUserId?: string | null) {
     const subscription = this.subscriptionsRepo.create({
       tenantId,
       partyId: dto.partyId ?? null,
       companyId: dto.companyId ?? null,
       eventTypes: dto.eventTypes,
+      subjectType: dto.subjectType ?? 'company',
+      organisationNumber: dto.organisationNumber ?? null,
+      personnummer: dto.personnummer ?? null,
+      datasetFamilies: dto.datasetFamilies ?? [],
+      alertConfig: dto.alertConfig ?? {},
       createdByUserId: actorUserId ?? null,
     });
     const saved = await this.subscriptionsRepo.save(subscription);
@@ -38,12 +42,12 @@ export class MonitoringService {
     return saved;
   }
 
-  listSubscriptions() {
-    return this.subscriptionsRepo.find({ order: { createdAt: 'DESC' } });
+  listSubscriptions(tenantId: string) {
+    return this.subscriptionsRepo.find({ where: { tenantId }, order: { createdAt: 'DESC' } });
   }
 
-  async createAlert(dto: CreateMonitoringAlertDto, actorUserId?: string) {
-    const subscription = await this.subscriptionsRepo.findOne({ where: { id: dto.subscriptionId } });
+  async createAlert(tenantId: string, dto: CreateMonitoringAlertDto, actorUserId?: string | null) {
+    const subscription = await this.subscriptionsRepo.findOne({ where: { id: dto.subscriptionId, tenantId } });
     if (!subscription) throw new NotFoundException('Subscription not found');
     const alert = this.alertsRepo.create({
       tenantId: subscription.tenantId,
@@ -52,6 +56,9 @@ export class MonitoringService {
       severity: dto.severity,
       title: dto.title,
       description: dto.description ?? null,
+      datasetFamily: (dto.payload as { datasetFamily?: string } | undefined)?.datasetFamily ?? null,
+      organisationNumber: subscription.organisationNumber ?? null,
+      personnummer: subscription.personnummer ?? null,
       payload: dto.payload ?? {},
     });
     const saved = await this.alertsRepo.save(alert);
@@ -66,12 +73,12 @@ export class MonitoringService {
     return saved;
   }
 
-  listAlerts() {
-    return this.alertsRepo.find({ order: { createdAt: 'DESC' } });
+  listAlerts(tenantId: string) {
+    return this.alertsRepo.find({ where: { tenantId }, order: { createdAt: 'DESC' } });
   }
 
-  async acknowledgeAlert(alertId: string, actorUserId: string) {
-    const alert = await this.alertsRepo.findOne({ where: { id: alertId } });
+  async acknowledgeAlert(tenantId: string, alertId: string, actorUserId: string | null) {
+    const alert = await this.alertsRepo.findOne({ where: { id: alertId, tenantId } });
     if (!alert) throw new NotFoundException('Alert not found');
     alert.isAcknowledged = true;
     alert.acknowledgedAt = new Date();
@@ -79,7 +86,7 @@ export class MonitoringService {
     const saved = await this.alertsRepo.save(alert);
     await this.auditService.log({
       tenantId: alert.tenantId,
-      actorId: actorUserId,
+      actorId: actorUserId ?? null,
       action: 'monitoring.alert.acknowledged',
       resourceType: 'monitoring_alert',
       resourceId: alertId,

@@ -65,6 +65,15 @@ export class OwnershipLinkEntity {
   @Column({ name: 'is_current', type: 'boolean', default: true })
   isCurrent!: boolean;
 
+  @Column({ name: 'ingestion_source', type: 'varchar', length: 96, nullable: true })
+  ingestionSource!: string | null;
+
+  @Column({ name: 'fi_parsed_snapshot_id', type: 'bigint', nullable: true })
+  fiParsedSnapshotId!: number | null;
+
+  @Column({ name: 'dedupe_key', type: 'varchar', length: 192, nullable: true })
+  dedupeKey!: string | null;
+
   @Column({ name: 'source_data', type: 'jsonb', default: () => "'{}'::jsonb" })
   sourceData!: Record<string, unknown>;
 

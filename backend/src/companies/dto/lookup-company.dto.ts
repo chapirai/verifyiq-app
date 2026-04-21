@@ -49,6 +49,17 @@ export class CompanyMetadataDto {
   degraded!: boolean;
   /** Failure state label when degraded fallback is used. */
   failure_state!: string | null;
+  /** True when HVD payload exists for this lookup. */
+  has_hvd_data!: boolean;
+  /** True when Företagsinformation payload exists for this lookup. */
+  has_foretagsinfo_data!: boolean;
+  /**
+   * True when Verkliga huvudmän register API returned an organisation block for this lookup.
+   * Separate Bolagsverket product from HVD and Företagsinformation v4.
+   */
+  has_verkliga_huvudman_data!: boolean;
+  /** Completeness marker for dual-API enrichment quality. */
+  profile_completeness!: 'complete' | 'partial';
 }
 
 export class LookupCompanyResponseDto {

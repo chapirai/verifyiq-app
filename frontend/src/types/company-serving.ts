@@ -111,3 +111,23 @@ export interface CompanyEngagementServing {
   personOrOrganisationName: string | null;
   dataRefreshedAt: string | null;
 }
+
+/** Latest Verkliga huvudmän register snapshot (separate Bolagsverket API from FI / HVD). */
+export interface CompanyVerkligaHuvudmanServing {
+  tenantId: string;
+  organisationsnummer: string;
+  fetchedAt: string | null;
+  requestId: string | null;
+  payload: Record<string, unknown>;
+}
+
+export interface CompanyServingBundle {
+  overview: CompanyOverviewServing | null;
+  officers: CompanyOfficerServing[];
+  reports: CompanyFiReportServing[];
+  documents: CompanyHvdDocumentServing[];
+  cases: CompanyFiCaseServing[];
+  shareCapital: CompanyShareCapitalServing | null;
+  engagements: CompanyEngagementServing[];
+  verkligaHuvudman: CompanyVerkligaHuvudmanServing | null;
+}

@@ -42,6 +42,9 @@ const envSchema = z.object({
   BV_FORETAGSINFO_BEARER_TOKEN: z.string().min(1).optional(),
   BV_FORETAGSINFO_AUTH_TOKEN: z.string().min(1).optional(),
   BV_FORETAGSINFO_TOKEN: z.string().min(1).optional(),
+  BV_VH_ENABLED: z.string().optional(),
+  BV_VH_BASE_URL: z.string().url().optional(),
+  BV_VH_POST_PATH: z.string().min(1).optional(),
   API_BASE_URL: z.string().url(),
   FRONTEND_URL: z.string().url().optional(),
   FRONTEND_URLS: z

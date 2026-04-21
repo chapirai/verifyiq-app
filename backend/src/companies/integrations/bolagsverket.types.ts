@@ -193,6 +193,8 @@ export interface BvOfficer {
   namn?: string;
   personId?: string;
   identitetsbeteckning?: string;
+  /** Schema: nested identitet on funktionärer (Företagsinformation v4). */
+  identitet?: { typ?: HvdKodKlartext | string; identitetsbeteckning?: string };
   roller?: BvOfficerRole[];
   fodelseAr?: string;
   nationalitet?: string;
@@ -791,6 +793,85 @@ export interface PersonInformationResponse {
 }
 
 export type PersonResponse = PersonInformationResponse[];
+
+// ── Verkliga huvudmän (register API, separate from FI v4 / HVD) ───────────────
+
+/** Kod/klartext pair as used across Bolagsverket JSON APIs. */
+export interface VhKodKlartext {
+  kod?: string;
+  klartext?: string;
+}
+
+export interface VhArende {
+  arendenummer?: string;
+  avslutatTidpunkt?: string;
+}
+
+export interface VhFelaktigaUppgift {
+  kod?: string;
+  arendenummer?: string;
+  klartext?: string;
+}
+
+export interface VhOrganisationBlock {
+  organisationsformForVerkligHuvudman?: VhKodKlartext;
+  identitetsbeteckning?: string;
+  organisationsnamn?: string;
+  statusForVerkligHuvudman?: VhKodKlartext;
+  felaktigaUppgifterIRegistretOverVerkligaHuvudman?: VhFelaktigaUppgift[];
+  fel?: BvFel;
+}
+
+export interface VhIndirektKontroll {
+  identitetsbeteckning?: string;
+  organisationsnamn?: string;
+}
+
+export interface VhKontrollObjekt {
+  artAvKontroll?: VhKodKlartext;
+  indirektKontroll?: VhIndirektKontroll;
+}
+
+export interface VhPersonnamn {
+  fornamn?: string;
+  mellannamn?: string;
+  efternamn?: string;
+}
+
+export interface VhPersonIdentitet {
+  identitetsbeteckning?: string;
+  typ?: VhKodKlartext;
+}
+
+export interface VhVerkligHuvudmanPerson {
+  arAnonym?: boolean;
+  personnamn?: VhPersonnamn;
+  identitet?: VhPersonIdentitet;
+  arMedborgareI?: VhKodKlartext;
+  arBosattI?: VhKodKlartext;
+  omfattningAvKontroll?: VhKodKlartext;
+  kontroll?: VhKontrollObjekt[];
+}
+
+export interface VhForetradare {
+  arAnonym?: boolean;
+  personnamn?: VhPersonnamn;
+  identitet?: VhPersonIdentitet;
+  arMedborgareI?: VhKodKlartext;
+  arBosattI?: VhKodKlartext;
+}
+
+/**
+ * Root response from POST …/verkliga-huvudman/v1/… (Bolagsverket register of beneficial owners).
+ * Separate product from Företagsinformation v4 and Värdefulla datamängder.
+ */
+export interface VerkligaHuvudmanRegisterResponse {
+  arende?: VhArende;
+  organisation?: VhOrganisationBlock;
+  verkligHuvudman?: VhVerkligHuvudmanPerson[];
+  foretradare?: VhForetradare[];
+  fel?: BvFel;
+}
 
 // ── Generic API error body ───────────────────────────────────────────────────
 

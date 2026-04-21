@@ -36,6 +36,10 @@ export default () => ({
   BV_FORETAGSINFO_BEARER_TOKEN: process.env.BV_FORETAGSINFO_BEARER_TOKEN,
   BV_FORETAGSINFO_AUTH_TOKEN: process.env.BV_FORETAGSINFO_AUTH_TOKEN,
   BV_FORETAGSINFO_TOKEN: process.env.BV_FORETAGSINFO_TOKEN,
+  /** Verkliga huvudmän register API (separate from FI v4 / HVD). Opt-in. */
+  BV_VH_ENABLED: process.env.BV_VH_ENABLED,
+  BV_VH_BASE_URL: process.env.BV_VH_BASE_URL,
+  BV_VH_POST_PATH: process.env.BV_VH_POST_PATH,
   API_BASE_URL: process.env.API_BASE_URL ?? 'http://localhost:4000/api/v1',
   FRONTEND_URL: process.env.FRONTEND_URL,
   FRONTEND_URLS: process.env.FRONTEND_URLS,

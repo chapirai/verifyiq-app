@@ -23,6 +23,12 @@ function normalizeOrgNumber(raw: string): string {
 export class CompanyServingController {
   constructor(private readonly serving: CompanyServingReadService) {}
 
+  @Get(':organisationNumber/bundle')
+  getBundle(@TenantId() tenantId: string, @Param('organisationNumber') organisationNumber: string) {
+    const org = normalizeOrgNumber(organisationNumber);
+    return this.serving.getBundle(tenantId, org);
+  }
+
   @Get(':organisationNumber/overview')
   getOverview(@TenantId() tenantId: string, @Param('organisationNumber') organisationNumber: string) {
     const org = normalizeOrgNumber(organisationNumber);
@@ -63,5 +69,12 @@ export class CompanyServingController {
   getEngagements(@TenantId() tenantId: string, @Param('organisationNumber') organisationNumber: string) {
     const org = normalizeOrgNumber(organisationNumber);
     return this.serving.getEngagements(tenantId, org);
+  }
+
+  /** Latest stored Verkliga huvudmän register payload (separate Bolagsverket API from FI/HVD). */
+  @Get(':organisationNumber/verkliga-huvudman')
+  getVerkligaHuvudman(@TenantId() tenantId: string, @Param('organisationNumber') organisationNumber: string) {
+    const org = normalizeOrgNumber(organisationNumber);
+    return this.serving.getVerkligaHuvudmanLatest(tenantId, org);
   }
 }

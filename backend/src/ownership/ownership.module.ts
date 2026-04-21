@@ -6,6 +6,7 @@ import { BeneficialOwnerEntity } from './entities/beneficial-owner.entity';
 import { OwnershipLinkEntity } from './entities/ownership-link.entity';
 import { WorkplaceEntity } from './entities/workplace.entity';
 import { OwnershipController } from './ownership.controller';
+import { OwnershipBvIngestionService } from './ownership-bv-ingestion.service';
 import { OwnershipService } from './ownership.service';
 
 @Module({
@@ -15,7 +16,7 @@ import { OwnershipService } from './ownership.service';
     ApiQuotaModule,
   ],
   controllers: [OwnershipController],
-  providers: [OwnershipService],
-  exports: [OwnershipService],
+  providers: [OwnershipService, OwnershipBvIngestionService],
+  exports: [OwnershipService, OwnershipBvIngestionService],
 })
 export class OwnershipModule {}

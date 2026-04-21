@@ -33,6 +33,9 @@ import {
   DocumentListResponse,
   HighValueDatasetResponse,
   OrganisationInformationResponse,
+  OrganisationsengagemangResponse,
+  PersonResponse,
+  VerkligaHuvudmanRegisterResponse,
 } from './integrations/bolagsverket.types';
 
 /** Timeout for external Bolagsverket API calls (ms). */
@@ -357,6 +360,12 @@ export class CompaniesService {
         (isFromCache ? 'cache_hit' : 'fresh_fetch');
       const degraded = policyDecision === 'stale_fallback' || fallbackUsed;
       const resolvedFailureState = degraded ? failureStateLabel ?? 'DEGRADED' : null;
+      const hasHvdData = result.highValueDataset != null;
+      const hasForetagsinfoData = Array.isArray(result.organisationInformation) && result.organisationInformation.length > 0;
+      const hasVerkligaHuvudmanData =
+        result.verkligaHuvudman != null &&
+        result.verkligaHuvudman.organisation != null &&
+        typeof result.verkligaHuvudman.organisation.identitetsbeteckning === 'string';
       const metadata: CompanyMetadataDto = {
         source,
         fetched_at: fetchedAt,
@@ -368,6 +377,10 @@ export class CompaniesService {
         policy_decision: policyDecision,
         degraded,
         failure_state: resolvedFailureState,
+        has_hvd_data: hasHvdData,
+        has_foretagsinfo_data: hasForetagsinfoData,
+        has_verkliga_huvudman_data: hasVerkligaHuvudmanData,
+        profile_completeness: hasHvdData && hasForetagsinfoData ? 'complete' : 'partial',
       };
 
       const company = result.normalisedData as unknown as Record<string, unknown>;
@@ -541,7 +554,15 @@ export class CompaniesService {
       organisationInformation:
         (rawSummary.organisationInformation as OrganisationInformationResponse[] | undefined) ?? [],
       documents: (rawSummary.documents as DocumentListResponse | undefined) ?? null,
+      verkligaHuvudman:
+        (rawSummary.verkligaHuvudman as VerkligaHuvudmanRegisterResponse | undefined) ?? null,
       retrievedAt: updatedSnapshot.fetchedAt.toISOString(),
+      vhRequestId: null,
+      organisationEngagementsAggregated:
+        (rawSummary.organisationEngagementsAggregated as OrganisationsengagemangResponse | undefined) ?? null,
+      relatedPersonInformation:
+        (rawSummary.relatedPersonInformation as Record<string, PersonResponse> | undefined) ?? undefined,
+      bolagsverketApiCallCount: updatedSnapshot.apiCallCount ?? 0,
     };
 
     return {

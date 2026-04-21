@@ -116,6 +116,28 @@ export class BolagsverketController {
     return this.bolagsverketService.fiIsAlive({ tenantId, actorId: actorId ?? null });
   }
 
+  /** GET /bolagsverket/vh/isalive — Verkliga huvudmän API (separate gateway; opt-in via BV_VH_ENABLED). */
+  @Get('vh/isalive')
+  vhIsAlive(@Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.vhIsAlive({ tenantId, actorId: actorId ?? null });
+  }
+
+  /**
+   * POST /bolagsverket/vh/organisationer
+   * Live fetch from Verkliga huvudmän register (does not replace orchestrated lookup persistence by itself).
+   */
+  @Post('vh/organisationer')
+  vhOrganisationer(@Body() dto: BolagsverketLookupDto, @Req() req: any) {
+    const tenantId = (req.user?.tenantId as string | undefined) ?? DEFAULT_TENANT_ID;
+    const actorId = (req.user?.sub ?? req.user?.id) as string | undefined;
+    return this.bolagsverketService.getVerkligaHuvudmanRegister(dto.identitetsbeteckning, {
+      tenantId,
+      actorId: actorId ?? null,
+    });
+  }
+
   /** GET /bolagsverket/token-cache – expose OAuth token cache diagnostics. */
   @Get('token-cache')
   tokenCacheStatus() {

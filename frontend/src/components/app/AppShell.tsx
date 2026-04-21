@@ -9,8 +9,11 @@ import { api } from '@/lib/api';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview' },
-  { href: '/search', label: 'Search' },
+  { href: '/search', label: 'Lookup' },
   { href: '/companies', label: 'Companies' },
+  { href: '/lists', label: 'Lists' },
+  { href: '/compare', label: 'Compare' },
+  { href: '/alerts', label: 'Alerts' },
   { href: '/bulk', label: 'Bulk' },
   { href: '/billing', label: 'Billing' },
   { href: '/api-keys', label: 'API' },
