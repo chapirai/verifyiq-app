@@ -4,6 +4,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CompaniesModule } from '../companies/companies.module';
 import { CompanyEntity } from '../companies/entities/company.entity';
+import { UsageEventEntity } from '../audit/usage-event.entity';
+import { SubscriptionEntity } from '../billing/entities/subscription.entity';
+import { Tenant } from '../tenants/tenant.entity';
+import { User } from '../users/user.entity';
 import { BolagsverketBulkController } from './bolagsverket-bulk.controller';
 import { BolagsverketBulkParser } from './bolagsverket-bulk.parser';
 import { BolagsverketBulkProcessor } from './bolagsverket-bulk.processor';
@@ -34,6 +38,10 @@ import { BOLAGSVERKET_BULK_QUEUE } from './queues/bolagsverket-bulk.queue';
       BvBulkCompanyHistoryEntity,
       BvBulkEnrichmentRequestEntity,
       CompanyEntity,
+      UsageEventEntity,
+      SubscriptionEntity,
+      Tenant,
+      User,
     ]),
   ],
   controllers: [BolagsverketBulkController],

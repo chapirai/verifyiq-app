@@ -15,6 +15,7 @@ export class BolagsverketBulkUniverse1000000000039 implements MigrationInterface
         zip_sha256 VARCHAR(64) NOT NULL UNIQUE,
         txt_sha256 VARCHAR(64) NOT NULL,
         row_count INTEGER NOT NULL DEFAULT 0,
+        parser_profile VARCHAR(64) NULL,
         status VARCHAR(32) NOT NULL DEFAULT 'downloaded',
         error_message TEXT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

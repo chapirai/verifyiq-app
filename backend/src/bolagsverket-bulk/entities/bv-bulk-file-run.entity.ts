@@ -33,6 +33,9 @@ export class BvBulkFileRunEntity {
   @Column({ name: 'row_count', type: 'integer', default: 0 })
   rowCount!: number;
 
+  @Column({ name: 'parser_profile', type: 'varchar', length: 64, nullable: true })
+  parserProfile!: string | null;
+
   @Column({ name: 'status', type: 'varchar', length: 32, default: 'downloaded' })
   status!: BvBulkFileRunStatus;
 

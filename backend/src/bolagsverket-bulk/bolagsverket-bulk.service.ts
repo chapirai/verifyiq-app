@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, MoreThanOrEqual, Repository } from 'typeorm';
 import { BolagsverketService } from '../companies/services/bolagsverket.service';
 import { BolagsverketBulkStorageService } from './bolagsverket-bulk.storage.service';
 import { BolagsverketBulkParser } from './bolagsverket-bulk.parser';
@@ -13,6 +13,11 @@ import { BvBulkRawRowEntity } from './entities/bv-bulk-raw-row.entity';
 import { BvBulkCompanyStagingEntity } from './entities/bv-bulk-company-staging.entity';
 import { BvBulkCompanyCurrentEntity } from './entities/bv-bulk-company-current.entity';
 import { BvBulkRunCheckpointEntity } from './entities/bv-bulk-run-checkpoint.entity';
+import { UsageEventEntity } from '../audit/usage-event.entity';
+import { SubscriptionEntity } from '../billing/entities/subscription.entity';
+import { Tenant } from '../tenants/tenant.entity';
+import { User } from '../users/user.entity';
+import { CompanyEntity } from '../companies/entities/company.entity';
 import {
   BvBulkEnrichmentReason,
   BvBulkEnrichmentRequestEntity,
@@ -37,10 +42,24 @@ export class BolagsverketBulkService {
     private readonly bolagsverketService: BolagsverketService,
     @InjectRepository(BvBulkFileRunEntity)
     private readonly runRepo: Repository<BvBulkFileRunEntity>,
+    @InjectRepository(BvBulkRawRowEntity)
+    private readonly rawRepo: Repository<BvBulkRawRowEntity>,
+    @InjectRepository(BvBulkRunCheckpointEntity)
+    private readonly checkpointRepo: Repository<BvBulkRunCheckpointEntity>,
     @InjectRepository(BvBulkCompanyCurrentEntity)
     private readonly currentRepo: Repository<BvBulkCompanyCurrentEntity>,
     @InjectRepository(BvBulkEnrichmentRequestEntity)
     private readonly enrichmentRepo: Repository<BvBulkEnrichmentRequestEntity>,
+    @InjectRepository(SubscriptionEntity)
+    private readonly subscriptionRepo: Repository<SubscriptionEntity>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(UsageEventEntity)
+    private readonly usageEventRepo: Repository<UsageEventEntity>,
+    @InjectRepository(CompanyEntity)
+    private readonly companyRepo: Repository<CompanyEntity>,
     @InjectQueue(BOLAGSVERKET_BULK_QUEUE)
     private readonly queue: Queue,
     private readonly dataSource: DataSource,
@@ -80,6 +99,7 @@ export class BolagsverketBulkService {
         'https://example.invalid/bolagsverket_bulkfil.zip',
       );
     const now = new Date();
+    const parserProfile = this.config.get<string>('BV_BULK_PARSER_PROFILE', 'default_v1');
     const dl = await this.storage.downloadAndArchiveWeeklyZip(sourceUrl);
 
     const existingByHash = await this.runRepo.findOne({ where: { zipSha256: dl.zipSha256 } });
@@ -104,6 +124,7 @@ export class BolagsverketBulkService {
         zipSha256: dl.zipSha256,
         txtSha256: dl.txtSha256,
         rowCount: 0,
+        parserProfile,
         status: 'downloaded',
       }),
     );
@@ -119,7 +140,7 @@ export class BolagsverketBulkService {
         try {
           const parsed = this.parser.parseLineToStaging(
             line,
-            this.config.get<string>('BV_BULK_PARSER_PROFILE', 'default_v1'),
+            parserProfile,
           );
           rawRows.push({ fileRunId: run.id, lineNumber: i + 1, rawLine: line, parsedOk: true, parseError: null });
           stagingRows.push({
@@ -230,6 +251,122 @@ export class BolagsverketBulkService {
       order: { downloadedAt: 'DESC' },
       take: Math.max(1, Math.min(200, limit)),
     });
+  }
+
+  async getOpsDashboardSummary(): Promise<Record<string, unknown>> {
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekRuns = await this.runRepo.find({
+      where: { downloadedAt: MoreThanOrEqual(weekStart) },
+      order: { downloadedAt: 'DESC' },
+      take: 8,
+    });
+    const latest = weekRuns[0] ?? null;
+    const latestRunId = latest?.id ?? null;
+
+    const [newCount, updatedCount, removedCount] = latestRunId
+      ? await Promise.all([
+          this.dataSource
+            .query(`SELECT COUNT(1)::int AS c FROM bv_bulk_company_history WHERE file_run_id = $1 AND change_type = 'new'`, [latestRunId])
+            .then(r => Number(r?.[0]?.c ?? 0)),
+          this.dataSource
+            .query(`SELECT COUNT(1)::int AS c FROM bv_bulk_company_history WHERE file_run_id = $1 AND change_type = 'updated'`, [latestRunId])
+            .then(r => Number(r?.[0]?.c ?? 0)),
+          this.dataSource
+            .query(`SELECT COUNT(1)::int AS c FROM bv_bulk_company_history WHERE file_run_id = $1 AND change_type = 'removed'`, [latestRunId])
+            .then(r => Number(r?.[0]?.c ?? 0)),
+        ])
+      : [0, 0, 0];
+
+    const [failedLines, checkpoints, subscriptions, tenants, users, companyCounts, usageRows] = await Promise.all([
+      latestRunId
+        ? this.rawRepo.count({ where: { fileRunId: latestRunId, parsedOk: false } })
+        : 0,
+      latestRunId
+        ? this.checkpointRepo.find({ where: { fileRunId: latestRunId }, order: { checkpointSeq: 'ASC' } })
+        : [],
+      this.subscriptionRepo.find(),
+      this.tenantRepo.find(),
+      this.userRepo.find(),
+      this.companyRepo
+        .createQueryBuilder('c')
+        .select('c.tenantId', 'tenantId')
+        .addSelect('COUNT(1)', 'count')
+        .groupBy('c.tenantId')
+        .getRawMany<{ tenantId: string; count: string }>(),
+      this.usageEventRepo
+        .createQueryBuilder('u')
+        .select('u.tenantId', 'tenantId')
+        .addSelect(`COALESCE(SUM(CASE WHEN (u.costImpact->>'apiCallCount') ~ '^[0-9]+$' THEN (u.costImpact->>'apiCallCount')::int ELSE 0 END), 0)`, 'apiCalls')
+        .where('u.createdAt >= :from', { from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) })
+        .groupBy('u.tenantId')
+        .getRawMany<{ tenantId: string; apiCalls: string }>(),
+    ]);
+
+    const companyByTenant = new Map(companyCounts.map(r => [r.tenantId, Number(r.count)]));
+    const apiCallsByTenant = new Map(usageRows.map(r => [r.tenantId, Number(r.apiCalls)]));
+    const usersByTenant = users.reduce<Map<string, number>>((m, u) => {
+      m.set(u.tenantId, (m.get(u.tenantId) ?? 0) + 1);
+      return m;
+    }, new Map());
+
+    const planByTenant = new Map(subscriptions.map(s => [s.tenantId, s.planCode ?? 'free']));
+    const tenantUsage = tenants.map(t => {
+      const plan = (planByTenant.get(t.id) ?? 'free').toLowerCase();
+      const apiCalls30d = apiCallsByTenant.get(t.id) ?? 0;
+      const included = plan === 'pro' ? 50000 : plan === 'basic' ? 5000 : 500;
+      const pct = included > 0 ? Math.round((apiCalls30d / included) * 1000) / 10 : 0;
+      return {
+        tenantId: t.id,
+        tenantName: t.name,
+        planCode: plan,
+        users: usersByTenant.get(t.id) ?? 0,
+        companies: companyByTenant.get(t.id) ?? 0,
+        apiCalls30d,
+        includedCallsPerDay: included,
+        packageUtilizationPct: pct,
+      };
+    });
+
+    const checkpointsProgress = checkpoints.length
+      ? {
+          completedCheckpoints: checkpoints.length,
+          lastCheckpointSeq: checkpoints[checkpoints.length - 1]?.checkpointSeq ?? 0,
+          lastLineNumber: checkpoints[checkpoints.length - 1]?.lastLineNumber ?? 0,
+          rowsWritten: checkpoints.reduce((a, c) => a + c.rowsWritten, 0),
+          stagingWritten: checkpoints.reduce((a, c) => a + c.stagingWritten, 0),
+        }
+      : {
+          completedCheckpoints: 0,
+          lastCheckpointSeq: 0,
+          lastLineNumber: 0,
+          rowsWritten: 0,
+          stagingWritten: 0,
+        };
+
+    return {
+      weekly_run: {
+        this_week_runs: weekRuns.length,
+        latest_run: latest,
+        this_week_status: latest?.status ?? 'not_run',
+        parser_profile_used: latest?.parserProfile ?? this.config.get<string>('BV_BULK_PARSER_PROFILE', 'default_v1'),
+        row_deltas: {
+          new: newCount,
+          updated: updatedCount,
+          removed: removedCount,
+        },
+        failed_lines: failedLines,
+        checkpoint_progress: checkpointsProgress,
+      },
+      customer_usage: {
+        tenants_total: tenants.length,
+        by_tenant: tenantUsage.sort((a, b) => b.apiCalls30d - a.apiCalls30d),
+      },
+      weekly_runs_recent: weekRuns,
+    };
   }
 
   async getRunFileLinks(runId: string) {

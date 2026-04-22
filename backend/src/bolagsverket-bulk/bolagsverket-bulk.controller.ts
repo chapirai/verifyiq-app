@@ -46,6 +46,12 @@ export class BolagsverketBulkController {
     return this.bulkService.getRunFileLinks(runId);
   }
 
+  @Get('ops/dashboard')
+  getOpsDashboard(@Req() req: Request) {
+    this.assertPlatformAdmin(req);
+    return this.bulkService.getOpsDashboardSummary();
+  }
+
   @Get('companies')
   listShallow(
     @Query('q') q?: string,

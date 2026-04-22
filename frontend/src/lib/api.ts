@@ -490,4 +490,55 @@ export const api = {
       method: 'POST',
     });
   },
+  async getBulkOpsDashboard() {
+    return request<{
+      weekly_run: {
+        this_week_runs: number;
+        this_week_status: string;
+        parser_profile_used: string;
+        latest_run: {
+          id: string;
+          downloadedAt: string;
+          rowCount: number;
+          status: string;
+          errorMessage?: string | null;
+        } | null;
+        row_deltas: { new: number; updated: number; removed: number };
+        failed_lines: number;
+        checkpoint_progress: {
+          completedCheckpoints: number;
+          lastCheckpointSeq: number;
+          lastLineNumber: number;
+          rowsWritten: number;
+          stagingWritten: number;
+        };
+      };
+      customer_usage: {
+        tenants_total: number;
+        by_tenant: Array<{
+          tenantId: string;
+          tenantName: string;
+          planCode: string;
+          users: number;
+          companies: number;
+          apiCalls30d: number;
+          includedCallsPerDay: number;
+          packageUtilizationPct: number;
+        }>;
+      };
+      weekly_runs_recent: Array<{
+        id: string;
+        downloadedAt: string;
+        rowCount: number;
+        status: string;
+      }>;
+    }>('/bolagsverket-bulk/ops/dashboard');
+  },
+  async getBulkRunFiles(runId: string) {
+    return request<{
+      runId: string;
+      zip: { objectKey: string; url: string; expiresInSeconds: number };
+      txt: { objectKey: string; url: string; expiresInSeconds: number };
+    }>(`/bolagsverket-bulk/runs/${encodeURIComponent(runId)}/files`);
+  },
 };
