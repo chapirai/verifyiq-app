@@ -10,6 +10,7 @@ export type ApiQuotaBucket = string;
 @Injectable()
 export class ApiQuotaService {
   private readonly redis: Redis;
+  private redisUnavailableLoggedAt = 0;
 
   constructor(
     @InjectRepository(SubscriptionEntity)
@@ -23,12 +24,28 @@ export class ApiQuotaService {
       lazyConnect: true,
       maxRetriesPerRequest: 2,
     });
+    this.redis.on('error', (err: unknown) => {
+      const now = Date.now();
+      if (now - this.redisUnavailableLoggedAt > 60_000) {
+        this.redisUnavailableLoggedAt = now;
+        console.warn(
+          `[ApiQuotaService] Redis connection issue (quota fallback to permissive mode): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    });
   }
 
-  private async ensureRedisConnected(): Promise<void> {
+  private async ensureRedisConnected(): Promise<boolean> {
     if (this.redis.status !== 'ready' && this.redis.status !== 'connect') {
-      await this.redis.connect();
+      try {
+        await this.redis.connect();
+      } catch {
+        return false;
+      }
     }
+    return true;
   }
 
   private async planCodeForTenant(tenantId: string): Promise<'free' | 'basic' | 'pro'> {
@@ -76,9 +93,12 @@ export class ApiQuotaService {
     clientKey: string;
     bucket: ApiQuotaBucket;
   }): Promise<{ allowed: boolean; limit: number; remaining: number; plan: string }> {
-    await this.ensureRedisConnected();
+    const redisReady = await this.ensureRedisConnected();
     const plan = await this.planCodeForTenant(params.tenantId);
     const limit = this.dailyLimitForPlan(plan);
+    if (!redisReady) {
+      return { allowed: true, limit, remaining: limit, plan };
+    }
     const day = new Date().toISOString().slice(0, 10);
     const key = this.redisKey(params.bucket, params.environment, params.tenantId, params.clientKey, day);
     const used = await this.redis.incr(key);
@@ -93,9 +113,12 @@ export class ApiQuotaService {
     clientKey: string;
     bucket: ApiQuotaBucket;
   }): Promise<{ limit: number; remaining: number; used: number; plan: string }> {
-    await this.ensureRedisConnected();
+    const redisReady = await this.ensureRedisConnected();
     const plan = await this.planCodeForTenant(params.tenantId);
     const limit = this.dailyLimitForPlan(plan);
+    if (!redisReady) {
+      return { limit, remaining: limit, used: 0, plan };
+    }
     const day = new Date().toISOString().slice(0, 10);
     const key = this.redisKey(params.bucket, params.environment, params.tenantId, params.clientKey, day);
     const raw = await this.redis.get(key);

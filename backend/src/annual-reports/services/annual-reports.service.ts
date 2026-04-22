@@ -53,6 +53,7 @@ export class AnnualReportsService {
   private readonly redis: Redis;
   private readonly bucket: string;
   private readonly region: string;
+  private redisErrorLoggedAt = 0;
 
   constructor(
     @InjectRepository(AnnualReportFileEntity)
@@ -100,12 +101,24 @@ export class AnnualReportsService {
       lazyConnect: true,
       maxRetriesPerRequest: 2,
     });
+    this.redis.on('error', (err: unknown) => {
+      const now = Date.now();
+      if (now - this.redisErrorLoggedAt > 60_000) {
+        this.redisErrorLoggedAt = now;
+        this.logger.warn(`AnnualReports Redis issue (lock fallback): ${err instanceof Error ? err.message : String(err)}`);
+      }
+    });
   }
 
-  private async ensureRedisConnected(): Promise<void> {
+  private async ensureRedisConnected(): Promise<boolean> {
     if (this.redis.status !== 'ready' && this.redis.status !== 'connect') {
-      await this.redis.connect();
+      try {
+        await this.redis.connect();
+      } catch {
+        return false;
+      }
     }
+    return true;
   }
 
   private staleThresholdMs(): number {
@@ -160,8 +173,15 @@ export class AnnualReportsService {
   }
 
   private async triggerAsyncRebuildForOrg(tenantId: string, organisationNumber: string): Promise<void> {
-    await this.ensureRedisConnected();
+    const redisReady = await this.ensureRedisConnected();
     const org = normalizeOrgNumber(organisationNumber);
+    if (!redisReady) {
+      // If Redis is unavailable, run rebuild without lock to keep API responsive on constrained tiers.
+      void this.rebuildApiFinancialTableForOrg(tenantId, org).catch(e =>
+        this.logger.warn(`Async financial rebuild failed org=${org}: ${e instanceof Error ? e.message : e}`),
+      );
+      return;
+    }
     const lockKey = `lock:financial-rebuild:${tenantId}:${org}`;
     const locked = await this.redis.set(lockKey, '1', 'EX', 20 * 60, 'NX');
     if (locked !== 'OK') return;

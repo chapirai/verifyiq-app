@@ -62,11 +62,15 @@ import { BolagsverketBulkModule } from './bolagsverket-bulk/bolagsverket-bulk.mo
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        skipVersionCheck: config.get<string>('BULLMQ_SKIP_REDIS_VERSION_CHECK') === 'true',
+        // Default to skipping version/eviction checks on managed Redis tiers to reduce noisy startup logs.
+        skipVersionCheck: String(config.get<string>('BULLMQ_SKIP_REDIS_VERSION_CHECK', 'true')).toLowerCase() === 'true',
         connection: {
           host: config.getOrThrow<string>('REDIS_HOST'),
           port: config.getOrThrow<number>('REDIS_PORT'),
           password: config.get<string>('REDIS_PASSWORD') || undefined,
+          enableReadyCheck: false,
+          maxRetriesPerRequest: null,
+          retryStrategy: (times: number) => Math.min(2000, Math.max(100, times * 100)),
         },
       }),
     }),

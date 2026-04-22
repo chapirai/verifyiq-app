@@ -20,6 +20,10 @@ type FiLatestRow = {
 @Injectable()
 export class OwnershipBvIngestionService {
   private readonly logger = new Logger(OwnershipBvIngestionService.name);
+  private malformedRowLogState: { windowStart: number; count: number } = {
+    windowStart: Date.now(),
+    count: 0,
+  };
 
   constructor(private readonly dataSource: DataSource) {}
 
@@ -51,21 +55,43 @@ export class OwnershipBvIngestionService {
     );
 
     let ok = 0;
-    for (const r of rows) {
-      if (!r.tenant_id || !r.organisationsnummer) {
-        this.logger.debug(`Skipping malformed ownership ingest row id=${r.id} tenant=${r.tenant_id} org=${r.organisationsnummer}`);
+    for (const r of rows as Array<Record<string, unknown>>) {
+      const rowId = String(r.id ?? r['q.id'] ?? '');
+      const tenantId = String(r.tenant_id ?? r.tenantId ?? '').trim();
+      const organisationNumber = String(r.organisationsnummer ?? r.organisationNumber ?? '').trim();
+      if (!tenantId || !organisationNumber) {
+        this.trackMalformedRow(rowId, tenantId, organisationNumber);
         continue;
       }
       try {
-        await this.syncFromLatestFiSnapshot(r.tenant_id, r.organisationsnummer);
+        await this.syncFromLatestFiSnapshot(tenantId, organisationNumber);
         ok += 1;
       } catch (e) {
         this.logger.warn(
-          `ownership BV ingest failed tenant=${r.tenant_id} org=${r.organisationsnummer}: ${e instanceof Error ? e.message : String(e)}`,
+          `ownership BV ingest failed tenant=${tenantId} org=${organisationNumber}: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     }
     return ok;
+  }
+
+  private trackMalformedRow(rowId: string, tenantId: string, organisationNumber: string): void {
+    const now = Date.now();
+    const windowMs = 60_000;
+    if (now - this.malformedRowLogState.windowStart >= windowMs) {
+      if (this.malformedRowLogState.count > 0) {
+        this.logger.warn(
+          `Skipped ${this.malformedRowLogState.count} malformed ownership ingest rows in the last minute (latest id=${rowId || 'n/a'}).`,
+        );
+      }
+      this.malformedRowLogState = { windowStart: now, count: 0 };
+    }
+    this.malformedRowLogState.count += 1;
+    if (this.malformedRowLogState.count === 1) {
+      this.logger.debug(
+        `Skipping malformed ownership ingest row id=${rowId || 'n/a'} tenant=${tenantId || 'n/a'} org=${organisationNumber || 'n/a'}`,
+      );
+    }
   }
 
   /**
