@@ -292,6 +292,27 @@ Class-level **`JwtAuthGuard`**. Selected routes add **`ScopeGuard`**, **`@Requir
 | POST | `/bulk/jobs/:id/retry-failures` | Retry failures | JWT |
 | GET | `/bulk/jobs/:id/download` | CSV download | JWT |
 
+### Bolagsverket bulk universe (`bolagsverket-bulk/`)
+
+This module provides the two-tier Bolagsverket ingestion model:
+- Tier 1: weekly bulk universe population (cheap, broad, shallow)
+- Tier 2: on-demand deep enrichment (expensive, narrow, user-driven)
+
+Sensitive operations are platform-admin only (role + optional platform tenant gate).
+
+| Method | Path | Purpose | Auth |
+|--------|------|---------|------|
+| POST | `/bolagsverket-bulk/runs/weekly` | Queue normal weekly ingestion job | JWT + scope `companies:write` + platform-admin check |
+| POST | `/bolagsverket-bulk/runs/force` | Force immediate download + full ingestion (optional source URL override) | same |
+| POST | `/bolagsverket-bulk/runs/:runId/replay` | Replay ingestion from archived TXT (no re-download) | same |
+| GET | `/bolagsverket-bulk/runs` | List weekly runs | JWT + scope `companies:read` + platform-admin check |
+| GET | `/bolagsverket-bulk/runs/:runId/files` | Get presigned ZIP/TXT archive links | same |
+| GET | `/bolagsverket-bulk/ops/dashboard` | Ops dashboard summary (+ filters + tenant paging + charts) | same |
+| GET | `/bolagsverket-bulk/ops/dashboard/export.csv` | Export `tenant_usage` / `run_deltas` CSV (+ audit trail) | same |
+| GET | `/bolagsverket-bulk/companies` | List shallow universe | JWT + scope `companies:read` |
+| GET | `/bolagsverket-bulk/companies/:organisationNumber` | Shallow company detail | JWT + scope `companies:read` |
+| POST | `/bolagsverket-bulk/companies/enrich` | Queue on-demand deep enrichment | JWT + scope `companies:write` |
+
 ### Screening (`screening/`)
 
 | Method | Path | Purpose | Auth |
@@ -426,7 +447,9 @@ No email (SendGrid, etc.) or dedicated APM SDK appeared in backend `package.json
 | **BullMQ processor** | `bulk-jobs` | `BulkProcessor` — bulk CSV processing. |
 | **BullMQ processor** | `screening` | `ScreeningProcessor` — screening jobs. |
 | **BullMQ processor** | `reports` | `ReportsProcessor` — report generation jobs. |
+| **BullMQ processor** | `bolagsverket-bulk` | `BolagsverketBulkProcessor` — weekly ingestion + enrichment request processing. |
 | **Nest schedule** | `@Interval(15000)` on `BvPipelineWorker` | Calls `BvPipelineService.processParseQueue` and `processRefreshQueue` with small batch sizes; can be disabled with `BV_PIPELINE_WORKER_ENABLED=false`. |
+| **Nest schedule** | `BolagsverketBulkScheduler` weekly cron | Enqueues weekly bulk ingestion when enabled by env. |
 
 **No `@Cron` decorators** were found in `backend/src`; scheduled work is the interval worker above.
 
@@ -464,12 +487,51 @@ Includes defaults for local Postgres name `Company`, MinIO host, etc.
 | `API_RATE_LIMIT_*_PER_DAY`, `AR_RATE_LIMIT_*_PER_DAY` | `api-quota.service.ts` |
 | `ARELLE_PYTHON`, `ARELLE_EXTRACT_SCRIPT`, `ARELLE_EXTRACT_TIMEOUT_MS` | `annual-report-arelle.service.ts` |
 | `MINIO_REGION` | `env.ts`, MinIO client construction in services |
+| `BV_BULK_*` | `bolagsverket-bulk` module (scheduler, parser profile, batching, staleness, admin and health policy tuning) |
+| `OPS_ALERT_WEBHOOK_URL` | webhook target for red health-state ops alerts |
 
 ### Frontend
 
 | Variable | Purpose |
 |----------|---------|
 | `NEXT_PUBLIC_API_BASE_URL` | Base URL for `fetch` including `/api/v1` |
+
+---
+
+## Bolagsverket Bulk Ops and Admin Dashboard
+
+### Two-tier ingestion model
+
+1. Weekly ZIP download is archived (ZIP + TXT) in object storage with checksums.
+2. TXT is parsed into raw/staging layers with checkpointed chunk writes.
+3. Canonical shallow layer (`bv_bulk_company_current`) is upserted.
+4. History and removed-company detection are applied.
+5. Existing company surfaces are seeded with depth state badges.
+6. Deep data enrichment is only run on demand (open company / compare / explicit request).
+
+### Admin dashboard capabilities
+
+- Weekly run status, parser profile, row deltas (new/updated/removed), failed lines, and checkpoint progress
+- Health score card (`green`/`yellow`/`red`) with reasons
+- Filters: week, tenant, plan
+- Server-side tenant usage pagination (`tenant_page`, `tenant_limit`)
+- CSV export for tenant usage and run deltas (export action is audit logged)
+- Run controls: force full ingestion now, replay archived run
+- Trend charts: run health trend + daily API usage (30d)
+
+### Health score policy (env-tunable)
+
+Health score no longer relies on fixed constants only; penalties/thresholds are controlled by env policy keys:
+- no weekly run penalty
+- failed run penalty
+- parsed-but-not-applied penalty
+- failed-line penalty base
+- incomplete-checkpoint penalty
+- yellow/green threshold cutoffs
+
+### Ops alert hook
+
+If `OPS_ALERT_WEBHOOK_URL` is configured, a webhook payload is emitted when dashboard health resolves to red after a run/replay evaluation. This is intended to integrate with Slack/email/on-call relays.
 
 ---
 

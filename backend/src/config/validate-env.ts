@@ -84,6 +84,14 @@ const envSchema = z.object({
   BV_BULK_BATCH_SIZE: z.coerce.number().int().positive().optional(),
   BV_BULK_ENRICH_STALE_DAYS: z.coerce.number().int().positive().optional(),
   BV_BULK_PLATFORM_ADMIN_TENANT_ID: z.string().uuid().optional(),
+  BV_BULK_HEALTH_NO_RUN_PENALTY: z.coerce.number().int().min(0).optional(),
+  BV_BULK_HEALTH_FAILED_RUN_PENALTY: z.coerce.number().int().min(0).optional(),
+  BV_BULK_HEALTH_NOT_APPLIED_PENALTY: z.coerce.number().int().min(0).optional(),
+  BV_BULK_HEALTH_FAILED_LINE_PENALTY_BASE: z.coerce.number().int().min(0).optional(),
+  BV_BULK_HEALTH_INCOMPLETE_CHECKPOINT_PENALTY: z.coerce.number().int().min(0).optional(),
+  BV_BULK_HEALTH_YELLOW_THRESHOLD: z.coerce.number().int().min(0).max(100).optional(),
+  BV_BULK_HEALTH_GREEN_THRESHOLD: z.coerce.number().int().min(0).max(100).optional(),
+  OPS_ALERT_WEBHOOK_URL: z.string().url().optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {

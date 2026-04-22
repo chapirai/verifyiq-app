@@ -79,6 +79,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function requestText(path: string, init?: RequestInit): Promise<string> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    let details: unknown = null;
+    try {
+      details = await res.json();
+    } catch {
+      details = await res.text();
+    }
+    const message = typeof details === 'object' && details && 'message' in details
+      ? String((details as { message?: string }).message)
+      : 'Request failed';
+    throw new ApiError(message, res.status, details);
+  }
+  return res.text();
+}
+
 export const api = {
   async healthHvd() {
     return request('/bolagsverket/hvd/isalive');
@@ -490,7 +515,19 @@ export const api = {
       method: 'POST',
     });
   },
-  async getBulkOpsDashboard() {
+  async getBulkOpsDashboard(filters?: {
+    weekStart?: string;
+    tenantId?: string;
+    planCode?: string;
+    tenantPage?: number;
+    tenantLimit?: number;
+  }) {
+    const q = new URLSearchParams();
+    if (filters?.weekStart) q.set('week_start', filters.weekStart);
+    if (filters?.tenantId) q.set('tenant_id', filters.tenantId);
+    if (filters?.planCode) q.set('plan_code', filters.planCode);
+    if (filters?.tenantPage) q.set('tenant_page', String(filters.tenantPage));
+    if (filters?.tenantLimit) q.set('tenant_limit', String(filters.tenantLimit));
     return request<{
       weekly_run: {
         this_week_runs: number;
@@ -512,9 +549,17 @@ export const api = {
           rowsWritten: number;
           stagingWritten: number;
         };
+        health_score: {
+          score: number;
+          color: 'green' | 'yellow' | 'red';
+          reasons: string[];
+        };
       };
       customer_usage: {
         tenants_total: number;
+        page: number;
+        limit: number;
+        has_next: boolean;
         by_tenant: Array<{
           tenantId: string;
           tenantName: string;
@@ -526,13 +571,30 @@ export const api = {
           packageUtilizationPct: number;
         }>;
       };
+      charts: {
+        package_utilization_series: Array<{
+          tenantId: string;
+          tenantName: string;
+          utilizationPct: number;
+        }>;
+        run_health_series: Array<{
+          runId: string;
+          downloadedAt: string;
+          status: string;
+          score: number;
+        }>;
+        api_calls_30d_daily: Array<{
+          day: string;
+          apiCalls: number;
+        }>;
+      };
       weekly_runs_recent: Array<{
         id: string;
         downloadedAt: string;
         rowCount: number;
         status: string;
       }>;
-    }>('/bolagsverket-bulk/ops/dashboard');
+    }>(`/bolagsverket-bulk/ops/dashboard${q.toString() ? `?${q.toString()}` : ''}`);
   },
   async getBulkRunFiles(runId: string) {
     return request<{
@@ -540,5 +602,26 @@ export const api = {
       zip: { objectKey: string; url: string; expiresInSeconds: number };
       txt: { objectKey: string; url: string; expiresInSeconds: number };
     }>(`/bolagsverket-bulk/runs/${encodeURIComponent(runId)}/files`);
+  },
+  async exportBulkOpsCsv(
+    type: 'tenant_usage' | 'run_deltas',
+    filters?: { weekStart?: string; tenantId?: string; planCode?: string },
+  ) {
+    const q = new URLSearchParams({ type });
+    if (filters?.weekStart) q.set('week_start', filters.weekStart);
+    if (filters?.tenantId) q.set('tenant_id', filters.tenantId);
+    if (filters?.planCode) q.set('plan_code', filters.planCode);
+    return requestText(`/bolagsverket-bulk/ops/dashboard/export.csv?${q.toString()}`);
+  },
+  async forceBulkRunNow(sourceUrl?: string) {
+    return request('/bolagsverket-bulk/runs/force', {
+      method: 'POST',
+      body: JSON.stringify(sourceUrl ? { sourceUrl } : {}),
+    });
+  },
+  async replayBulkRun(runId: string) {
+    return request(`/bolagsverket-bulk/runs/${encodeURIComponent(runId)}/replay`, {
+      method: 'POST',
+    });
   },
 };

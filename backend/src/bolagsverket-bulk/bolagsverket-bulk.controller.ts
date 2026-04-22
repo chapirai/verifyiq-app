@@ -1,5 +1,6 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Query, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Query, Req, Res, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { Request } from 'express';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequiredScopes } from '../common/decorators/required-scopes.decorator';
@@ -34,6 +35,20 @@ export class BolagsverketBulkController {
     return this.bulkService.enqueueWeeklyIngestion();
   }
 
+  @Post('runs/force')
+  @RequiredScopes('companies:write')
+  forceRunNow(@Req() req: Request, @Body() body?: { sourceUrl?: string }) {
+    this.assertPlatformAdmin(req);
+    return this.bulkService.runWeeklyIngestion(body?.sourceUrl, true);
+  }
+
+  @Post('runs/:runId/replay')
+  @RequiredScopes('companies:write')
+  replayRunFromArchive(@Req() req: Request, @Param('runId') runId: string) {
+    this.assertPlatformAdmin(req);
+    return this.bulkService.replayRunFromArchive(runId);
+  }
+
   @Get('runs')
   listRuns(@Req() req: Request, @Query('limit') limit?: string) {
     this.assertPlatformAdmin(req);
@@ -47,9 +62,44 @@ export class BolagsverketBulkController {
   }
 
   @Get('ops/dashboard')
-  getOpsDashboard(@Req() req: Request) {
+  getOpsDashboard(
+    @Req() req: Request,
+    @Query('week_start') weekStart?: string,
+    @Query('tenant_id') tenantId?: string,
+    @Query('plan_code') planCode?: string,
+    @Query('tenant_page') tenantPage?: string,
+    @Query('tenant_limit') tenantLimit?: string,
+  ) {
     this.assertPlatformAdmin(req);
-    return this.bulkService.getOpsDashboardSummary();
+    return this.bulkService.getOpsDashboardSummary({
+      weekStart,
+      tenantId,
+      planCode,
+      tenantPage: Number(tenantPage ?? 1),
+      tenantLimit: Number(tenantLimit ?? 10),
+    });
+  }
+
+  @Get('ops/dashboard/export.csv')
+  async exportOpsDashboardCsv(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('type') type: 'tenant_usage' | 'run_deltas' = 'tenant_usage',
+    @Query('week_start') weekStart?: string,
+    @Query('tenant_id') tenantId?: string,
+    @Query('plan_code') planCode?: string,
+    @CurrentUser('sub') userId?: string,
+    @TenantId() actorTenantId?: string,
+  ) {
+    this.assertPlatformAdmin(req);
+    const csv = await this.bulkService.exportOpsDashboardCsv(
+      type,
+      { weekStart, tenantId, planCode },
+      { actorUserId: userId ?? null, actorTenantId: actorTenantId ?? null },
+    );
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="verifyiq-${type}.csv"`);
+    res.send(csv);
   }
 
   @Get('companies')

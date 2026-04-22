@@ -2,6 +2,7 @@ import { HttpModule } from '@nestjs/axios';
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuditModule } from '../audit/audit.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { CompanyEntity } from '../companies/entities/company.entity';
 import { UsageEventEntity } from '../audit/usage-event.entity';
@@ -27,6 +28,7 @@ import { BOLAGSVERKET_BULK_QUEUE } from './queues/bolagsverket-bulk.queue';
 @Module({
   imports: [
     HttpModule,
+    AuditModule,
     CompaniesModule,
     BullModule.registerQueue({ name: BOLAGSVERKET_BULK_QUEUE }),
     TypeOrmModule.forFeature([

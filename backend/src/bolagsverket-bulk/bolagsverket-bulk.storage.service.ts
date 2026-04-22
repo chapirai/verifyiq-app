@@ -73,5 +73,15 @@ export class BolagsverketBulkStorageService {
     const url = await this.minio.presignedGetObject(this.bucket, objectKey, expiresInSeconds);
     return { url, expiresInSeconds };
   }
+
+  async getObjectBuffer(objectKey: string): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    const stream = await this.minio.getObject(this.bucket, objectKey);
+    return await new Promise((resolve, reject) => {
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
+  }
 }
 
