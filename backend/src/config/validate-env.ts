@@ -74,6 +74,9 @@ const envSchema = z.object({
   STRIPE_PRICE_ID_FREE: z.string().min(1).optional(),
   STRIPE_PRICE_ID_BASIC: z.string().min(1).optional(),
   STRIPE_PRICE_ID_PRO: z.string().min(1).optional(),
+  MONITORING_DETECT_ENABLED: z.enum(['true', 'false']).optional(),
+  MONITORING_DETECT_INTERVAL_MS: z.coerce.number().int().positive().optional(),
+  MONITORING_DETECT_LOOKBACK_HOURS: z.coerce.number().int().positive().optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {

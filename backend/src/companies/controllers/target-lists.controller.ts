@@ -6,8 +6,10 @@ import { RequiredScopes } from '../../common/decorators/required-scopes.decorato
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
 import { ScopeGuard } from '../../common/guards/scope.guard';
 import { ApiQuotaInterceptor } from '../../common/interceptors/api-quota.interceptor';
+import { AddTargetListItemsBulkDto } from '../dto/add-target-list-items-bulk.dto';
 import { AddTargetListItemDto } from '../dto/add-target-list-item.dto';
 import { CreateTargetListDto } from '../dto/create-target-list.dto';
+import { UpdateTargetListPlaybookDto } from '../dto/update-target-list-playbook.dto';
 import { TargetListsService } from '../services/target-lists.service';
 
 @Controller('target-lists')
@@ -41,6 +43,28 @@ export class TargetListsController {
     @Param('id') id: string,
   ) {
     return this.targetListsService.deleteList(tenantId, actorId ?? null, id);
+  }
+
+  @Post(':id/items/bulk')
+  @RequiredScopes('companies:write')
+  addItemsBulk(
+    @TenantId() tenantId: string,
+    @CurrentUser('sub') actorId: string | undefined,
+    @Param('id') id: string,
+    @Body() dto: AddTargetListItemsBulkDto,
+  ) {
+    return this.targetListsService.addItemsBulk(tenantId, actorId ?? null, id, dto);
+  }
+
+  @Post(':id/playbook')
+  @RequiredScopes('companies:write')
+  updatePlaybook(
+    @TenantId() tenantId: string,
+    @CurrentUser('sub') actorId: string | undefined,
+    @Param('id') id: string,
+    @Body() dto: UpdateTargetListPlaybookDto,
+  ) {
+    return this.targetListsService.updatePlaybook(tenantId, actorId ?? null, id, dto);
   }
 
   @Post(':id/items')

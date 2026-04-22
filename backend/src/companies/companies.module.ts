@@ -57,16 +57,30 @@ import { IntegrationTokenService } from './services/integration-token.service';
 import { DataIngestionLogEntity } from './entities/data-ingestion-log.entity';
 import { TargetListEntity } from './entities/target-list.entity';
 import { TargetListItemEntity } from './entities/target-list-item.entity';
+import { CompanySignalEntity } from './entities/company-signal.entity';
+import { CompanyDecisionSnapshotEntity } from './entities/company-decision-snapshot.entity';
+import { FinancialStatementEntity } from '../financial/entities/financial-statement.entity';
+import { OwnershipLinkEntity } from '../ownership/entities/ownership-link.entity';
+import { CompanyCaseEntity } from '../company-cases/entities/company-case.entity';
 import { DataIngestionLogService } from './services/data-ingestion-log.service';
 import { HvdAggregatorService } from './services/hvd-aggregator.service';
 import { BolagsverketProvider } from './providers/bolagsverket.provider';
 import { BvEnrichmentProcessor } from './processors/bv-enrichment.processor';
 import { BV_ENRICHMENT_QUEUE } from './queues/bv-enrichment.queue';
+import { COMPANY_SIGNALS_QUEUE } from './queues/company-signals.queue';
+import { CompanySignalsProcessor } from './processors/company-signals.processor';
+import { CompanySignalsService } from './services/company-signals.service';
+import { CompanyDecisionService } from './services/company-decision.service';
 import { BvPipelineService } from './services/bv-pipeline.service';
 import { BvPipelineWorker } from './services/bv-pipeline.worker';
 import { CompanyServingReadService } from './services/company-serving-read.service';
 import { TargetListsService } from './services/target-lists.service';
 import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-report-parse.queue';
+import { DECISION_REFRESH_QUEUE } from './queues/decision-refresh.queue';
+import { DecisionRefreshProcessor } from './processors/decision-refresh.processor';
+import { DecisionRefreshTriggerService } from './services/decision-refresh-trigger.service';
+import { CompanySourcingProfileEntity } from './entities/company-sourcing-profile.entity';
+import { CompanySourcingProfileService } from './services/company-sourcing-profile.service';
 
 @Module({
   imports: [
@@ -94,11 +108,19 @@ import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-repor
       DataIngestionLogEntity,
       TargetListEntity,
       TargetListItemEntity,
+      CompanySignalEntity,
+      CompanyDecisionSnapshotEntity,
+      FinancialStatementEntity,
+      OwnershipLinkEntity,
+      CompanyCaseEntity,
+      CompanySourcingProfileEntity,
     ]),
     HttpModule,
     AuditModule,
     BullModule.registerQueue({ name: BV_ENRICHMENT_QUEUE }),
     BullModule.registerQueue({ name: ANNUAL_REPORT_PARSE_QUEUE }),
+    BullModule.registerQueue({ name: COMPANY_SIGNALS_QUEUE }),
+    BullModule.registerQueue({ name: DECISION_REFRESH_QUEUE }),
   ],
   controllers: [
     CompaniesController,
@@ -142,6 +164,12 @@ import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-repor
     BvPipelineWorker,
     CompanyServingReadService,
     TargetListsService,
+    CompanySignalsService,
+    CompanyDecisionService,
+    CompanySignalsProcessor,
+    DecisionRefreshProcessor,
+    DecisionRefreshTriggerService,
+    CompanySourcingProfileService,
   ],
   exports: [
     CompaniesService,
@@ -168,6 +196,9 @@ import { ANNUAL_REPORT_PARSE_QUEUE } from '../annual-reports/queues/annual-repor
     HvdAggregatorService,
     BolagsverketProvider,
     TargetListsService,
+    CompanyDecisionService,
+    DecisionRefreshTriggerService,
+    CompanySourcingProfileService,
   ],
 })
 export class CompaniesModule {}

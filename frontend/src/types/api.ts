@@ -61,10 +61,18 @@ export interface CompanyListResponse {
     organisationNumber: string;
     legalName: string;
     status: string;
+    companyForm?: string | null;
     updatedAt: string;
+    ownershipRiskScore?: number;
+    dealMode?: 'founder_exit' | 'distressed' | 'roll_up' | null;
+    dealModeScore?: number | null;
   }>;
   total: number;
   page: number;
   limit: number;
   has_next: boolean;
+  perf?: {
+    elapsed_ms: number;
+    cache_hit: boolean;
+  };
 }

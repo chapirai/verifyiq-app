@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequiredScopes } from '../common/decorators/required-scopes.decorator';
@@ -45,6 +45,14 @@ export class MonitoringController {
     return this.monitoringService.listAlerts(tenantId);
   }
 
+  @Get('alerts/feed-grouped')
+  @RequiredScopes('companies:read')
+  listGroupedFeed(@TenantId() tenantId: string, @Query('limit') limit?: string) {
+    const parsed = Number.parseInt(limit ?? '100', 10);
+    const take = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 500) : 100;
+    return this.monitoringService.listAlertFeedGrouped(tenantId, take);
+  }
+
   @Patch(':id/acknowledge')
   @RequiredScopes('companies:write')
   acknowledgeAlert(
@@ -65,5 +73,21 @@ export class MonitoringController {
   @RequiredScopes('companies:read')
   listSubscriptionsByOrg(@TenantId() tenantId: string, @Param('orgNr') orgNr: string) {
     return this.monitoringService.listSubscriptionsByOrg(tenantId, orgNr);
+  }
+
+  /**
+   * POST /monitoring/detect-changes
+   * Phase 7: derive alerts from recent change-events + signal deltas.
+   */
+  @Post('detect-changes')
+  @RequiredScopes('companies:write')
+  detectChanges(
+    @TenantId() tenantId: string,
+    @CurrentUser('sub') actorId: string | undefined,
+    @Query('lookbackHours') lookbackHours?: string,
+  ) {
+    const parsed = Number.parseInt(lookbackHours ?? '24', 10);
+    const hours = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 24 * 30) : 24;
+    return this.monitoringService.detectChangesAndCreateAlerts(tenantId, actorId ?? null, hours);
   }
 }

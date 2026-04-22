@@ -6,4 +6,8 @@ export interface TargetList {
   createdAt: string;
   updatedAt: string;
   organisationNumbers: string[];
+  playbook?: {
+    dealMode?: 'founder_exit' | 'distressed' | 'roll_up';
+    thesis?: string;
+  };
 }

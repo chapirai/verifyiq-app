@@ -86,4 +86,21 @@ export class ApiQuotaService {
     const remaining = Math.max(0, limit - used);
     return { allowed: used <= limit, limit, remaining, plan };
   }
+
+  async readQuota(params: {
+    tenantId: string;
+    environment: 'live' | 'sandbox';
+    clientKey: string;
+    bucket: ApiQuotaBucket;
+  }): Promise<{ limit: number; remaining: number; used: number; plan: string }> {
+    await this.ensureRedisConnected();
+    const plan = await this.planCodeForTenant(params.tenantId);
+    const limit = this.dailyLimitForPlan(plan);
+    const day = new Date().toISOString().slice(0, 10);
+    const key = this.redisKey(params.bucket, params.environment, params.tenantId, params.clientKey, day);
+    const raw = await this.redis.get(key);
+    const used = Math.max(0, Number(raw ?? 0) || 0);
+    const remaining = Math.max(0, limit - used);
+    return { limit, remaining, used, plan };
+  }
 }

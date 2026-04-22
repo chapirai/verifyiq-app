@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import type { UrlObject } from 'url';
 import { api } from '@/lib/api';
 import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { EmptyState, ErrorState } from '@/components/ui/StateBlocks';
 import { Table } from '@/components/ui/Table';
 import type { TargetList } from '@/types/target-lists';
@@ -18,7 +20,7 @@ type SearchRow = {
   status: string;
 };
 
-export default function ListsPage() {
+function ListsPageContent() {
   const searchParams = useSearchParams();
   const [lists, setLists] = useState<TargetList[]>([]);
   const [activeListId, setActiveListId] = useState<string>('');
@@ -28,6 +30,8 @@ export default function ListsPage() {
   const [searchError, setSearchError] = useState('');
   const [listsLoading, setListsLoading] = useState(true);
   const [listsError, setListsError] = useState('');
+  const [playbookMode, setPlaybookMode] = useState<'' | 'founder_exit' | 'distressed' | 'roll_up'>('');
+  const [playbookThesis, setPlaybookThesis] = useState('');
 
   const loadLists = async () => {
     setListsLoading(true);
@@ -52,11 +56,19 @@ export default function ListsPage() {
   }, []);
 
   const activeList = useMemo(() => lists.find((x) => x.id === activeListId) ?? null, [lists, activeListId]);
+  useEffect(() => {
+    setPlaybookMode((activeList?.playbook?.dealMode as '' | 'founder_exit' | 'distressed' | 'roll_up') ?? '');
+    setPlaybookThesis(activeList?.playbook?.thesis ?? '');
+  }, [activeList?.id, activeList?.playbook?.dealMode, activeList?.playbook?.thesis]);
 
-  const compareListHref = useMemo(() => {
-    if (!activeList || activeList.organisationNumbers.length < 2) return '';
+  /** `UrlObject` keeps `next/link` happy with `experimental.typedRoutes` (plain `string` is rejected). */
+  const compareListHref = useMemo((): UrlObject | null => {
+    if (!activeList || activeList.organisationNumbers.length < 2) return null;
     const orgs = activeList.organisationNumbers.slice(0, 8).join(',');
-    return `/compare?orgs=${encodeURIComponent(orgs)}`;
+    return {
+      pathname: '/compare',
+      search: `?orgs=${encodeURIComponent(orgs)}`,
+    };
   }, [activeList]);
 
   const createList = async () => {
@@ -162,7 +174,7 @@ export default function ListsPage() {
                   <h2 className="text-xl">{activeList.name}</h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {compareListHref ? (
+                  {compareListHref != null ? (
                     <Link
                       href={compareListHref}
                       className="border-2 border-foreground bg-foreground px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-background hover:opacity-90"
@@ -172,6 +184,38 @@ export default function ListsPage() {
                   ) : null}
                   <p className="text-xs text-muted-foreground">Updated {new Date(activeList.updatedAt).toLocaleString()}</p>
                 </div>
+              </div>
+              <div className="grid gap-2 border border-border-light p-3 md:grid-cols-[220px_1fr_auto]">
+                <Select
+                  value={playbookMode}
+                  onChange={(e) => setPlaybookMode(e.target.value as '' | 'founder_exit' | 'distressed' | 'roll_up')}
+                >
+                  <option value="">Playbook: none</option>
+                  <option value="founder_exit">Founder exit</option>
+                  <option value="distressed">Distressed</option>
+                  <option value="roll_up">Roll-up</option>
+                </Select>
+                <Input
+                  value={playbookThesis}
+                  onChange={(e) => setPlaybookThesis(e.target.value)}
+                  placeholder="Playbook thesis (e.g. fragmented B2B niche with owner succession pressure)"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    if (!activeList) return;
+                    void api
+                      .updateTargetListPlaybook(activeList.id, {
+                        dealMode: playbookMode || undefined,
+                        thesis: playbookThesis.trim() || undefined,
+                      })
+                      .then(() => loadLists())
+                      .catch(() => undefined);
+                  }}
+                >
+                  Save playbook
+                </Button>
               </div>
 
               <div className="grid gap-2 md:grid-cols-[1fr_auto]">
@@ -213,7 +257,12 @@ export default function ListsPage() {
                       <tr key={org}>
                         <td className="font-mono text-xs">{org}</td>
                         <td>
-                          <Link href={`/companies/workspace/${org}`} className="underline underline-offset-4">Open workspace</Link>
+                          <Link
+                            href={{ pathname: `/companies/workspace/${org}` }}
+                            className="underline underline-offset-4"
+                          >
+                            Open workspace
+                          </Link>
                         </td>
                         <td>
                           <button className="underline underline-offset-4" onClick={() => void removeOrgFromActiveList(org)}>
@@ -230,5 +279,13 @@ export default function ListsPage() {
         </article>
       </div>
     </section>
+  );
+}
+
+export default function ListsPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-muted-foreground">Loading lists…</p>}>
+      <ListsPageContent />
+    </Suspense>
   );
 }

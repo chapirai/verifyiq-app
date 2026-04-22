@@ -17,6 +17,12 @@ export class TargetListItemEntity {
   @Column({ name: 'organisation_number', type: 'varchar', length: 32 })
   organisationNumber!: string;
 
+  @Column({ name: 'deal_mode', type: 'varchar', length: 32, nullable: true })
+  dealMode!: string | null;
+
+  @Column({ name: 'sourcing_snapshot', type: 'jsonb', default: () => "'{}'::jsonb" })
+  sourcingSnapshot!: Record<string, unknown>;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 }

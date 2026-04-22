@@ -21,9 +21,17 @@ import type {
 import type {
   CreateMonitoringSubscriptionPayload,
   MonitoringAlert,
+  MonitoringGroupedFeedRow,
   MonitoringSubscription,
 } from '@/types/monitoring';
 import type { TargetList } from '@/types/target-lists';
+import type {
+  CompanySignalsJobStatus,
+  CompanySignalsResponse,
+  CompanySignalsRecomputeResponse,
+} from '@/types/company-signals';
+import type { CompanyDecisionInsight, CompanyDecisionInsightSnapshot } from '@/types/decision';
+import type { SimilarCompaniesResponse, SourcingParseResult } from '@/types/sourcing';
 
 const API_BASE_URL = API_V1_BASE_URL;
 
@@ -116,6 +124,106 @@ export const api = {
   },
   async getCompanies(query = '') {
     return request<CompanyListResponse>(`/companies${query ? `?${query}` : ''}`);
+  },
+  /** Phase 4 discovery — same contract as GET /companies; prefer for ranked sourcing UIs. */
+  async searchCompanies(query = '') {
+    return request<CompanyListResponse>(`/companies/search${query ? `?${query}` : ''}`);
+  },
+  async getSearchPerformance() {
+    return request<{
+      samples: number;
+      p50_ms: number;
+      p95_ms: number;
+      p99_ms: number;
+      target_ms: number;
+      target_met_p95: boolean | null;
+    }>('/companies/search/performance');
+  },
+  async compareCompanies(payload: { organisationNumbers: string[]; years?: number }) {
+    return request<{
+      data: Array<{
+        organisationNumber: string;
+        company: {
+          legalName: string;
+          status: string | null;
+          companyForm: string | null;
+          countryCode: string;
+          updatedAt: string;
+          businessDescription: string | null;
+        } | null;
+        ownership: { currentEdges: number; ownershipRiskScore?: number };
+        financials: {
+          fiscalYear: string | null;
+          revenue: string | null;
+          netResult: string | null;
+          totalAssets: string | null;
+          totalEquity: string | null;
+          equityRatio: number | null;
+          statementsCount: number;
+        };
+        signals: Array<{
+          signalType: string;
+          score: number | null;
+          engineVersion: string;
+          computedAt: string;
+          explanation: Record<string, unknown>;
+        }>;
+      }>;
+      summary: { compared: number; orgs: string[] };
+    }>('/companies/compare', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  async parseSourcingQuery(text: string) {
+    return request<SourcingParseResult>('/companies/sourcing/parse-query', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  },
+  async getSimilarCompanies(organisationNumber: string, limit = 10, mode?: string) {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (mode) q.set('mode', mode);
+    return request<SimilarCompaniesResponse>(`/companies/${organisationNumber}/similar?${q}`);
+  },
+  async getCompanySignals(organisationNumber: string) {
+    return request<CompanySignalsResponse>(`/companies/${organisationNumber}/signals`);
+  },
+  async recomputeCompanySignals(organisationNumber: string) {
+    return request<CompanySignalsRecomputeResponse>(
+      `/companies/${organisationNumber}/signals/recompute`,
+      { method: 'POST' },
+    );
+  },
+  async getCompanySignalsJobStatus(organisationNumber: string, jobId: string) {
+    return request<CompanySignalsJobStatus>(
+      `/companies/${organisationNumber}/signals/jobs/${encodeURIComponent(jobId)}`,
+    );
+  },
+  async getCompanyDecisionInsight(organisationNumber: string, mode?: 'pe' | 'credit' | 'compliance', persist = false) {
+    const q = new URLSearchParams();
+    if (mode) q.set('mode', mode);
+    if (persist) q.set('persist', 'true');
+    const qs = q.toString();
+    return request<CompanyDecisionInsight>(
+      `/companies/${organisationNumber}/decision-insight${qs ? `?${qs}` : ''}`,
+    );
+  },
+  async getCompanyDecisionInsightHistory(
+    organisationNumber: string,
+    mode: 'pe' | 'credit' | 'compliance' = 'pe',
+    limit = 20,
+  ) {
+    const q = new URLSearchParams({ mode, limit: String(limit) });
+    return request<CompanyDecisionInsightSnapshot[]>(
+      `/companies/${organisationNumber}/decision-insight/history?${q}`,
+    );
+  },
+  async captureCompanyDecisionSnapshots(organisationNumber: string) {
+    return request<CompanyDecisionInsight[]>(
+      `/companies/${organisationNumber}/decision-insight/snapshot`,
+      { method: 'POST' },
+    );
   },
   async getCompany(id: string) {
     return request(`/companies/${id}`);
@@ -307,9 +415,24 @@ export const api = {
   async listMonitoringAlerts() {
     return request<MonitoringAlert[]>('/monitoring/alerts');
   },
+  async listMonitoringGroupedFeed(limit = 100) {
+    return request<MonitoringGroupedFeedRow[]>(
+      `/monitoring/alerts/feed-grouped?limit=${encodeURIComponent(String(limit))}`,
+    );
+  },
   async acknowledgeMonitoringAlert(id: string) {
     return request<MonitoringAlert>(`/monitoring/${encodeURIComponent(id)}/acknowledge`, {
       method: 'PATCH',
+    });
+  },
+  async detectMonitoringChanges(lookbackHours = 24) {
+    return request<{
+      scanned_subscriptions: number;
+      created_alerts: number;
+      lookback_hours: number;
+      triggered_event_types: string[];
+    }>(`/monitoring/detect-changes?lookbackHours=${encodeURIComponent(String(lookbackHours))}`, {
+      method: 'POST',
     });
   },
   async listTargetLists() {
@@ -337,7 +460,34 @@ export const api = {
       method: 'DELETE',
     });
   },
+  async addTargetListItemsBulk(
+    id: string,
+    organisationNumbers: string[],
+    dealMode?: 'founder_exit' | 'distressed' | 'roll_up',
+  ) {
+    return request<{ added: number; skipped: number; items: unknown[] }>(
+      `/target-lists/${encodeURIComponent(id)}/items/bulk`,
+      { method: 'POST', body: JSON.stringify({ organisationNumbers, dealMode }) },
+    );
+  },
+  async updateTargetListPlaybook(
+    id: string,
+    payload: { dealMode?: 'founder_exit' | 'distressed' | 'roll_up'; thesis?: string },
+  ) {
+    return request(`/target-lists/${encodeURIComponent(id)}/playbook`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
   async getOwnershipGraph(orgNumber: string) {
     return request(`/ownership/graph/${encodeURIComponent(orgNumber)}`);
+  },
+  async getAdvancedOwnershipInsights(orgNumber: string) {
+    return request(`/ownership/advanced/${encodeURIComponent(orgNumber)}`);
+  },
+  async precomputeAdvancedOwnershipInsights(orgNumber: string) {
+    return request(`/ownership/advanced/${encodeURIComponent(orgNumber)}/precompute`, {
+      method: 'POST',
+    });
   },
 };

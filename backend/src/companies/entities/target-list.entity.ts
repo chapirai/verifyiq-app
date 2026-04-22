@@ -15,6 +15,9 @@ export class TargetListEntity {
   @Column({ name: 'created_by_user_id', type: 'uuid', nullable: true })
   createdByUserId!: string | null;
 
+  @Column({ name: 'playbook', type: 'jsonb', default: () => "'{}'::jsonb" })
+  playbook!: Record<string, unknown>;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

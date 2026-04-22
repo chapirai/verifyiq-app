@@ -35,6 +35,14 @@ export interface MonitoringAlert {
   updatedAt: string;
 }
 
+export interface MonitoringGroupedFeedRow {
+  organisationNumber: string | null;
+  alertType: string;
+  latestCreatedAt: string;
+  alertCount: number;
+  openCount: number;
+}
+
 export interface CreateMonitoringSubscriptionPayload {
   eventTypes: string[];
   subjectType?: string;

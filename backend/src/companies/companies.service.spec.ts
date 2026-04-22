@@ -16,6 +16,9 @@ import { FailureStateService } from './services/failure-state.service';
 import { BvCacheService } from './services/bv-cache.service';
 import { LineageMetadataCaptureService } from './services/lineage-metadata-capture.service';
 import { RefreshDecisionService } from './services/refresh-decision.service';
+import { FinancialStatementEntity } from '../financial/entities/financial-statement.entity';
+import { OwnershipLinkEntity } from '../ownership/entities/ownership-link.entity';
+import { CompanySignalEntity } from './entities/company-signal.entity';
 
 const TENANT_ID = 'tenant-abc';
 const ORG_NR = '5560000001';
@@ -163,6 +166,18 @@ describe('CompaniesService – orchestrateLookup', () => {
         },
         {
           provide: getRepositoryToken(CompanyEntity),
+          useValue: { createQueryBuilder: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(FinancialStatementEntity),
+          useValue: { count: jest.fn().mockResolvedValue(0), createQueryBuilder: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(OwnershipLinkEntity),
+          useValue: { count: jest.fn().mockResolvedValue(0), createQueryBuilder: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(CompanySignalEntity),
           useValue: { createQueryBuilder: jest.fn() },
         },
       ],
@@ -445,6 +460,8 @@ function makeQbMock(data: Partial<CompanyEntity>[], total: number) {
   qb.select = jest.fn(chain);
   qb.where = jest.fn(chain);
   qb.andWhere = jest.fn(chain);
+  qb.orderBy = jest.fn(chain);
+  qb.addOrderBy = jest.fn(chain);
   qb.skip = jest.fn(chain);
   qb.take = jest.fn(chain);
   qb.getManyAndCount = jest.fn().mockResolvedValue([data, total]);
@@ -521,6 +538,18 @@ describe('CompaniesService – findAll', () => {
         {
           provide: getRepositoryToken(CompanyEntity),
           useValue: companyRepo,
+        },
+        {
+          provide: getRepositoryToken(FinancialStatementEntity),
+          useValue: { count: jest.fn().mockResolvedValue(0), createQueryBuilder: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(OwnershipLinkEntity),
+          useValue: { count: jest.fn().mockResolvedValue(0), createQueryBuilder: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(CompanySignalEntity),
+          useValue: { createQueryBuilder: jest.fn() },
         },
       ],
     }).compile();
@@ -727,6 +756,18 @@ describe('CompaniesService – findAll', () => {
           {
             provide: getRepositoryToken(CompanyEntity),
             useValue: companyRepo,
+          },
+          {
+            provide: getRepositoryToken(FinancialStatementEntity),
+            useValue: { count: jest.fn().mockResolvedValue(0), createQueryBuilder: jest.fn() },
+          },
+          {
+            provide: getRepositoryToken(OwnershipLinkEntity),
+            useValue: { count: jest.fn().mockResolvedValue(0), createQueryBuilder: jest.fn() },
+          },
+          {
+            provide: getRepositoryToken(CompanySignalEntity),
+            useValue: { createQueryBuilder: jest.fn() },
           },
         ],
       }).compile();

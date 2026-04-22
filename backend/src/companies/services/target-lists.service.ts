@@ -2,8 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
+import { AddTargetListItemsBulkDto } from '../dto/add-target-list-items-bulk.dto';
 import { AddTargetListItemDto } from '../dto/add-target-list-item.dto';
 import { CreateTargetListDto } from '../dto/create-target-list.dto';
+import { UpdateTargetListPlaybookDto } from '../dto/update-target-list-playbook.dto';
 import { TargetListItemEntity } from '../entities/target-list-item.entity';
 import { TargetListEntity } from '../entities/target-list.entity';
 
@@ -77,6 +79,70 @@ export class TargetListsService {
       metadata: null,
     });
     return { id: listId, deleted: true };
+  }
+
+  async addItemsBulk(tenantId: string, actorId: string | null, listId: string, dto: AddTargetListItemsBulkDto) {
+    const list = await this.targetListsRepo.findOne({ where: { id: listId, tenantId } });
+    if (!list) throw new NotFoundException('Target list not found');
+    let added = 0;
+    let skipped = 0;
+    const saved: TargetListItemEntity[] = [];
+    for (const raw of dto.organisationNumbers) {
+      const org = normalizeOrgNumber(raw);
+      if (org.length !== 10 && org.length !== 12) {
+        skipped += 1;
+        continue;
+      }
+      const existing = await this.targetListItemsRepo.findOne({
+        where: { tenantId, targetListId: listId, organisationNumber: org },
+      });
+      if (existing) {
+        skipped += 1;
+        continue;
+      }
+      const item = this.targetListItemsRepo.create({
+        tenantId,
+        targetListId: listId,
+        organisationNumber: org,
+        dealMode: dto.dealMode ?? null,
+        sourcingSnapshot: dto.dealMode ? { dealMode: dto.dealMode, addedAt: new Date().toISOString() } : {},
+      });
+      const row = await this.targetListItemsRepo.save(item);
+      saved.push(row);
+      added += 1;
+    }
+    await this.auditService.log({
+      tenantId,
+      actorId,
+      action: 'target_list.items_bulk_added',
+      resourceType: 'target_list',
+      resourceId: listId,
+      metadata: { added, skipped, requested: dto.organisationNumbers.length, deal_mode: dto.dealMode ?? null },
+    });
+    return { added, skipped, items: saved };
+  }
+
+  async updatePlaybook(tenantId: string, actorId: string | null, listId: string, dto: UpdateTargetListPlaybookDto) {
+    const list = await this.targetListsRepo.findOne({ where: { id: listId, tenantId } });
+    if (!list) throw new NotFoundException('Target list not found');
+    const nextPlaybook = {
+      ...(list.playbook ?? {}),
+      ...(dto.dealMode ? { dealMode: dto.dealMode } : {}),
+      ...(dto.thesis ? { thesis: dto.thesis } : {}),
+      updatedAt: new Date().toISOString(),
+      updatedBy: actorId,
+    };
+    list.playbook = nextPlaybook;
+    const saved = await this.targetListsRepo.save(list);
+    await this.auditService.log({
+      tenantId,
+      actorId,
+      action: 'target_list.playbook_updated',
+      resourceType: 'target_list',
+      resourceId: listId,
+      metadata: { deal_mode: dto.dealMode ?? null },
+    });
+    return saved;
   }
 
   async addItem(tenantId: string, actorId: string | null, listId: string, dto: AddTargetListItemDto) {

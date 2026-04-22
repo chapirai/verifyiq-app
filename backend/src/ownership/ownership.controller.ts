@@ -71,4 +71,16 @@ export class OwnershipController {
   getOwnershipGraph(@TenantId() tenantId: string, @Param('orgNr') orgNr: string) {
     return this.ownershipService.getOwnershipGraph(tenantId, orgNr);
   }
+
+  @Get('advanced/:orgNr')
+  @RequiredScopes('ownership:read')
+  getAdvancedOwnershipInsights(@TenantId() tenantId: string, @Param('orgNr') orgNr: string) {
+    return this.ownershipService.getAdvancedOwnershipInsights(tenantId, orgNr);
+  }
+
+  @Post('advanced/:orgNr/precompute')
+  @RequiredScopes('ownership:write')
+  precomputeAdvancedOwnershipInsights(@TenantId() tenantId: string, @Param('orgNr') orgNr: string) {
+    return this.ownershipService.enqueueAdvancedOwnershipInsightsPrecompute(tenantId, orgNr);
+  }
 }

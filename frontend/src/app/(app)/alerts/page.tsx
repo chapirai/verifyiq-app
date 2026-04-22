@@ -1,36 +1,45 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
-import type { MonitoringAlert, MonitoringSubscription } from '@/types/monitoring';
+import type { MonitoringAlert, MonitoringGroupedFeedRow, MonitoringSubscription } from '@/types/monitoring';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateBlocks';
 import { Table } from '@/components/ui/Table';
 
-export default function AlertsPage() {
+function AlertsPageContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState('');
   const [subscriptions, setSubscriptions] = useState<MonitoringSubscription[]>([]);
   const [alerts, setAlerts] = useState<MonitoringAlert[]>([]);
+  const [groupedFeed, setGroupedFeed] = useState<MonitoringGroupedFeedRow[]>([]);
   const [orgNumber, setOrgNumber] = useState('');
-  const [eventTypes, setEventTypes] = useState('ownership.change,board.change,financial.change');
+  const [eventTypes, setEventTypes] = useState('ownership.change,board.change,filings.change,signal.change');
   const [formError, setFormError] = useState('');
+  const [detectionMsg, setDetectionMsg] = useState('');
+  const [detectionLoading, setDetectionLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
     setListError('');
     try {
-      const [subRows, alertRows] = await Promise.all([api.listMonitoringSubscriptions(), api.listMonitoringAlerts()]);
+      const [subRows, alertRows, groupedRows] = await Promise.all([
+        api.listMonitoringSubscriptions(),
+        api.listMonitoringAlerts(),
+        api.listMonitoringGroupedFeed(100),
+      ]);
       setSubscriptions(subRows);
       setAlerts(alertRows);
+      setGroupedFeed(groupedRows);
     } catch (e) {
       setListError(e instanceof Error ? e.message : 'Could not load alerts');
       setSubscriptions([]);
       setAlerts([]);
+      setGroupedFeed([]);
     } finally {
       setLoading(false);
     }
@@ -77,6 +86,22 @@ export default function AlertsPage() {
     await load();
   };
 
+  const runDetection = async () => {
+    setDetectionLoading(true);
+    setDetectionMsg('');
+    try {
+      const res = await api.detectMonitoringChanges(24);
+      setDetectionMsg(
+        `Scanned ${res.scanned_subscriptions} subscriptions, created ${res.created_alerts} alerts (${res.triggered_event_types.join(', ') || 'none'}).`,
+      );
+      await load();
+    } catch (e) {
+      setDetectionMsg(e instanceof Error ? e.message : 'Detection failed');
+    } finally {
+      setDetectionLoading(false);
+    }
+  };
+
   return (
     <section className="space-y-6">
       <h1 className="font-display text-5xl">Alerts</h1>
@@ -84,6 +109,12 @@ export default function AlertsPage() {
         Subscribe to monitored organisations and track ownership, filing, and financial changes in one queue. Company workspace can prefill org via{' '}
         <span className="font-mono text-xs">?org=</span>.
       </p>
+      <div className="flex flex-wrap items-center gap-2 border border-border-light p-3">
+        <Button type="button" variant="secondary" onClick={() => void runDetection()} disabled={detectionLoading}>
+          {detectionLoading ? 'Detecting…' : 'Run change detection now'}
+        </Button>
+        {detectionMsg ? <p className="text-xs text-muted-foreground">{detectionMsg}</p> : null}
+      </div>
 
       {loading ? <LoadingSkeleton lines={4} /> : null}
       {!loading && listError ? <ErrorState title="Could not load subscriptions or alerts" message={listError} /> : null}
@@ -130,6 +161,30 @@ export default function AlertsPage() {
       </article>
 
       <article className="space-y-3">
+        <h2 className="text-2xl">Grouped feed</h2>
+        {groupedFeed.length === 0 ? (
+          <EmptyState title="No grouped feed entries" description="Grouped alert rollups appear after detection runs." />
+        ) : (
+          <Table>
+            <thead>
+              <tr><th>Org number</th><th>Alert type</th><th>Open</th><th>Total</th><th>Latest</th></tr>
+            </thead>
+            <tbody>
+              {groupedFeed.map((row) => (
+                <tr key={`${row.organisationNumber ?? 'unknown'}:${row.alertType}`}>
+                  <td className="font-mono text-xs">{row.organisationNumber ?? '—'}</td>
+                  <td>{row.alertType}</td>
+                  <td>{row.openCount}</td>
+                  <td>{row.alertCount}</td>
+                  <td>{new Date(row.latestCreatedAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </article>
+
+      <article className="space-y-3">
         <h2 className="text-2xl">Open alerts</h2>
         {alerts.length === 0 ? (
           <EmptyState title="No alerts" description="Alerts will appear when monitored entities trigger subscribed events." />
@@ -162,5 +217,13 @@ export default function AlertsPage() {
         )}
       </article>
     </section>
+  );
+}
+
+export default function AlertsPage() {
+  return (
+    <Suspense fallback={<LoadingSkeleton lines={4} />}>
+      <AlertsPageContent />
+    </Suspense>
   );
 }

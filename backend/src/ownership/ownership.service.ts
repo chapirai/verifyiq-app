@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Queue } from 'bullmq';
 import { DataSource, In, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { CreateBeneficialOwnerDto } from './dto/create-beneficial-owner.dto';
@@ -8,9 +10,21 @@ import { CreateWorkplaceDto } from './dto/create-workplace.dto';
 import { BeneficialOwnerEntity } from './entities/beneficial-owner.entity';
 import { OwnershipLinkEntity } from './entities/ownership-link.entity';
 import { WorkplaceEntity } from './entities/workplace.entity';
+import {
+  OWNERSHIP_ADVANCED_INSIGHTS_QUEUE,
+  OwnershipAdvancedInsightsJobData,
+  OwnershipAdvancedInsightsJobName,
+} from './queues/ownership-advanced-insights.queue';
 
 @Injectable()
 export class OwnershipService {
+  private readonly advancedInsightsCache = new Map<
+    string,
+    { cachedAtMs: number; data: Record<string, unknown> }
+  >();
+  private readonly advancedInsightsCacheTtlMs = 3 * 60 * 1000;
+  private readonly advancedInsightsHitCounter = new Map<string, number>();
+
   constructor(
     @InjectRepository(OwnershipLinkEntity)
     private readonly ownershipLinksRepo: Repository<OwnershipLinkEntity>,
@@ -18,6 +32,8 @@ export class OwnershipService {
     private readonly beneficialOwnersRepo: Repository<BeneficialOwnerEntity>,
     @InjectRepository(WorkplaceEntity)
     private readonly workplacesRepo: Repository<WorkplaceEntity>,
+    @InjectQueue(OWNERSHIP_ADVANCED_INSIGHTS_QUEUE)
+    private readonly advancedInsightsQueue: Queue<OwnershipAdvancedInsightsJobData>,
     private readonly auditService: AuditService,
     private readonly dataSource: DataSource,
   ) {}
@@ -657,6 +673,252 @@ export class OwnershipService {
           chainContext: reconciliationRows.filter((r) => r.status === 'chain_context').length,
         },
         rows: reconciliationRows,
+      },
+    };
+  }
+
+  async getAdvancedOwnershipInsights(tenantId: string, organisationNumber: string) {
+    const org = (organisationNumber ?? '').replace(/\D/g, '');
+    const cacheKey = `${tenantId}:${org}`;
+    const now = Date.now();
+    const cached = this.advancedInsightsCache.get(cacheKey);
+    if (cached && now - cached.cachedAtMs <= this.advancedInsightsCacheTtlMs) {
+      this.bumpAdvancedInsightsTraffic(tenantId, org);
+      return { ...cached.data, cache: { hit: true, ttl_ms: this.advancedInsightsCacheTtlMs } };
+    }
+
+    const graph = await this.getOwnershipGraph(tenantId, org);
+    const computed = await this.computeAdvancedOwnershipInsightsFromGraph(tenantId, org, graph);
+    this.advancedInsightsCache.set(cacheKey, { cachedAtMs: now, data: computed });
+    this.bumpAdvancedInsightsTraffic(tenantId, org);
+    return { ...computed, cache: { hit: false, ttl_ms: this.advancedInsightsCacheTtlMs } };
+  }
+
+  async precomputeAdvancedOwnershipInsights(tenantId: string, organisationNumber: string) {
+    const org = (organisationNumber ?? '').replace(/\D/g, '');
+    const graph = await this.getOwnershipGraph(tenantId, org);
+    const computed = await this.computeAdvancedOwnershipInsightsFromGraph(tenantId, org, graph);
+    this.advancedInsightsCache.set(`${tenantId}:${org}`, { cachedAtMs: Date.now(), data: computed });
+    return { queued: false, precomputed: true, organisationNumber: org };
+  }
+
+  async enqueueAdvancedOwnershipInsightsPrecompute(tenantId: string, organisationNumber: string) {
+    const org = (organisationNumber ?? '').replace(/\D/g, '');
+    if (org.length !== 10 && org.length !== 12) return { queued: false, reason: 'invalid_org' as const };
+    const jobId = `${tenantId}:${org}:advanced-insights`;
+    await this.advancedInsightsQueue.add(
+      OwnershipAdvancedInsightsJobName.PRECOMPUTE,
+      { tenantId, organisationNumber: org },
+      { jobId, removeOnComplete: true, removeOnFail: 500, attempts: 2 },
+    );
+    return { queued: true, job_id: jobId };
+  }
+
+  private bumpAdvancedInsightsTraffic(tenantId: string, org: string) {
+    const key = `${tenantId}:${org}`;
+    const hits = (this.advancedInsightsHitCounter.get(key) ?? 0) + 1;
+    this.advancedInsightsHitCounter.set(key, hits);
+    // Optional async precompute for hot orgs.
+    if (hits % 8 === 0) {
+      void this.enqueueAdvancedOwnershipInsightsPrecompute(tenantId, org);
+    }
+  }
+
+  private async computeAdvancedOwnershipInsightsFromGraph(
+    tenantId: string,
+    org: string,
+    graph: Record<string, any>,
+  ): Promise<Record<string, unknown>> {
+    const edges = Array.isArray(graph.edges)
+      ? (graph.edges as Array<{
+          id: string;
+          from: string;
+          to: string;
+          ownershipPercentage: number | null;
+          controlPercentage: number | null;
+          ownershipType: string | null;
+          direct: boolean;
+        }>)
+      : [];
+    const nodes = graph.nodes ?? [];
+
+    const adjacency = new Map<string, string[]>();
+    for (const e of edges) {
+      const arr = adjacency.get(e.from) ?? [];
+      arr.push(e.to);
+      adjacency.set(e.from, arr);
+    }
+
+    const cycleNodes = new Set<string>();
+    const visited = new Set<string>();
+    const stack = new Set<string>();
+    const walk = (node: string) => {
+      if (stack.has(node)) {
+        cycleNodes.add(node);
+        return;
+      }
+      if (visited.has(node)) return;
+      visited.add(node);
+      stack.add(node);
+      for (const next of adjacency.get(node) ?? []) walk(next);
+      stack.delete(node);
+    };
+    for (const n of nodes) walk(n.id);
+
+    const unknownWeightEdges = edges.filter((e) => e.ownershipPercentage == null && e.controlPercentage == null);
+    const highControlLowEconomic = edges.filter((e) => {
+      const control = e.controlPercentage ?? 0;
+      const ownership = e.ownershipPercentage ?? 0;
+      return control >= 50 && ownership > 0 && ownership < 20;
+    });
+
+    const incomingByNode = new Map<string, number>();
+    for (const e of edges) {
+      incomingByNode.set(e.to, (incomingByNode.get(e.to) ?? 0) + 1);
+    }
+    const hiddenOwnershipIndicators = [
+      ...new Set(
+        [...incomingByNode.entries()]
+          .filter(([, count]) => count >= 4)
+          .map(([node]) => node),
+      ),
+    ];
+
+    const anomalies = [
+      {
+        code: 'ownership_cycle_detected',
+        severity: cycleNodes.size > 0 ? 'high' : 'low',
+        riskTier: cycleNodes.size >= 2 ? 'tier_1' : cycleNodes.size > 0 ? 'tier_2' : 'tier_4',
+        analystPriority: cycleNodes.size >= 2 ? 1 : cycleNodes.size > 0 ? 2 : 4,
+        count: cycleNodes.size,
+        description:
+          cycleNodes.size > 0
+            ? 'Circular control path(s) detected in current ownership graph.'
+            : 'No circular control paths detected.',
+      },
+      {
+        code: 'unknown_edge_weights',
+        severity: unknownWeightEdges.length >= 5 ? 'high' : unknownWeightEdges.length > 0 ? 'medium' : 'low',
+        riskTier: unknownWeightEdges.length >= 10 ? 'tier_1' : unknownWeightEdges.length >= 5 ? 'tier_2' : unknownWeightEdges.length > 0 ? 'tier_3' : 'tier_4',
+        analystPriority: unknownWeightEdges.length >= 10 ? 1 : unknownWeightEdges.length >= 5 ? 2 : unknownWeightEdges.length > 0 ? 3 : 4,
+        count: unknownWeightEdges.length,
+        description: 'Ownership/control percentages missing on current link edges.',
+      },
+      {
+        code: 'high_control_low_economic',
+        severity: highControlLowEconomic.length > 0 ? 'medium' : 'low',
+        riskTier: highControlLowEconomic.length >= 3 ? 'tier_2' : highControlLowEconomic.length > 0 ? 'tier_3' : 'tier_4',
+        analystPriority: highControlLowEconomic.length >= 3 ? 2 : highControlLowEconomic.length > 0 ? 3 : 4,
+        count: highControlLowEconomic.length,
+        description: 'Control concentration appears materially above economic ownership.',
+      },
+    ].sort((a, b) => a.analystPriority - b.analystPriority || b.count - a.count);
+
+    const paths = Array.isArray(graph.controlPaths) ? (graph.controlPaths as Array<Record<string, unknown>>) : [];
+    const suspiciousPathFlags: Array<Record<string, unknown>> = [];
+    for (const path of paths.slice(0, 30)) {
+      const steps = Array.isArray(path.steps) ? (path.steps as Array<Record<string, unknown>>) : [];
+      if (steps.length === 0) continue;
+      const companyStepCount = steps.filter((s) => String(s.ownerType ?? '') === 'company').length;
+      if (companyStepCount >= 3) {
+        suspiciousPathFlags.push({
+          code: 'nominee_chain_candidate',
+          severity: 'medium',
+          riskTier: 'tier_2',
+          analystPriority: 2,
+          summary: String(path.summary ?? ''),
+          reason: 'Control path traverses three or more company layers before natural person endpoint.',
+        });
+      }
+      const hasUnknownWeights = steps.some((s) => s.weightComplete === false);
+      if (hasUnknownWeights && steps.length >= 2) {
+        suspiciousPathFlags.push({
+          code: 'opaque_multihop_path',
+          severity: 'medium',
+          riskTier: 'tier_3',
+          analystPriority: 3,
+          summary: String(path.summary ?? ''),
+          reason: 'Multi-hop ownership path includes one or more edges without complete weights.',
+        });
+      }
+    }
+
+    const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const historicLinks = await this.ownershipLinksRepo.find({
+      where: { tenantId, ownedOrganisationNumber: org },
+      order: { updatedAt: 'DESC', createdAt: 'DESC' },
+      take: 120,
+    });
+    const recent = historicLinks.filter((l) => {
+      const d = l.updatedAt ?? l.createdAt;
+      return d instanceof Date ? d >= since : true;
+    });
+    const ownerKeys = recent.map((l) =>
+      l.ownerType === 'person'
+        ? `p:${l.ownerPersonnummer ?? l.ownerName.toLowerCase()}`
+        : `c:${(l.ownerOrganisationNumber ?? '').replace(/\D/g, '')}`,
+    );
+    let transitions = 0;
+    for (let i = 1; i < ownerKeys.length; i++) {
+      if (ownerKeys[i] !== ownerKeys[i - 1]) transitions += 1;
+    }
+    if (transitions >= 6) {
+      suspiciousPathFlags.push({
+        code: 'rapid_owner_turnover',
+        severity: 'high',
+        riskTier: 'tier_1',
+        analystPriority: 1,
+        summary: `Owner transitions in last 12 months: ${transitions}`,
+        reason: 'Frequent ownership identity changes suggest potential nominee rotation or instability.',
+      });
+    } else if (transitions >= 3) {
+      suspiciousPathFlags.push({
+        code: 'owner_turnover_watch',
+        severity: 'medium',
+        riskTier: 'tier_2',
+        analystPriority: 2,
+        summary: `Owner transitions in last 12 months: ${transitions}`,
+        reason: 'Moderate ownership turnover indicates governance or control volatility.',
+      });
+    }
+    suspiciousPathFlags.sort(
+      (a, b) => Number(a.analystPriority ?? 9) - Number(b.analystPriority ?? 9),
+    );
+    const ownershipRiskScore = Math.min(
+      100,
+      anomalies.reduce((acc, a) => {
+        const priority = Number(a.analystPriority ?? 4);
+        const count = Number(a.count ?? 0);
+        const per = priority <= 1 ? 14 : priority === 2 ? 9 : priority === 3 ? 5 : 2;
+        return acc + per * Math.max(0, Math.min(5, count));
+      }, 0) +
+        suspiciousPathFlags.reduce((acc, f) => {
+          const priority = Number(f.analystPriority ?? 4);
+          return acc + (priority <= 1 ? 15 : priority === 2 ? 10 : priority === 3 ? 6 : 2);
+        }, 0),
+    );
+
+    return {
+      organisationNumber: graph.organisationNumber,
+      generatedAt: new Date().toISOString(),
+      ownershipRiskScore,
+      anomalies,
+      suspiciousPathFlags,
+      hiddenOwnershipIndicators: hiddenOwnershipIndicators.map((id) => ({
+        nodeId: id,
+        signal: 'multi-layer concentration',
+        rationale: 'Node has many incoming ownership edges, suggesting layered structure or nominees.',
+      })),
+      network: {
+        nodes: nodes.length,
+        edges: edges.length,
+        maxChainDepth: graph.structuralComplexity?.maxChainDepth ?? 0,
+        potentialCycleNodes: cycleNodes.size,
+      },
+      basedOn: {
+        ownershipLinksCurrent: graph.subgraph?.linksLoaded ?? edges.length,
+        beneficialOwnerRows: graph.dataCoverage?.hasBeneficialOwnerRows ?? false,
+        vhSnapshotPresent: graph.dataCoverage?.hasVerkligaHuvudmanSnapshot ?? false,
       },
     };
   }

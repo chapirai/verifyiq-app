@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import type { Route } from 'next';
 import { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -7,9 +9,9 @@ import { clearSession, getCurrentUser } from '@/lib/auth';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
-const navItems = [
+const navItems: Array<{ href: Route; label: string }> = [
   { href: '/dashboard', label: 'Overview' },
-  { href: '/search', label: 'Lookup' },
+  { href: '/search', label: 'Lookup & sourcing' },
   { href: '/companies', label: 'Companies' },
   { href: '/lists', label: 'Lists' },
   { href: '/compare', label: 'Compare' },
@@ -37,6 +39,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       .catch(() => setPlanCode('starter'));
   }, []);
 
+  useEffect(() => {
+    // Warm core analyst routes to reduce first navigation latency.
+    const hotRoutes: Route[] = ['/search', '/companies', '/lists', '/compare', '/alerts'];
+    for (const href of hotRoutes) router.prefetch(href);
+  }, [router]);
+
   const restrictedByPlan: Record<string, string[]> = {
     starter: ['/bulk'],
     growth: [],
@@ -59,13 +67,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                     {item.label} (upgrade)
                   </div>
                 ) : (
-                  <a
+                  <Link
                     key={item.href}
                     href={item.href}
+                    prefetch
+                    onMouseEnter={() => router.prefetch(item.href as Route)}
                     className={`block border px-3 py-2 text-sm ${active ? 'border-foreground bg-foreground text-background' : 'border-transparent hover:border-foreground'}`}
                   >
                     {item.label}
-                  </a>
+                  </Link>
                 )
               );
             })}

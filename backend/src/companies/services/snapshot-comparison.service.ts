@@ -7,6 +7,7 @@ import {
   ChangeType,
   CompanyChangeEventEntity,
 } from '../entities/company-change-event.entity';
+import { DecisionRefreshTriggerService } from './decision-refresh-trigger.service';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ export class SnapshotComparisonService {
     @InjectRepository(CompanyChangeEventEntity)
     private readonly changeEventRepo: Repository<CompanyChangeEventEntity>,
     private readonly auditService: AuditService,
+    private readonly decisionRefreshTrigger: DecisionRefreshTriggerService,
   ) {}
 
   // ── Public API ───────────────────────────────────────────────────────────────
@@ -209,6 +211,33 @@ export class SnapshotComparisonService {
     this._emitComparisonAuditEvent(afterSnap, snapshotIdBefore, changes).catch((err) =>
       this.logger.warn(`[P02-T08] Audit emit failed for comparison: ${err}`),
     );
+
+    const hasOwnershipChange = changes.some(
+      (c) =>
+        c.changeType !== ChangeType.UNCHANGED &&
+        /(owner|ownership|beneficial|verklig|huvudman|control)/i.test(c.attributeName),
+    );
+    const hasFilingsChange = changes.some(
+      (c) =>
+        c.changeType !== ChangeType.UNCHANGED &&
+        /(arende|dokument|document|filing|status|snapshot|registrering)/i.test(c.attributeName),
+    );
+    if (hasOwnershipChange) {
+      void this.decisionRefreshTrigger.enqueue({
+        tenantId,
+        organisationNumber: afterSnap.organisationsnummer,
+        reason: 'ownership_change',
+        triggerId: snapshotIdAfter,
+      });
+    }
+    if (hasFilingsChange) {
+      void this.decisionRefreshTrigger.enqueue({
+        tenantId,
+        organisationNumber: afterSnap.organisationsnummer,
+        reason: 'filings_change',
+        triggerId: snapshotIdAfter,
+      });
+    }
 
     return {
       snapshotIdBefore,

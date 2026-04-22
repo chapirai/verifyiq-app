@@ -33,6 +33,7 @@ import { ScreeningModule } from './screening/screening.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { UsersModule } from './users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { PublicApiModule } from './public-api/public-api.module';
 
 @Module({
   imports: [
@@ -94,6 +95,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     PropertyModule,
     RiskIndicatorsModule,
     AnnualReportsModule,
+    PublicApiModule,
   ],
   controllers: [AppController],
 })
