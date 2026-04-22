@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AppController } from './app.controller';
+import { ApiQuotaModule } from './common/api-quota.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { AnnualReportsModule } from './annual-reports/annual-reports.module';
 import { AuditModule } from './audit/audit.module';
@@ -59,6 +60,7 @@ import { BolagsverketBulkModule } from './bolagsverket-bulk/bolagsverket-bulk.mo
         ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
       }),
     }),
+    ApiQuotaModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
+import { getCurrentUser } from '@/lib/auth';
 import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
 import { hvdClient } from '@/lib/source-clients';
 import { Badge } from '@/components/ui/Badge';
@@ -21,6 +22,7 @@ import {
 import { AnnualReportsWorkspacePanel } from '@/components/company/AnnualReportsWorkspacePanel';
 import type {
   CompanyServingBundle,
+  CompanyServingBundleDiagnostics,
   CompanyOverviewServing,
   CompanyVerkligaHuvudmanServing,
 } from '@/types/company-serving';
@@ -87,6 +89,52 @@ function formatMoneyAmount(amount: string | null | undefined, currency: string |
   const n = Number(amount);
   if (!Number.isFinite(n)) return `${amount} ${currency ?? ''}`.trim();
   return `${n.toLocaleString()} ${currency ?? ''}`.trim();
+}
+
+function WorkspaceCallout({ tone, title, message }: { tone: 'warn' | 'danger' | 'info'; title: string; message: string }) {
+  const cls =
+    tone === 'danger'
+      ? 'border-destructive/60 bg-destructive/5'
+      : tone === 'warn'
+        ? 'border-foreground/40 bg-muted/25'
+        : 'border-border-light bg-muted/15';
+  return (
+    <article className={`border-2 p-4 ${cls}`} role="status">
+      <p className="mono-label text-[10px]">{title}</p>
+      <p className="mt-2 text-sm leading-relaxed">{message}</p>
+    </article>
+  );
+}
+
+function pickProviderDiag(
+  rows: unknown,
+  provider: string,
+): { status: string; message?: string; organisation_number?: string } | null {
+  if (!Array.isArray(rows)) return null;
+  const hit = rows.find((r) => r && typeof r === 'object' && (r as Record<string, unknown>).provider === provider);
+  if (!hit || typeof hit !== 'object') return null;
+  const o = hit as Record<string, unknown>;
+  return {
+    status: String(o.status ?? ''),
+    message: o.message != null ? String(o.message) : undefined,
+    organisation_number: o.organisation_number != null ? String(o.organisation_number) : undefined,
+  };
+}
+
+function formatIsoShort(iso: string | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+}
+
+function ProviderStatusCard({ title, statusLine, detail }: { title: string; statusLine: string; detail?: string }) {
+  return (
+    <article className="border-2 border-foreground p-4">
+      <p className="mono-label text-[10px]">{title}</p>
+      <p className="mt-2 text-sm font-medium">{statusLine}</p>
+      {detail ? <p className="mt-1 text-xs text-muted-foreground leading-snug">{detail}</p> : null}
+    </article>
+  );
 }
 
 const emptyServing = (): CompanyServingBundle => ({
@@ -450,6 +498,8 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
   const [decisionActionMsg, setDecisionActionMsg] = useState('');
   const [namnskyddslopnummer, setNamnskyddslopnummer] = useState('');
   const namnskyddRef = useRef('');
+  const [bulkIngestBusy, setBulkIngestBusy] = useState(false);
+  const [bulkIngestMsg, setBulkIngestMsg] = useState('');
   useEffect(() => {
     namnskyddRef.current = namnskyddslopnummer;
   }, [namnskyddslopnummer]);
@@ -547,7 +597,16 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
       })
       .catch((e: unknown) => {
         setLookupError(e instanceof Error ? e.message : 'Lookup failed');
-        setLookupResult(null);
+        const fallback = sessionStorage.getItem(lookupCacheKey);
+        if (fallback) {
+          try {
+            setLookupResult(JSON.parse(fallback) as Record<string, unknown>);
+          } catch {
+            setLookupResult(null);
+          }
+        } else {
+          setLookupResult(null);
+        }
       })
       .finally(() => setLookupLoading(false));
   }, [org]);
@@ -670,6 +729,46 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
   const hvdSection = company.hvdSection as Record<string, unknown> | undefined;
   const v4Section = company.v4Section as Record<string, unknown> | undefined;
 
+  const providerRows = metadata.provider_fetch_diagnostics;
+  const hvdFetchDiag = pickProviderDiag(providerRows, 'hvd.organisationer');
+  const fiFetchDiag = pickProviderDiag(providerRows, 'fi.organisationer');
+  const vhFetchDiag = pickProviderDiag(providerRows, 'vh.verkligaHuvudman');
+  const truthy = (v: unknown) => v === true || v === 'true';
+  const hasHvdHint =
+    hvdFetchDiag?.status === 'loaded' ||
+    hvdFetchDiag?.status === 'partial' ||
+    truthy(metadata.has_hvd_data) ||
+    hvdOrg.ok;
+  const hasFiHint =
+    fiFetchDiag?.status === 'loaded' ||
+    fiFetchDiag?.status === 'partial' ||
+    truthy(metadata.has_foretagsinfo_data);
+  const hasReadModelSlice =
+    serving.overview != null ||
+    serving.documents.length > 0 ||
+    serving.reports.length > 0 ||
+    serving.officers.length > 0 ||
+    serving.cases.length > 0 ||
+    serving.engagements.length > 0 ||
+    serving.shareCapital != null;
+
+  const hasPartialSignals =
+    lookupResult != null ||
+    Boolean(hasHvdHint) ||
+    Boolean(hasFiHint) ||
+    hasReadModelSlice ||
+    hvdDocs.ok;
+
+  const lookupIsBlocking = Boolean(lookupError) && !hasPartialSignals;
+  const lookupIsDegraded = Boolean(lookupError) && hasPartialSignals;
+  const readModelIsBlocking = Boolean(servingMeta.error) && !hasPartialSignals;
+  const readModelIsDegraded = Boolean(servingMeta.error) && hasPartialSignals;
+  const dualGapIsBlocking = !hasDualApiCoverage && !hasPartialSignals;
+  const dualGapIsDegraded = !hasDualApiCoverage && hasPartialSignals;
+
+  const bundleDiag = serving.diagnostics as CompanyServingBundleDiagnostics | undefined;
+  const isPlatformAdmin = getCurrentUser<{ role?: string }>()?.role === 'admin';
+
   const hvdEndpointOrg = extractHvdOrganisation(hvdOrg.data);
   const servingOverviewRows = serving.overview ? buildServingOverviewSummary(serving.overview) : [];
 
@@ -701,9 +800,14 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
             variant="secondary"
             className="min-h-10 text-[10px]"
             onClick={() => {
+              const lookupCacheKey = `${LOOKUP_CACHE_PREFIX}${org}`;
               void api
                 .lookupCompany(org, true)
-                .then((r) => setLookupResult(r as Record<string, unknown>))
+                .then((r) => {
+                  const payload = r as Record<string, unknown>;
+                  setLookupResult(payload);
+                  sessionStorage.setItem(lookupCacheKey, JSON.stringify(payload));
+                })
                 .catch(() => undefined);
               void loadEndpoints(org);
               void loadServing(org);
@@ -997,28 +1101,152 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <article className="border-2 border-foreground p-4">
-          <p className="mono-label text-[10px]">Värdefulla datamängder (HVD)</p>
-          <p className="mt-2 text-sm">{String(metadata.has_hvd_data ?? false)}</p>
-        </article>
-        <article className="border-2 border-foreground p-4">
-          <p className="mono-label text-[10px]">Företagsinformation v4</p>
-          <p className="mt-2 text-sm">{String(metadata.has_foretagsinfo_data ?? false)}</p>
-        </article>
-        <article className="border-2 border-foreground p-4">
-          <p className="mono-label text-[10px]">Verkliga huvudmän (register)</p>
-          <p className="mt-2 text-sm">{String(metadata.has_verkliga_huvudman_data ?? false)}</p>
-        </article>
+        <ProviderStatusCard
+          title="Värdefulla datamängder (HVD)"
+          statusLine={
+            hvdFetchDiag?.status === 'loaded'
+              ? 'Loaded'
+              : hvdFetchDiag?.status === 'partial'
+                ? 'Partial'
+                : hvdFetchDiag?.status === 'error'
+                  ? 'Unavailable'
+                  : truthy(metadata.has_hvd_data) || hvdOrg.ok
+                    ? 'Available (live or index)'
+                    : 'Unavailable'
+          }
+          detail={
+            hvdFetchDiag?.message
+              ? `${hvdFetchDiag.organisation_number ? `Org ${hvdFetchDiag.organisation_number} · ` : ''}${hvdFetchDiag.message}`
+              : undefined
+          }
+        />
+        <ProviderStatusCard
+          title="Företagsinformation v4"
+          statusLine={
+            fiFetchDiag?.status === 'loaded'
+              ? 'Loaded'
+              : fiFetchDiag?.status === 'partial'
+                ? 'Partial'
+                : fiFetchDiag?.status === 'error'
+                  ? 'Unavailable'
+                  : truthy(metadata.has_foretagsinfo_data)
+                    ? 'Available (index)'
+                    : 'Unavailable'
+          }
+          detail={
+            fiFetchDiag?.message
+              ? `${fiFetchDiag.organisation_number ? `Org ${fiFetchDiag.organisation_number} · ` : ''}${fiFetchDiag.message}`
+              : undefined
+          }
+        />
+        <ProviderStatusCard
+          title="Verkliga huvudmän (register)"
+          statusLine={
+            vhFetchDiag?.status === 'skipped'
+              ? 'Not live yet / disabled'
+              : vhFetchDiag?.status === 'loaded'
+                ? 'Loaded'
+                : vhFetchDiag?.status === 'error'
+                  ? 'Unavailable'
+                  : truthy(metadata.has_verkliga_huvudman_data)
+                    ? 'Available'
+                    : 'Not live yet or no row'
+          }
+          detail={
+            vhFetchDiag?.message
+              ? `${vhFetchDiag.organisation_number ? `Org ${vhFetchDiag.organisation_number} · ` : ''}${vhFetchDiag.message}`
+              : undefined
+          }
+        />
       </div>
 
-      {lookupError ? <ErrorState title="Lookup unavailable" message={lookupError} /> : null}
-      {servingMeta.error ? <ErrorState title="Read model unavailable" message={servingMeta.error} /> : null}
-      {!hasDualApiCoverage ? (
+      {lookupIsBlocking ? <ErrorState title="Lookup unavailable" message={lookupError ?? ''} /> : null}
+      {lookupIsDegraded ? (
+        <WorkspaceCallout
+          tone="warn"
+          title="Lookup request failed — showing cached or live data"
+          message={`${lookupError ?? ''} You can still use HVD live calls, read-model slices, and annual reports when those sources succeed.`}
+        />
+      ) : null}
+      {readModelIsBlocking ? <ErrorState title="Read model unavailable" message={servingMeta.error ?? ''} /> : null}
+      {readModelIsDegraded ? (
+        <WorkspaceCallout
+          tone="warn"
+          title="Read-model bundle request had issues"
+          message={`${servingMeta.error ?? ''} Other sections above may still show rows returned before the error.`}
+        />
+      ) : null}
+      {dualGapIsBlocking ? (
         <ErrorState
           title="Partial provider coverage"
           message="This lookup did not return full dual-API coverage for the organisation number. Trigger Force refresh to re-run HVD + Företagsinformation and complete the profile."
         />
       ) : null}
+      {dualGapIsDegraded ? (
+        <WorkspaceCallout
+          tone="info"
+          title="Partial provider coverage"
+          message="HVD and Företagsinformation v4 were not both fully populated for this org. The workspace still shows whatever succeeded (including annual reports under Financials). Use Force refresh to retry missing providers."
+        />
+      ) : null}
+
+      <details className="border border-border-light p-3">
+        <summary className="cursor-pointer mono-label text-[10px] text-muted-foreground">
+          Retrieval timeline & debug
+        </summary>
+        <div className="mt-3 space-y-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+          <p>
+            Lookup metadata fetched_at: {formatIsoShort(metadata.fetched_at != null ? String(metadata.fetched_at) : undefined)}
+          </p>
+          <p>Snapshot fetch status: {String(metadata.snapshot_fetch_status ?? '—')}</p>
+          <p>
+            Read-model bundle: requested {formatIsoShort(bundleDiag?.requested_at)} → finished{' '}
+            {formatIsoShort(bundleDiag?.finished_at)}
+          </p>
+          {bundleDiag?.sections
+            ? Object.entries(bundleDiag.sections).map(([k, s]) => (
+                <p key={k}>
+                  {k}: {s.status}
+                  {s.error ? ` — ${s.error}` : ''} ({formatIsoShort(s.started_at)} → {formatIsoShort(s.finished_at)})
+                </p>
+              ))
+            : null}
+        </div>
+      </details>
+
+      {isPlatformAdmin ? (
+        <div className="flex flex-col gap-2 border border-dashed border-foreground/40 p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="mono-label text-[10px]">Platform admin</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Ingest the latest Bolagsverket bulk file (same as Dashboard bulk ops). This can take several minutes.
+            </p>
+            {bulkIngestMsg ? <p className="mt-2 font-mono text-xs">{bulkIngestMsg}</p> : null}
+          </div>
+          <button
+            type="button"
+            disabled={bulkIngestBusy}
+            onClick={() => {
+              setBulkIngestBusy(true);
+              setBulkIngestMsg('');
+              void api
+                .forceBulkRunNow()
+                .then((r) => {
+                  const row = r as { runId?: string; rowCount?: number; applied?: number; deduplicatedByHash?: boolean };
+                  setBulkIngestMsg(
+                    `Run ${row.runId ?? '—'} · rows ${row.rowCount ?? '—'} · applied ${row.applied ?? '—'} · dedup=${String(row.deduplicatedByHash ?? false)}`,
+                  );
+                })
+                .catch((e: unknown) => setBulkIngestMsg(e instanceof Error ? e.message : 'Bulk ingest request failed'))
+                .finally(() => setBulkIngestBusy(false));
+            }}
+            className="border-2 border-foreground bg-background px-4 py-2 font-mono text-[10px] uppercase tracking-widest hover:bg-muted disabled:opacity-50"
+          >
+            {bulkIngestBusy ? 'Starting…' : 'Ingest latest bulk file'}
+          </button>
+        </div>
+      ) : null}
+
       {servingMeta.loading ? (
         <p className="text-sm text-muted-foreground">Updating read-model tables…</p>
       ) : null}

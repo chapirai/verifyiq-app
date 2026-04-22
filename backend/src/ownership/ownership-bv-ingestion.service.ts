@@ -49,16 +49,18 @@ export class OwnershipBvIngestionService {
       SET processed_at = NOW()
       FROM picked
       WHERE q.id = picked.id
-      RETURNING q.id, q.tenant_id::text, q.organisationsnummer
+      RETURNING q.id::text AS queue_id,
+                q.tenant_id::text AS tenant_id,
+                q.organisationsnummer::text AS organisationsnummer
       `,
       [batchSize],
     );
 
     let ok = 0;
     for (const r of rows as Array<Record<string, unknown>>) {
-      const rowId = String(r.id ?? r['q.id'] ?? '');
-      const tenantId = String(r.tenant_id ?? r.tenantId ?? '').trim();
-      const organisationNumber = String(r.organisationsnummer ?? r.organisationNumber ?? '').trim();
+      const rowId = String(r.queue_id ?? r.id ?? '').trim();
+      const tenantId = String(r.tenant_id ?? '').trim();
+      const organisationNumber = String(r.organisationsnummer ?? '').trim();
       if (!tenantId || !organisationNumber) {
         this.trackMalformedRow(rowId, tenantId, organisationNumber);
         continue;

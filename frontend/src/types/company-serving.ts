@@ -121,6 +121,25 @@ export interface CompanyVerkligaHuvudmanServing {
   payload: Record<string, unknown>;
 }
 
+export type CompanyServingSectionStatus = 'loaded' | 'empty' | 'error';
+
+export interface CompanyServingSectionDiagnostic {
+  status: CompanyServingSectionStatus;
+  started_at: string;
+  finished_at: string;
+  duration_ms: number;
+  error?: string;
+  row_count?: number;
+}
+
+export interface CompanyServingBundleDiagnostics {
+  requested_at: string;
+  finished_at: string;
+  organisation_number: string;
+  tenant_id: string;
+  sections: Record<string, CompanyServingSectionDiagnostic>;
+}
+
 export interface CompanyServingBundle {
   overview: CompanyOverviewServing | null;
   officers: CompanyOfficerServing[];
@@ -130,4 +149,6 @@ export interface CompanyServingBundle {
   shareCapital: CompanyShareCapitalServing | null;
   engagements: CompanyEngagementServing[];
   verkligaHuvudman: CompanyVerkligaHuvudmanServing | null;
+  /** Present on GET …/bundle — per-table read-model timing and errors. */
+  diagnostics?: CompanyServingBundleDiagnostics;
 }

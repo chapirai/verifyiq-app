@@ -60,6 +60,15 @@ export class CompanyMetadataDto {
   has_verkliga_huvudman_data!: boolean;
   /** Completeness marker for dual-API enrichment quality. */
   profile_completeness!: 'complete' | 'partial';
+
+  /** Per-provider fetch diagnostics (HVD / FI / dokumentlista / VH). */
+  @IsOptional()
+  provider_fetch_diagnostics?: Record<string, unknown>[];
+
+  /** Snapshot row fetch_status (success | partial | error) for this lookup. */
+  @IsOptional()
+  @IsString()
+  snapshot_fetch_status?: string | null;
 }
 
 export class LookupCompanyResponseDto {

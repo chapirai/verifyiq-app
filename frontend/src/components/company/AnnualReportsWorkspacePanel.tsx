@@ -64,24 +64,40 @@ export function AnnualReportsWorkspacePanel({ orgNumber }: { orgNumber: string }
   const [readModel, setReadModel] = useState<AnnualReportWorkspaceReadModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [partialWarning, setPartialWarning] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const [comparison, workspace] = await Promise.all([
-        api.getAnnualReportFinancialComparison(orgNumber, { maxYears: 50 }),
-        api.getAnnualReportWorkspaceReadModel(orgNumber),
-      ]);
-      setData(comparison);
-      setReadModel(workspace);
-    } catch (e) {
+    setPartialWarning(null);
+    const [comparisonRes, workspaceRes] = await Promise.allSettled([
+      api.getAnnualReportFinancialComparison(orgNumber, { maxYears: 50 }),
+      api.getAnnualReportWorkspaceReadModel(orgNumber),
+    ]);
+    const errs: string[] = [];
+    if (comparisonRes.status === 'fulfilled') {
+      setData(comparisonRes.value);
+    } else {
       setData(null);
-      setReadModel(null);
-      setError(e instanceof Error ? e.message : 'Could not load annual report data');
-    } finally {
-      setLoading(false);
+      const r = comparisonRes.reason;
+      errs.push(r instanceof Error ? r.message : 'Financial comparison request failed');
     }
+    if (workspaceRes.status === 'fulfilled') {
+      setReadModel(workspaceRes.value);
+    } else {
+      setReadModel(null);
+      const r = workspaceRes.reason;
+      errs.push(r instanceof Error ? r.message : 'Workspace read model request failed');
+    }
+    if (errs.length === 2) {
+      setError(errs.join(' · '));
+    } else if (errs.length === 1) {
+      setError(null);
+      setPartialWarning(errs[0] ?? null);
+    } else {
+      setError(null);
+    }
+    setLoading(false);
   }, [orgNumber]);
 
   useEffect(() => {
@@ -99,12 +115,12 @@ export function AnnualReportsWorkspacePanel({ orgNumber }: { orgNumber: string }
     return <p className="text-sm text-muted-foreground">Loading extracted annual reports…</p>;
   }
 
-  if (error) {
-    return <p className="text-sm text-destructive">{error}</p>;
-  }
-
   const hasComparison = data && data.years.length > 0;
   const hasRead = readModel && readModel.headerId;
+
+  if (error && !hasComparison && !hasRead) {
+    return <p className="text-sm text-destructive">{error}</p>;
+  }
 
   if (!hasComparison && !hasRead) {
     return (
@@ -126,6 +142,11 @@ export function AnnualReportsWorkspacePanel({ orgNumber }: { orgNumber: string }
 
   return (
     <div className="space-y-8">
+      {partialWarning ? (
+        <p className="border border-dashed border-foreground/40 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+          Partial load: {partialWarning}
+        </p>
+      ) : null}
       {hasRead && readModel && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">

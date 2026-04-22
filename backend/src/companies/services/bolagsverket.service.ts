@@ -41,6 +41,16 @@ const SHARE_CAPITAL_TOLERANCE = 0.01;
 /** Base Bolagsverket calls in getCompleteCompanyData (HVD + FI + dokumentlista). */
 const ENRICH_API_CALL_COUNT_BASE = 3;
 
+/** Structured per-provider outcome for lookup UI and logs (not persisted as its own table). */
+export interface BvProviderFetchDiagnostic {
+  provider: 'hvd.organisationer' | 'fi.organisationer' | 'hvd.dokumentlista' | 'vh.verkligaHuvudman';
+  stage: 'fetch';
+  status: 'loaded' | 'partial' | 'unavailable' | 'error' | 'skipped';
+  organisation_number: string;
+  message?: string;
+  request_id?: string | null;
+}
+
 /** Max FI organisationsengagemang pages per company (safety cap). */
 const ORG_ENGAGEMENT_MAX_PAGES = 25;
 
@@ -76,6 +86,8 @@ export interface CompleteCompanyProfile {
   relatedPersonInformation?: Record<string, PersonResponse>;
   /** Total Bolagsverket HTTP calls attempted in this profile fetch (for metering). */
   bolagsverketApiCallCount: number;
+  /** Per-source fetch outcome for observability (partial success paths). */
+  providerFetchDiagnostics?: BvProviderFetchDiagnostic[];
 }
 
 export interface OfficerProfile {
@@ -444,6 +456,80 @@ export class BolagsverketService {
       );
     }
 
+    const providerFetchDiagnostics: BvProviderFetchDiagnostic[] = [
+      {
+        provider: 'hvd.organisationer',
+        stage: 'fetch',
+        status: hvdResult.status === 'fulfilled' ? 'loaded' : 'error',
+        organisation_number: identitetsbeteckning,
+        request_id: hvdResult.status === 'fulfilled' ? hvdResult.value.requestId ?? null : null,
+        message:
+          hvdResult.status === 'fulfilled'
+            ? undefined
+            : hvdResult.reason instanceof Error
+              ? hvdResult.reason.message
+              : String(hvdResult.reason),
+      },
+      {
+        provider: 'fi.organisationer',
+        stage: 'fetch',
+        status:
+          richResult.status === 'fulfilled'
+            ? organisationInformation.length > 0
+              ? 'loaded'
+              : 'partial'
+            : 'error',
+        organisation_number: identitetsbeteckning,
+        request_id: richResult.status === 'fulfilled' ? richResult.value.requestId ?? null : null,
+        message:
+          richResult.status === 'fulfilled'
+            ? organisationInformation.length > 0
+              ? undefined
+              : 'Företagsinformation returned no organisationInformation rows'
+            : richResult.reason instanceof Error
+              ? richResult.reason.message
+              : String(richResult.reason),
+      },
+      {
+        provider: 'hvd.dokumentlista',
+        stage: 'fetch',
+        status: docResult.status === 'fulfilled' ? 'loaded' : 'error',
+        organisation_number: identitetsbeteckning,
+        request_id: docResult.status === 'fulfilled' ? docResult.value.requestId ?? null : null,
+        message:
+          docResult.status === 'fulfilled'
+            ? undefined
+            : docResult.reason instanceof Error
+              ? docResult.reason.message
+              : String(docResult.reason),
+      },
+      {
+        provider: 'vh.verkligaHuvudman',
+        stage: 'fetch',
+        status: !vhEnabled
+          ? 'skipped'
+          : vhResult?.status === 'fulfilled'
+            ? verkligaHuvudman
+              ? 'loaded'
+              : 'unavailable'
+            : 'error',
+        organisation_number: identitetsbeteckning,
+        request_id: vhResult?.status === 'fulfilled' ? vhResult.value.requestId ?? null : null,
+        message:
+          !vhEnabled
+            ? 'Verkliga huvudmän API not enabled (BV_VH_ENABLED)'
+            : vhResult?.status === 'fulfilled'
+              ? verkligaHuvudman
+                ? undefined
+                : 'No VH payload for this organisation (404 / empty)'
+              : vhResult?.status === 'rejected'
+                ? vhResult.reason instanceof Error
+                  ? vhResult.reason.message
+                  : String(vhResult.reason)
+                : 'VH fetch not started',
+      },
+    ];
+
     const normalisedData = this.mapper.map(highValueDataset, organisationInformation, identitetsbeteckning);
 
     let bolagsverketApiCallCount = ENRICH_API_CALL_COUNT_BASE + (vhEnabled ? 1 : 0);
@@ -474,6 +560,7 @@ export class BolagsverketService {
       organisationEngagementsAggregated,
       relatedPersonInformation,
       bolagsverketApiCallCount,
+      providerFetchDiagnostics,
     };
   }
 
@@ -1086,6 +1173,7 @@ export class BolagsverketService {
             organisationEngagementsAggregated: cachedOrgEngagements,
             relatedPersonInformation: cachedRelatedPersons,
             bolagsverketApiCallCount: cacheCheck.snapshot.apiCallCount ?? 0,
+            providerFetchDiagnostics: [],
           };
           return {
             result: cachedResult,
@@ -1155,6 +1243,13 @@ export class BolagsverketService {
         correlationId,
       });
       apiCallCount = result.bolagsverketApiCallCount;
+      if (result.providerFetchDiagnostics?.some((d) => d.status === 'error')) {
+        fetchStatus = 'partial';
+        errorMessage = result.providerFetchDiagnostics
+          .filter((d) => d.status === 'error')
+          .map((d) => `${d.provider}: ${d.message ?? 'request failed'}`)
+          .join('; ');
+      }
       void this.auditService.emitAuditEvent({
         tenantId,
         userId: actor,

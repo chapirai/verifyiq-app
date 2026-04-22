@@ -631,6 +631,8 @@ export class CompaniesService {
         has_foretagsinfo_data: hasForetagsinfoData,
         has_verkliga_huvudman_data: hasVerkligaHuvudmanData,
         profile_completeness: hasHvdData && hasForetagsinfoData ? 'complete' : 'partial',
+        provider_fetch_diagnostics: (result.providerFetchDiagnostics ?? []) as unknown as Record<string, unknown>[],
+        snapshot_fetch_status: snapshot.fetchStatus ?? null,
       };
 
       const company = result.normalisedData as unknown as Record<string, unknown>;

@@ -1,5 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+
+/** Per-section read-model fetch outcome (bundle endpoint). */
+export type CompanyServingSectionStatus = 'loaded' | 'empty' | 'error';
+
+export interface CompanyServingSectionDiagnostic {
+  status: CompanyServingSectionStatus;
+  started_at: string;
+  finished_at: string;
+  duration_ms: number;
+  error?: string;
+  row_count?: number;
+}
+
+export interface CompanyServingBundleDiagnostics {
+  requested_at: string;
+  finished_at: string;
+  organisation_number: string;
+  tenant_id: string;
+  sections: Record<string, CompanyServingSectionDiagnostic>;
+}
 
 export interface CompanyOverviewServingRow {
   tenantId: string;
@@ -131,25 +151,91 @@ export interface CompanyServingBundleRow {
   shareCapital: CompanyShareCapitalServingRow | null;
   engagements: CompanyEngagementServingRow[];
   verkligaHuvudman: CompanyVerkligaHuvudmanServingRow | null;
+  /** Optional diagnostics — present on GET …/bundle for observability. */
+  diagnostics?: CompanyServingBundleDiagnostics;
 }
 
 @Injectable()
 export class CompanyServingReadService {
+  private readonly logger = new Logger(CompanyServingReadService.name);
+
   constructor(private readonly dataSource: DataSource) {}
 
   async getBundle(tenantId: string, org: string): Promise<CompanyServingBundleRow> {
+    const requestedAt = new Date().toISOString();
+    const sections: Record<string, CompanyServingSectionDiagnostic> = {};
+
+    const run = async <T>(
+      key: string,
+      fn: () => Promise<T>,
+      emptyFallback: T,
+      isEmpty: (value: T) => boolean,
+      rowCount?: (value: T) => number | undefined,
+    ): Promise<T> => {
+      const startedAt = new Date().toISOString();
+      const t0 = Date.now();
+      try {
+        const value = await fn();
+        const empty = isEmpty(value);
+        const rc = rowCount ? rowCount(value) : undefined;
+        sections[key] = {
+          status: empty ? 'empty' : 'loaded',
+          started_at: startedAt,
+          finished_at: new Date().toISOString(),
+          duration_ms: Date.now() - t0,
+          ...(rc !== undefined ? { row_count: rc } : {}),
+        };
+        return value;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `[company-serving/bundle] section=${key} stage=read_model_query org=${org} tenant=${tenantId} error=${msg}`,
+        );
+        sections[key] = {
+          status: 'error',
+          started_at: startedAt,
+          finished_at: new Date().toISOString(),
+          duration_ms: Date.now() - t0,
+          error: msg,
+        };
+        return emptyFallback;
+      }
+    };
+
     const [overview, officers, reports, documents, cases, shareCapital, engagements, verkligaHuvudman] =
       await Promise.all([
-        this.getOverview(tenantId, org),
-        this.getOfficers(tenantId, org),
-        this.getFiReports(tenantId, org),
-        this.getHvdDocuments(tenantId, org),
-        this.getFiCases(tenantId, org),
-        this.getShareCapital(tenantId, org),
-        this.getEngagements(tenantId, org),
-        this.getVerkligaHuvudmanLatest(tenantId, org),
+        run('overview', () => this.getOverview(tenantId, org), null, (v) => v == null),
+        run('officers', () => this.getOfficers(tenantId, org), [], (v) => v.length === 0, (v) => v.length),
+        run('fi_financial_reports', () => this.getFiReports(tenantId, org), [], (v) => v.length === 0, (v) => v.length),
+        run('hvd_documents', () => this.getHvdDocuments(tenantId, org), [], (v) => v.length === 0, (v) => v.length),
+        run('fi_cases', () => this.getFiCases(tenantId, org), [], (v) => v.length === 0, (v) => v.length),
+        run('share_capital', () => this.getShareCapital(tenantId, org), null, (v) => v == null),
+        run('engagements', () => this.getEngagements(tenantId, org), [], (v) => v.length === 0, (v) => v.length),
+        run(
+          'verkliga_huvudman',
+          () => this.getVerkligaHuvudmanLatest(tenantId, org),
+          null,
+          (v) => v == null || (v.payload && Object.keys(v.payload).length === 0),
+        ),
       ]);
-    return { overview, officers, reports, documents, cases, shareCapital, engagements, verkligaHuvudman };
+
+    return {
+      overview,
+      officers,
+      reports,
+      documents,
+      cases,
+      shareCapital,
+      engagements,
+      verkligaHuvudman,
+      diagnostics: {
+        requested_at: requestedAt,
+        finished_at: new Date().toISOString(),
+        organisation_number: org,
+        tenant_id: tenantId,
+        sections,
+      },
+    };
   }
 
   async getVerkligaHuvudmanLatest(
