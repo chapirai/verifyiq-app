@@ -484,8 +484,8 @@ export class BolagsverketBulkService {
           completedCheckpoints: checkpoints.length,
           lastCheckpointSeq: checkpoints[checkpoints.length - 1]?.checkpointSeq ?? 0,
           lastLineNumber: checkpoints[checkpoints.length - 1]?.lastLineNumber ?? 0,
-          rowsWritten: checkpoints.reduce((a, c) => a + c.rowsWritten, 0),
-          stagingWritten: checkpoints.reduce((a, c) => a + c.stagingWritten, 0),
+          rowsWritten: checkpoints.reduce<number>((a, c) => a + c.rowsWritten, 0),
+          stagingWritten: checkpoints.reduce<number>((a, c) => a + c.stagingWritten, 0),
         }
       : {
           completedCheckpoints: 0,
