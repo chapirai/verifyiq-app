@@ -30,6 +30,7 @@ import {
 } from './dto/lookup-company.dto';
 import { CompanyEntity } from './entities/company.entity';
 import { CompanySignalEntity } from './entities/company-signal.entity';
+import { BvBulkCompanyCurrentEntity } from '../bolagsverket-bulk/entities/bv-bulk-company-current.entity';
 import { BvFetchSnapshotEntity, SnapshotPolicyDecision } from './entities/bv-fetch-snapshot.entity';
 import { FailureStateService } from './services/failure-state.service';
 import { CompanySourcingProfileService } from './services/company-sourcing-profile.service';
@@ -111,6 +112,8 @@ export class CompaniesService {
     private readonly ownershipLinkRepo: Repository<OwnershipLinkEntity>,
     @InjectRepository(CompanySignalEntity)
     private readonly companySignalRepo: Repository<CompanySignalEntity>,
+    @InjectRepository(BvBulkCompanyCurrentEntity)
+    private readonly bulkCompanyCurrentRepo: Repository<BvBulkCompanyCurrentEntity>,
     private readonly sourcingProfileService: CompanySourcingProfileService,
   ) {}
 
@@ -972,6 +975,57 @@ export class CompaniesService {
       data = scored.slice(offset, offset + limit);
     }
 
+    const depthMode = (query.depth_mode ?? 'deep_only') as 'deep_only' | 'shallow_only' | 'merged';
+    const annotateDepth = (row: Record<string, unknown>): Record<string, unknown> => {
+      const summary = (row.sourcePayloadSummary ?? {}) as Record<string, unknown>;
+      const depthState = String(summary.depth_state ?? 'ENRICHED').toUpperCase();
+      return {
+        ...row,
+        dataDepthState: depthState,
+        dataDepthBadge: depthState === 'ENRICHED' ? 'Enriched' : depthState === 'STALE_ENRICHED' ? 'Stale' : 'Basic',
+      };
+    };
+
+    const bulkRows = async () => {
+      const bq = this.bulkCompanyCurrentRepo.createQueryBuilder('b');
+      if (query.q) bq.andWhere('b.name_primary ILIKE :q', { q: `%${query.q}%` });
+      if (query.org_number) bq.andWhere('b.organisation_number = :org', { org: query.org_number });
+      if (query.country_code) bq.andWhere(`b.registrations_country_code = :cc`, { cc: query.country_code });
+      if (depthMode === 'shallow_only') bq.andWhere(`b.seed_state <> 'ENRICHED'`);
+      bq.orderBy('b.updated_at', 'DESC').skip(offset).take(limit);
+      const [rows, count] = await bq.getManyAndCount();
+      const mapped = rows.map(r => ({
+        id: r.id,
+        organisationNumber: r.organisationNumber,
+        legalName: r.namePrimary ?? r.organisationNumber,
+        status: r.isDeregistered ? 'DEREGISTERED' : 'ACTIVE',
+        companyForm: r.organisationFormText ?? r.organisationFormCode,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        dataDepthState: r.seedState,
+        dataDepthBadge: r.seedState === 'ENRICHED' ? 'Enriched' : r.seedState === 'STALE_ENRICHED' ? 'Stale' : 'Basic',
+      }));
+      return { mapped, count };
+    };
+
+    if (depthMode === 'shallow_only') {
+      const shallow = await bulkRows();
+      data = shallow.mapped;
+      total = shallow.count;
+    } else if (depthMode === 'merged') {
+      const deep = data.map(d => annotateDepth(d));
+      const deepOrg = new Set(deep.map(d => String(d.organisationNumber ?? '')));
+      const shallow = await bulkRows();
+      const mergedRows = [...deep];
+      for (const row of shallow.mapped) {
+        if (!deepOrg.has(String(row.organisationNumber))) mergedRows.push(row);
+      }
+      total = Math.max(total, mergedRows.length);
+      data = mergedRows.slice(0, limit);
+    } else {
+      data = data.map(d => annotateDepth(d));
+    }
+
     await this.auditService.log({
       tenantId: ctx.tenantId,
       actorId: ctx.actorId ?? null,
@@ -988,6 +1042,7 @@ export class CompaniesService {
         has_financial_reports: query.has_financial_reports ?? null,
         officer_role_contains: offRaw || null,
         via: opts?.viaSearchEndpoint ? 'companies/search' : 'companies',
+        depth_mode: depthMode,
         deal_mode: dealMode ?? null,
         sort_by: query.sort_by ?? 'updatedAt',
         sort_dir: query.sort_dir ?? 'desc',

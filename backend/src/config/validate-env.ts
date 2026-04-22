@@ -77,6 +77,13 @@ const envSchema = z.object({
   MONITORING_DETECT_ENABLED: z.enum(['true', 'false']).optional(),
   MONITORING_DETECT_INTERVAL_MS: z.coerce.number().int().positive().optional(),
   MONITORING_DETECT_LOOKBACK_HOURS: z.coerce.number().int().positive().optional(),
+  BV_BULK_WEEKLY_ENABLED: z.enum(['true', 'false']).optional(),
+  BV_BULK_WEEKLY_URL: z.string().url().optional(),
+  BV_BULK_DEFAULT_TENANT_ID: z.string().uuid().optional(),
+  BV_BULK_PARSER_PROFILE: z.enum(['default_v1', 'vendor_2025_alt']).optional(),
+  BV_BULK_BATCH_SIZE: z.coerce.number().int().positive().optional(),
+  BV_BULK_ENRICH_STALE_DAYS: z.coerce.number().int().positive().optional(),
+  BV_BULK_PLATFORM_ADMIN_TENANT_ID: z.string().uuid().optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {

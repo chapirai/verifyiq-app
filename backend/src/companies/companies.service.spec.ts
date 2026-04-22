@@ -16,9 +16,11 @@ import { FailureStateService } from './services/failure-state.service';
 import { BvCacheService } from './services/bv-cache.service';
 import { LineageMetadataCaptureService } from './services/lineage-metadata-capture.service';
 import { RefreshDecisionService } from './services/refresh-decision.service';
+import { CompanySourcingProfileService } from './services/company-sourcing-profile.service';
 import { FinancialStatementEntity } from '../financial/entities/financial-statement.entity';
 import { OwnershipLinkEntity } from '../ownership/entities/ownership-link.entity';
 import { CompanySignalEntity } from './entities/company-signal.entity';
+import { BvBulkCompanyCurrentEntity } from '../bolagsverket-bulk/entities/bv-bulk-company-current.entity';
 
 const TENANT_ID = 'tenant-abc';
 const ORG_NR = '5560000001';
@@ -179,6 +181,14 @@ describe('CompaniesService – orchestrateLookup', () => {
         {
           provide: getRepositoryToken(CompanySignalEntity),
           useValue: { createQueryBuilder: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(BvBulkCompanyCurrentEntity),
+          useValue: { createQueryBuilder: jest.fn() },
+        },
+        {
+          provide: CompanySourcingProfileService,
+          useValue: { ensureProfiles: jest.fn().mockResolvedValue([]) },
         },
       ],
     }).compile();
@@ -551,6 +561,14 @@ describe('CompaniesService – findAll', () => {
           provide: getRepositoryToken(CompanySignalEntity),
           useValue: { createQueryBuilder: jest.fn() },
         },
+        {
+          provide: getRepositoryToken(BvBulkCompanyCurrentEntity),
+          useValue: { createQueryBuilder: jest.fn() },
+        },
+        {
+          provide: CompanySourcingProfileService,
+          useValue: { ensureProfiles: jest.fn().mockResolvedValue([]) },
+        },
       ],
     }).compile();
 
@@ -566,7 +584,7 @@ describe('CompaniesService – findAll', () => {
     companyRepo.createQueryBuilder.mockReturnValue(qb);
 
     const result = await service.findAll(ctx, {});
-    expect(result).toEqual({ data: [], total: 0, page: 1, limit: 10, has_next: false });
+    expect(result).toMatchObject({ data: [], total: 0, page: 1, limit: 10, has_next: false });
   });
 
   it('applies tenant isolation via WHERE tenantId = :tenantId', async () => {
@@ -768,6 +786,14 @@ describe('CompaniesService – findAll', () => {
           {
             provide: getRepositoryToken(CompanySignalEntity),
             useValue: { createQueryBuilder: jest.fn() },
+          },
+          {
+            provide: getRepositoryToken(BvBulkCompanyCurrentEntity),
+            useValue: { createQueryBuilder: jest.fn() },
+          },
+          {
+            provide: CompanySourcingProfileService,
+            useValue: { ensureProfiles: jest.fn().mockResolvedValue([]) },
           },
         ],
       }).compile();

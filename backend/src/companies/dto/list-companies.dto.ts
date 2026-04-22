@@ -35,6 +35,10 @@ const ORG_NR_REGEX = /^(\d{10}|\d{12})$/;
 
 export class ListCompaniesDto {
   @IsOptional()
+  @IsEnum(['deep_only', 'shallow_only', 'merged'])
+  depth_mode?: 'deep_only' | 'shallow_only' | 'merged' = 'deep_only';
+
+  @IsOptional()
   @IsEnum(['founder_exit', 'distressed', 'roll_up'], {
     message: 'deal_mode must be one of: founder_exit, distressed, roll_up',
   })

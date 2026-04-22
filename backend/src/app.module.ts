@@ -34,6 +34,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { UsersModule } from './users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { PublicApiModule } from './public-api/public-api.module';
+import { BolagsverketBulkModule } from './bolagsverket-bulk/bolagsverket-bulk.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { PublicApiModule } from './public-api/public-api.module';
     RiskIndicatorsModule,
     AnnualReportsModule,
     PublicApiModule,
+    BolagsverketBulkModule,
   ],
   controllers: [AppController],
 })

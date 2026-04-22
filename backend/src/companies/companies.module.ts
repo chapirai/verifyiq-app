@@ -80,6 +80,7 @@ import { DECISION_REFRESH_QUEUE } from './queues/decision-refresh.queue';
 import { DecisionRefreshProcessor } from './processors/decision-refresh.processor';
 import { DecisionRefreshTriggerService } from './services/decision-refresh-trigger.service';
 import { CompanySourcingProfileEntity } from './entities/company-sourcing-profile.entity';
+import { BvBulkCompanyCurrentEntity } from '../bolagsverket-bulk/entities/bv-bulk-company-current.entity';
 import { CompanySourcingProfileService } from './services/company-sourcing-profile.service';
 
 @Module({
@@ -114,6 +115,7 @@ import { CompanySourcingProfileService } from './services/company-sourcing-profi
       OwnershipLinkEntity,
       CompanyCaseEntity,
       CompanySourcingProfileEntity,
+      BvBulkCompanyCurrentEntity,
     ]),
     HttpModule,
     AuditModule,
