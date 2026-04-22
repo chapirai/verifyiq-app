@@ -705,7 +705,8 @@ export class OwnershipService {
   async enqueueAdvancedOwnershipInsightsPrecompute(tenantId: string, organisationNumber: string) {
     const org = (organisationNumber ?? '').replace(/\D/g, '');
     if (org.length !== 10 && org.length !== 12) return { queued: false, reason: 'invalid_org' as const };
-    const jobId = `${tenantId}:${org}:advanced-insights`;
+    // BullMQ forbids ":" in custom jobId values.
+    const jobId = `own-adv-${tenantId}-${org}`;
     await this.advancedInsightsQueue.add(
       OwnershipAdvancedInsightsJobName.PRECOMPUTE,
       { tenantId, organisationNumber: org },

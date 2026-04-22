@@ -14,7 +14,11 @@ export class DecisionRefreshTriggerService {
   async enqueue(payload: DecisionRefreshJobData) {
     const org = payload.organisationNumber.replace(/\D/g, '');
     if (org.length !== 10 && org.length !== 12) return null;
-    const jobId = `${payload.tenantId}:${org}:${payload.reason}:${payload.triggerId}`;
+    // BullMQ rejects custom jobId values containing ":" (see bullmq Job.validateOptions).
+    const jobId = `dr-${payload.tenantId}-${org}-${payload.reason}-${payload.triggerId}`.replace(
+      /:/g,
+      '-',
+    );
     return this.queue.add(
       DecisionRefreshJobName.REFRESH_ORG,
       { ...payload, organisationNumber: org },
