@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { createHash } from 'crypto';
 import * as unzipper from 'unzipper';
 import * as Minio from 'minio';
+import { Readable } from 'stream';
 
 @Injectable()
 export class BolagsverketBulkStorageService {
@@ -37,12 +38,12 @@ export class BolagsverketBulkStorageService {
   }
 
   async downloadAndArchiveWeeklyZip(sourceUrl: string): Promise<{
-    zipBuffer: Buffer;
-    txtBuffer: Buffer;
     zipSha256: string;
     txtSha256: string;
     zipObjectKey: string;
     txtObjectKey: string;
+    zipSizeBytes: number;
+    txtSizeBytes: number;
   }> {
     const response = await firstValueFrom(this.http.get(sourceUrl, { responseType: 'arraybuffer' }));
     const zipBuffer = Buffer.from(response.data as ArrayBuffer);
@@ -66,7 +67,14 @@ export class BolagsverketBulkStorageService {
       'Content-Type': 'text/plain; charset=utf-8',
     });
 
-    return { zipBuffer, txtBuffer, zipSha256, txtSha256, zipObjectKey, txtObjectKey };
+    return {
+      zipSha256,
+      txtSha256,
+      zipObjectKey,
+      txtObjectKey,
+      zipSizeBytes: zipBuffer.length,
+      txtSizeBytes: txtBuffer.length,
+    };
   }
 
   async getPresignedObjectUrl(objectKey: string, expiresInSeconds = 900): Promise<{ url: string; expiresInSeconds: number }> {
@@ -82,6 +90,10 @@ export class BolagsverketBulkStorageService {
       stream.on('end', () => resolve(Buffer.concat(chunks)));
       stream.on('error', reject);
     });
+  }
+
+  async getObjectStream(objectKey: string): Promise<Readable> {
+    return (await this.minio.getObject(this.bucket, objectKey)) as Readable;
   }
 }
 

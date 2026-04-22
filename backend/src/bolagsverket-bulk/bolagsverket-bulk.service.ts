@@ -7,6 +7,8 @@ import { Queue } from 'bullmq';
 import { DataSource, MoreThanOrEqual, Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { createHash } from 'crypto';
+import * as readline from 'readline';
+import { Readable } from 'stream';
 import { BolagsverketService } from '../companies/services/bolagsverket.service';
 import { BolagsverketBulkStorageService } from './bolagsverket-bulk.storage.service';
 import { BolagsverketBulkParser } from './bolagsverket-bulk.parser';
@@ -107,6 +109,10 @@ export class BolagsverketBulkService {
     const now = new Date();
     const parserProfile = this.config.get<string>('BV_BULK_PARSER_PROFILE', 'default_v1');
     const dl = await this.storage.downloadAndArchiveWeeklyZip(sourceUrl);
+    const maxTxtBytes = Number(this.config.get<number>('BV_BULK_MAX_TXT_BYTES', 350_000_000));
+    if (maxTxtBytes > 0 && dl.txtSizeBytes > maxTxtBytes) {
+      throw new Error(`Bulk TXT too large (${dl.txtSizeBytes} bytes), exceeds BV_BULK_MAX_TXT_BYTES=${maxTxtBytes}`);
+    }
 
     const existingByHash = await this.runRepo.findOne({ where: { zipSha256: dl.zipSha256 } });
     if (existingByHash && !force) {
@@ -136,10 +142,10 @@ export class BolagsverketBulkService {
     );
 
     try {
-      const lines = dl.txtBuffer.toString('utf8').split(/\r?\n/).filter(x => x.trim().length > 0);
-      await this.ingestLinesWithCheckpoints(run.id, lines, parserProfile);
+      const txtStream = await this.storage.getObjectStream(dl.txtObjectKey);
+      const lineCount = await this.ingestStreamWithCheckpoints(run.id, txtStream, parserProfile);
 
-      run.rowCount = lines.length;
+      run.rowCount = lineCount;
       run.status = 'parsed';
       await this.runRepo.save(run);
 
@@ -154,7 +160,7 @@ export class BolagsverketBulkService {
       await this.maybeEmitOpsAlert(run.id);
       return {
         runId: run.id,
-        rowCount: lines.length,
+        rowCount: lineCount,
         applied: applied.upserted,
         changed: applied.changed + removed,
         seeded,
@@ -177,7 +183,6 @@ export class BolagsverketBulkService {
     seeded: number;
   }> {
     const sourceRun = await this.runRepo.findOneByOrFail({ id: runId });
-    const txtBuffer = await this.storage.getObjectBuffer(sourceRun.txtObjectKey);
     const now = new Date();
     const parserProfile = sourceRun.parserProfile ?? this.config.get<string>('BV_BULK_PARSER_PROFILE', 'default_v1');
     const replayRun = await this.runRepo.save(
@@ -195,9 +200,9 @@ export class BolagsverketBulkService {
       }),
     );
     try {
-      const lines = txtBuffer.toString('utf8').split(/\r?\n/).filter(x => x.trim().length > 0);
-      await this.ingestLinesWithCheckpoints(replayRun.id, lines, parserProfile);
-      replayRun.rowCount = lines.length;
+      const txtStream = await this.storage.getObjectStream(sourceRun.txtObjectKey);
+      const lineCount = await this.ingestStreamWithCheckpoints(replayRun.id, txtStream, parserProfile);
+      replayRun.rowCount = lineCount;
       replayRun.status = 'parsed';
       await this.runRepo.save(replayRun);
       const applied = await this.upsert.applyStagingToCurrent(replayRun.id, now);
@@ -209,7 +214,7 @@ export class BolagsverketBulkService {
       return {
         replayRunId: replayRun.id,
         sourceRunId: sourceRun.id,
-        rowCount: lines.length,
+        rowCount: lineCount,
         applied: applied.upserted,
         changed: applied.changed + removed,
         seeded,
@@ -227,15 +232,44 @@ export class BolagsverketBulkService {
     return createHash('sha256').update(seed).digest('hex');
   }
 
-  private async ingestLinesWithCheckpoints(fileRunId: string, lines: string[], parserProfile: string): Promise<void> {
-    const rawRows: Array<Partial<BvBulkRawRowEntity>> = [];
-    const stagingRows: Array<Partial<BvBulkCompanyStagingEntity>> = [];
-    for (let i = 0; i < lines.length; i += 1) {
-      const line = lines[i]!;
+  private async ingestStreamWithCheckpoints(fileRunId: string, stream: Readable, parserProfile: string): Promise<number> {
+    const chunkSize = Math.max(50, Number(this.config.get<number>('BV_BULK_BATCH_SIZE', 500)));
+    const yieldEveryLines = Math.max(1000, Number(this.config.get<number>('BV_BULK_YIELD_EVERY_LINES', 5000)));
+    const chunkPauseMs = Math.max(0, Number(this.config.get<number>('BV_BULK_CHUNK_PAUSE_MS', 5)));
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+    let lineNumber = 0;
+    let checkpointSeq = 0;
+    let rawChunk: Array<Partial<BvBulkRawRowEntity>> = [];
+    let stagingChunk: Array<Partial<BvBulkCompanyStagingEntity>> = [];
+    const flush = async () => {
+      if (rawChunk.length === 0 && stagingChunk.length === 0) return;
+      checkpointSeq += 1;
+      const rowsWritten = rawChunk.length;
+      const stagingWritten = stagingChunk.length;
+      await this.dataSource.transaction(async manager => {
+        if (rowsWritten > 0) await manager.insert(BvBulkRawRowEntity, rawChunk);
+        if (stagingWritten > 0) await manager.insert(BvBulkCompanyStagingEntity, stagingChunk);
+        await manager.insert(BvBulkRunCheckpointEntity, {
+          fileRunId,
+          checkpointSeq,
+          lastLineNumber: lineNumber,
+          rowsWritten,
+          stagingWritten,
+        });
+      });
+      rawChunk = [];
+      stagingChunk = [];
+      if (chunkPauseMs > 0) await new Promise(resolve => setTimeout(resolve, chunkPauseMs));
+    };
+
+    for await (const raw of rl) {
+      const line = String(raw);
+      if (!line.trim()) continue;
+      lineNumber += 1;
       try {
         const parsed = this.parser.parseLineToStaging(line, parserProfile);
-        rawRows.push({ fileRunId, lineNumber: i + 1, rawLine: line, parsedOk: true, parseError: null });
-        stagingRows.push({
+        rawChunk.push({ fileRunId, lineNumber, rawLine: line, parsedOk: true, parseError: null });
+        stagingChunk.push({
           fileRunId,
           organisationIdentityRaw: parsed.identityRaw,
           identityValue: parsed.identityValue,
@@ -259,33 +293,19 @@ export class BolagsverketBulkService {
           contentHash: parsed.contentHash,
         });
       } catch (err) {
-        rawRows.push({
+        rawChunk.push({
           fileRunId,
-          lineNumber: i + 1,
+          lineNumber,
           rawLine: line,
           parsedOk: false,
           parseError: err instanceof Error ? err.message : String(err),
         });
       }
+      if (rawChunk.length >= chunkSize) await flush();
+      if (lineNumber % yieldEveryLines === 0) await new Promise(resolve => setImmediate(resolve));
     }
-    const chunk = Math.max(100, Number(this.config.get<number>('BV_BULK_BATCH_SIZE', 2000)));
-    let seq = 0;
-    for (let i = 0; i < rawRows.length; i += chunk) {
-      seq += 1;
-      const rawChunk = rawRows.slice(i, i + chunk);
-      const stagingChunk = stagingRows.slice(i, i + chunk);
-      await this.dataSource.transaction(async manager => {
-        if (rawChunk.length > 0) await manager.insert(BvBulkRawRowEntity, rawChunk);
-        if (stagingChunk.length > 0) await manager.insert(BvBulkCompanyStagingEntity, stagingChunk);
-        await manager.insert(BvBulkRunCheckpointEntity, {
-          fileRunId,
-          checkpointSeq: seq,
-          lastLineNumber: Math.min(lines.length, i + chunk),
-          rowsWritten: rawChunk.length,
-          stagingWritten: stagingChunk.length,
-        });
-      });
-    }
+    await flush();
+    return lineNumber;
   }
 
   async listCurrentShallow(query: { q?: string; page?: number; limit?: number; seedState?: string }) {
