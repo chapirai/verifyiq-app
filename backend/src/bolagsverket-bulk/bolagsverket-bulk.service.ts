@@ -479,13 +479,20 @@ export class BolagsverketBulkService {
       .sort((a, b) => b.apiCalls30d - a.apiCalls30d)
       .slice(tenantOffset, tenantOffset + tenantLimit);
 
+    let checkpointRowsWritten = 0;
+    let checkpointStagingWritten = 0;
+    for (const cp of checkpoints) {
+      checkpointRowsWritten += Number(cp.rowsWritten ?? 0);
+      checkpointStagingWritten += Number(cp.stagingWritten ?? 0);
+    }
+
     const checkpointsProgress = checkpoints.length
       ? {
           completedCheckpoints: checkpoints.length,
           lastCheckpointSeq: checkpoints[checkpoints.length - 1]?.checkpointSeq ?? 0,
           lastLineNumber: checkpoints[checkpoints.length - 1]?.lastLineNumber ?? 0,
-          rowsWritten: checkpoints.reduce<number>((a, c) => a + c.rowsWritten, 0),
-          stagingWritten: checkpoints.reduce<number>((a, c) => a + c.stagingWritten, 0),
+          rowsWritten: checkpointRowsWritten,
+          stagingWritten: checkpointStagingWritten,
         }
       : {
           completedCheckpoints: 0,
