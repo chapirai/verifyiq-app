@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/Input';
 import { api, ApiError } from '@/lib/api';
 
 export default function LoginPage() {
-  const [tenantId, setTenantId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +17,7 @@ export default function LoginPage() {
     setError('');
     setSubmitting(true);
     try {
-      await api.login({ tenantId, email, password });
+      await api.login({ email, password });
       const params = new URLSearchParams(window.location.search);
       const requestedNext = params.get('next') ?? '/dashboard';
       const nextPath =
@@ -41,7 +40,6 @@ export default function LoginPage() {
           <p className="mono-label text-[10px]">Account Access</p>
           <h1 className="font-display mt-4 text-5xl">Login</h1>
           <form className="mt-10 space-y-5" onSubmit={onSubmit}>
-            <Input value={tenantId} onChange={(e) => setTenantId(e.target.value)} placeholder="Tenant ID" required />
             <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Work email" type="email" required />
             <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" required />
             {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}

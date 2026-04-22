@@ -39,6 +39,15 @@ export class User {
   @Column({ type: 'varchar', length: 64 })
   role!: string;
 
+  @Column({ name: 'status', type: 'varchar', length: 64, default: 'active' })
+  status!: 'pending_verification' | 'verified_pending_password' | 'active' | 'suspended';
+
+  @Column({ name: 'email_verified_at', type: 'timestamptz', nullable: true })
+  emailVerifiedAt!: Date | null;
+
+  @Column({ name: 'must_change_password', type: 'boolean', default: false })
+  mustChangePassword!: boolean;
+
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive!: boolean;
 

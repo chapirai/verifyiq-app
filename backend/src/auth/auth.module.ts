@@ -11,13 +11,23 @@ import { OauthModule } from '../oauth/oauth.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { UsersModule } from '../users/users.module';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { User } from '../users/user.entity';
+import { PendingSignupEntity } from './entities/pending-signup.entity';
+import { EmailVerificationTokenEntity } from './entities/email-verification-token.entity';
+import { PasswordSetupTokenEntity } from './entities/password-setup-token.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RefreshToken]),
+    TypeOrmModule.forFeature([
+      RefreshToken,
+      User,
+      PendingSignupEntity,
+      EmailVerificationTokenEntity,
+      PasswordSetupTokenEntity,
+    ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [ConfigService],

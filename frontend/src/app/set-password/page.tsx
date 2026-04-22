@@ -1,12 +1,13 @@
 'use client';
 
+import { FormEvent, useState } from 'react';
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
+import { useEffect } from 'react';
 
-export default function ResetPasswordPage() {
+export default function SetPasswordPage() {
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -24,7 +25,7 @@ export default function ResetPasswordPage() {
     setError('');
     setMessage('');
     if (!token) {
-      setError('Invalid reset token.');
+      setError('Invalid setup token.');
       return;
     }
     if (password !== confirmPassword) {
@@ -33,11 +34,11 @@ export default function ResetPasswordPage() {
     }
     setSubmitting(true);
     try {
-      await api.resetPassword(token, password);
-      setMessage('Password reset successful. You can now log in.');
+      await api.setPassword(token, password);
+      setMessage('Password set. Redirecting to app...');
+      window.location.href = '/dashboard';
     } catch (err) {
-      const text = err instanceof Error ? err.message : 'Reset failed.';
-      setError(text);
+      setError(err instanceof Error ? err.message : 'Could not set password.');
     } finally {
       setSubmitting(false);
     }
@@ -47,20 +48,23 @@ export default function ResetPasswordPage() {
     <main className="site-divider min-h-screen py-20">
       <div className="editorial-container max-w-2xl">
         <div className="border-2 border-foreground p-8 md:p-10">
-          <p className="mono-label text-[10px]">Reset Link</p>
-          <h1 className="font-display mt-4 text-5xl">Reset password</h1>
-          <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-            <Input type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            <Input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+          <p className="mono-label text-[10px]">Set password</p>
+          <h1 className="font-display mt-4 text-5xl">Create your password</h1>
+          <form className="mt-10 space-y-5" onSubmit={onSubmit}>
+            <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <Input type="password" placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
             {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
             {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-            <Button className="w-full" disabled={submitting}>{submitting ? 'Saving...' : 'Reset password'}</Button>
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? 'Saving...' : 'Set password'}
+            </Button>
           </form>
           <p className="mt-6 text-sm">
-            Return to <Link href="/login" className="underline underline-offset-4">login</Link>
+            <Link href="/login" className="underline underline-offset-4">Back to login</Link>
           </p>
         </div>
       </div>
     </main>
   );
 }
+

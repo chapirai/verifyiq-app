@@ -16,7 +16,19 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | undefined> {
-    return await this.userRepository.findOne({ where: { email } }) ?? undefined;
+    return (
+      (await this.userRepository.findOne({
+        where: { email: email.trim().toLowerCase() },
+      })) ?? undefined
+    );
+  }
+
+  async findActiveByEmail(email: string): Promise<User | undefined> {
+    return (
+      (await this.userRepository.findOne({
+        where: { email: email.trim().toLowerCase(), status: 'active', isActive: true },
+      })) ?? undefined
+    );
   }
 
   async findByTenantAndEmail(tenantId: string, email: string): Promise<User | undefined> {

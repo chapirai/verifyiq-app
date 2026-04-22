@@ -114,21 +114,52 @@ export const api = {
   async healthVh() {
     return request<{ status: string; enabled: boolean }>('/bolagsverket/vh/isalive');
   },
-  async login(payload: { tenantId: string; email: string; password: string }) {
+  async login(payload: { email: string; password: string }) {
     const data = await request<AuthTokens>('/auth/login', { method: 'POST', body: JSON.stringify(payload) });
     setSession(data.accessToken, data.refreshToken, data.user);
     return data;
   },
   async signup(payload: {
-    tenantSlug: string;
-    tenantName: string;
-    email: string;
-    password: string;
     fullName: string;
+    email: string;
+    companyName?: string;
+    termsAccepted: boolean;
   }) {
-    const data = await request<AuthTokens>('/auth/signup', { method: 'POST', body: JSON.stringify(payload) });
+    return request<{ status: string; email: string }>('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  async resendSignupVerification(email: string) {
+    return request<{ status: string }>('/auth/signup/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+  async verifyEmail(token: string) {
+    return request<{ status: string; passwordSetupToken: string; redirectUrl: string }>(
+      `/auth/verify-email?token=${encodeURIComponent(token)}`,
+    );
+  },
+  async setPassword(token: string, password: string) {
+    const data = await request<AuthTokens>('/auth/set-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
     setSession(data.accessToken, data.refreshToken, data.user);
     return data;
+  },
+  async forgotPassword(email: string) {
+    return request<{ status: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+  async resetPassword(token: string, password: string) {
+    return request<{ status: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
   },
   async refresh() {
     const refreshToken = getRefreshToken();

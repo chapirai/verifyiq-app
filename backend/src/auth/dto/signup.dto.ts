@@ -1,24 +1,19 @@
-import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsString()
   @MinLength(2)
-  @MaxLength(120)
-  tenantName!: string;
-
-  @IsString()
-  @Matches(/^[a-z0-9-]{2,120}$/)
-  tenantSlug!: string;
+  @MaxLength(255)
+  fullName!: string;
 
   @IsEmail()
   email!: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(8)
-  password!: string;
-
-  @IsString()
-  @MinLength(2)
   @MaxLength(255)
-  fullName!: string;
+  companyName?: string;
+
+  @IsBoolean()
+  termsAccepted!: boolean;
 }

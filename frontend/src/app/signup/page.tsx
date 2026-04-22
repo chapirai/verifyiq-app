@@ -7,64 +7,32 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api, ApiError } from '@/lib/api';
 
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80);
-}
-
-function deriveWorkspaceFromEmail(email: string) {
-  const [localPartRaw, domainRaw] = email.split('@');
-  const localPart = localPartRaw?.trim() || 'user';
-  const domain = domainRaw?.trim() || 'workspace';
-  const domainName = domain.split('.')[0] || 'workspace';
-  const base = slugify(domainName) || 'workspace';
-  const suffix = Math.random().toString(36).slice(2, 8);
-  return {
-    tenantName: `${domainName.charAt(0).toUpperCase()}${domainName.slice(1)} Workspace`,
-    tenantSlug: `${base}-${suffix}`,
-    fullName: localPart.replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-  };
-}
-
 export default function SignupPage() {
   const router = useRouter();
   const [form, setForm] = useState({
+    fullName: '',
     email: '',
-    password: '',
-    planCode: 'free',
+    companyName: '',
+    termsAccepted: false,
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError('');
+    setSuccess('');
     setSubmitting(true);
     try {
-      const derived = deriveWorkspaceFromEmail(form.email);
       await api.signup({
-        tenantSlug: derived.tenantSlug,
-        tenantName: derived.tenantName,
-        fullName: derived.fullName,
+        fullName: form.fullName,
         email: form.email,
-        password: form.password,
+        companyName: form.companyName || undefined,
+        termsAccepted: form.termsAccepted,
       });
-
-      if (form.planCode === 'free') {
-        router.push('/dashboard');
-        return;
-      }
-
-      const checkout = await api.createCheckoutSession(form.planCode);
-      const checkoutUrl = (checkout as { data?: { checkoutUrl?: string } }).data?.checkoutUrl;
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
-        return;
-      }
-      router.push('/billing');
+      setSuccess('Verification email sent. Continue to verify your email.');
+      router.push(`/verify-email-pending?email=${encodeURIComponent(form.email.trim().toLowerCase())}`);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
       else setError('Could not create account.');
@@ -78,22 +46,35 @@ export default function SignupPage() {
       <div className="editorial-container max-w-2xl">
         <div className="border-2 border-foreground p-8 md:p-10">
           <p className="mono-label text-[10px]">Workspace Creation</p>
-          <h1 className="font-display mt-4 text-5xl">Sign up</h1>
+          <h1 className="font-display mt-4 text-5xl">Create your VerifyIQ access</h1>
           <form className="mt-10 grid gap-5" onSubmit={onSubmit}>
+            <Input
+              placeholder="Full name"
+              value={form.fullName}
+              onChange={(e) => setForm((v) => ({ ...v, fullName: e.target.value }))}
+              required
+            />
             <Input placeholder="Work email" type="email" value={form.email} onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))} required />
-            <Input placeholder="Password" type="password" value={form.password} onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))} required />
-            <select
-              className="border border-border-light bg-background px-3 py-2 text-sm"
-              value={form.planCode}
-              onChange={(e) => setForm((v) => ({ ...v, planCode: e.target.value }))}
-            >
-              <option value="free">Free - 0 SEK/month</option>
-              <option value="basic">Basic - 49 SEK/month</option>
-              <option value="pro">Pro - 999 SEK/month</option>
-            </select>
+            <Input
+              placeholder="Company name (optional)"
+              value={form.companyName}
+              onChange={(e) => setForm((v) => ({ ...v, companyName: e.target.value }))}
+            />
+            <label className="flex items-start gap-3 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={form.termsAccepted}
+                onChange={(e) => setForm((v) => ({ ...v, termsAccepted: e.target.checked }))}
+                required
+              />
+              <span>
+                I agree to the terms and privacy policy.
+              </span>
+            </label>
             {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
+            {success ? <p className="text-sm text-emerald-700">{success}</p> : null}
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? 'Creating...' : 'Create account'}
+              {submitting ? 'Submitting...' : 'Request access'}
             </Button>
           </form>
           <p className="mt-6 text-sm">

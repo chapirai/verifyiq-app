@@ -5,7 +5,7 @@ export function Footer() {
     <footer className="site-divider py-16">
       <Container className="grid gap-6 md:grid-cols-2">
         <div>
-          <p className="font-display text-4xl">Nordic Company Data</p>
+          <p className="font-display text-4xl">Nordic Data Company</p>
           <p className="mt-3 text-lg text-muted-foreground">Product: VerifyIQ</p>
         </div>
         <div className="md:justify-self-end md:text-right">
