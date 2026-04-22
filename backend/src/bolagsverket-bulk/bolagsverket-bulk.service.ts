@@ -9,6 +9,7 @@ import { firstValueFrom } from 'rxjs';
 import { createHash } from 'crypto';
 import * as readline from 'readline';
 import { Readable } from 'stream';
+import { monitorEventLoopDelay } from 'perf_hooks';
 import { BolagsverketService } from '../companies/services/bolagsverket.service';
 import { BolagsverketBulkStorageService } from './bolagsverket-bulk.storage.service';
 import { BolagsverketBulkParser } from './bolagsverket-bulk.parser';
@@ -235,12 +236,29 @@ export class BolagsverketBulkService {
   private async ingestStreamWithCheckpoints(fileRunId: string, stream: Readable, parserProfile: string): Promise<number> {
     const chunkSize = Math.max(50, Number(this.config.get<number>('BV_BULK_BATCH_SIZE', 500)));
     const yieldEveryLines = Math.max(1000, Number(this.config.get<number>('BV_BULK_YIELD_EVERY_LINES', 5000)));
-    const chunkPauseMs = Math.max(0, Number(this.config.get<number>('BV_BULK_CHUNK_PAUSE_MS', 5)));
+    const baseChunkPauseMs = Math.max(0, Number(this.config.get<number>('BV_BULK_CHUNK_PAUSE_MS', 5)));
+    const autoThrottleEnabled = String(this.config.get<string>('BV_BULK_AUTO_THROTTLE_ENABLED', 'true')).toLowerCase() === 'true';
+    const autoThrottleMaxPauseMs = Math.max(baseChunkPauseMs, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MAX_PAUSE_MS', 100)));
+    const memWarnMb = Math.max(64, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MEM_WARN_MB', 350)));
+    const memHardMb = Math.max(memWarnMb, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MEM_HARD_MB', 500)));
+    const lagWarnMs = Math.max(10, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_EVENT_LOOP_WARN_MS', 80)));
+    const lagHardMs = Math.max(lagWarnMs, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_EVENT_LOOP_HARD_MS', 140)));
+    const loopLag = monitorEventLoopDelay({ resolution: 20 });
+    loopLag.enable();
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     let lineNumber = 0;
     let checkpointSeq = 0;
     let rawChunk: Array<Partial<BvBulkRawRowEntity>> = [];
     let stagingChunk: Array<Partial<BvBulkCompanyStagingEntity>> = [];
+    const adaptivePauseMs = (): number => {
+      if (!autoThrottleEnabled) return baseChunkPauseMs;
+      const memoryUsedMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
+      const p95LagMs = Number(loopLag.percentile(95) / 1_000_000);
+      let pause = baseChunkPauseMs;
+      if (memoryUsedMb >= memWarnMb || p95LagMs >= lagWarnMs) pause += 15;
+      if (memoryUsedMb >= memHardMb || p95LagMs >= lagHardMs) pause += 45;
+      return Math.min(autoThrottleMaxPauseMs, pause);
+    };
     const flush = async () => {
       if (rawChunk.length === 0 && stagingChunk.length === 0) return;
       checkpointSeq += 1;
@@ -259,52 +277,57 @@ export class BolagsverketBulkService {
       });
       rawChunk = [];
       stagingChunk = [];
-      if (chunkPauseMs > 0) await new Promise(resolve => setTimeout(resolve, chunkPauseMs));
+      const pauseMs = adaptivePauseMs();
+      if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
     };
 
-    for await (const raw of rl) {
-      const line = String(raw);
-      if (!line.trim()) continue;
-      lineNumber += 1;
-      try {
-        const parsed = this.parser.parseLineToStaging(line, parserProfile);
-        rawChunk.push({ fileRunId, lineNumber, rawLine: line, parsedOk: true, parseError: null });
-        stagingChunk.push({
-          fileRunId,
-          organisationIdentityRaw: parsed.identityRaw,
-          identityValue: parsed.identityValue,
-          identityType: parsed.identityType,
-          namnskyddslopnummer: parsed.namnskyddslopnummer,
-          registrationCountryCode: parsed.registrationCountryCode,
-          organisationNamesRaw: parsed.namesRaw,
-          organisationFormCode: parsed.organisationFormCode,
-          deregistrationDate: parsed.deregistrationDate,
-          deregistrationReasonCode: parsed.deregistrationReasonCode,
-          deregistrationReasonText: parsed.deregistrationReasonText,
-          restructuringRaw: parsed.restructuringRaw,
-          registrationDate: parsed.registrationDate,
-          businessDescription: parsed.businessDescription,
-          postalAddressRaw: parsed.postalAddressRaw,
-          deliveryAddress: parsed.deliveryAddress,
-          coAddress: parsed.coAddress,
-          postalCode: parsed.postalCode,
-          city: parsed.city,
-          countryCode: parsed.countryCode,
-          contentHash: parsed.contentHash,
-        });
-      } catch (err) {
-        rawChunk.push({
-          fileRunId,
-          lineNumber,
-          rawLine: line,
-          parsedOk: false,
-          parseError: err instanceof Error ? err.message : String(err),
-        });
+    try {
+      for await (const raw of rl) {
+        const line = String(raw);
+        if (!line.trim()) continue;
+        lineNumber += 1;
+        try {
+          const parsed = this.parser.parseLineToStaging(line, parserProfile);
+          rawChunk.push({ fileRunId, lineNumber, rawLine: line, parsedOk: true, parseError: null });
+          stagingChunk.push({
+            fileRunId,
+            organisationIdentityRaw: parsed.identityRaw,
+            identityValue: parsed.identityValue,
+            identityType: parsed.identityType,
+            namnskyddslopnummer: parsed.namnskyddslopnummer,
+            registrationCountryCode: parsed.registrationCountryCode,
+            organisationNamesRaw: parsed.namesRaw,
+            organisationFormCode: parsed.organisationFormCode,
+            deregistrationDate: parsed.deregistrationDate,
+            deregistrationReasonCode: parsed.deregistrationReasonCode,
+            deregistrationReasonText: parsed.deregistrationReasonText,
+            restructuringRaw: parsed.restructuringRaw,
+            registrationDate: parsed.registrationDate,
+            businessDescription: parsed.businessDescription,
+            postalAddressRaw: parsed.postalAddressRaw,
+            deliveryAddress: parsed.deliveryAddress,
+            coAddress: parsed.coAddress,
+            postalCode: parsed.postalCode,
+            city: parsed.city,
+            countryCode: parsed.countryCode,
+            contentHash: parsed.contentHash,
+          });
+        } catch (err) {
+          rawChunk.push({
+            fileRunId,
+            lineNumber,
+            rawLine: line,
+            parsedOk: false,
+            parseError: err instanceof Error ? err.message : String(err),
+          });
+        }
+        if (rawChunk.length >= chunkSize) await flush();
+        if (lineNumber % yieldEveryLines === 0) await new Promise(resolve => setImmediate(resolve));
       }
-      if (rawChunk.length >= chunkSize) await flush();
-      if (lineNumber % yieldEveryLines === 0) await new Promise(resolve => setImmediate(resolve));
+      await flush();
+    } finally {
+      loopLag.disable();
     }
-    await flush();
     return lineNumber;
   }
 

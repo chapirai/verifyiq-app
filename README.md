@@ -516,6 +516,7 @@ For very large bulk files (for example ~2,000,000 rows), ingestion is designed t
 - DB inserts are checkpointed in small chunks (`BV_BULK_BATCH_SIZE`) instead of giant arrays.
 - Cooperative yielding (`BV_BULK_YIELD_EVERY_LINES`) gives the event loop breathing room so normal API traffic remains responsive.
 - Optional micro-pauses between chunk commits (`BV_BULK_CHUNK_PAUSE_MS`) reduce CPU/DB burst pressure on low-tier instances.
+- Dynamic auto-throttle can increase pause automatically when event-loop lag or memory rises (`BV_BULK_AUTO_THROTTLE_*`).
 - File guardrail (`BV_BULK_MAX_TXT_BYTES`) fails fast on unexpectedly huge files to prevent OOM crashes.
 - Worker concurrency for bulk queue is fixed to 1 to avoid parallel memory pressure.
 
@@ -524,6 +525,8 @@ Recommended baseline on Render/Vercel free tiers:
 - `BV_BULK_MAX_TXT_BYTES=350000000`
 - `BV_BULK_YIELD_EVERY_LINES=5000`
 - `BV_BULK_CHUNK_PAUSE_MS=5`
+- `BV_BULK_AUTO_THROTTLE_ENABLED=true`
+- `BV_BULK_AUTO_THROTTLE_MAX_PAUSE_MS=100`
 
 Tune upward only after observing stable memory/headroom.
 

@@ -34,6 +34,9 @@ export class OwnershipBvIngestionService {
       WITH picked AS (
         SELECT id FROM bv_pipeline.ownership_ingest_queue
         WHERE processed_at IS NULL
+          AND tenant_id IS NOT NULL
+          AND organisationsnummer IS NOT NULL
+          AND NULLIF(TRIM(organisationsnummer), '') IS NOT NULL
         ORDER BY id
         LIMIT $1
         FOR UPDATE SKIP LOCKED
@@ -49,6 +52,10 @@ export class OwnershipBvIngestionService {
 
     let ok = 0;
     for (const r of rows) {
+      if (!r.tenant_id || !r.organisationsnummer) {
+        this.logger.debug(`Skipping malformed ownership ingest row id=${r.id} tenant=${r.tenant_id} org=${r.organisationsnummer}`);
+        continue;
+      }
       try {
         await this.syncFromLatestFiSnapshot(r.tenant_id, r.organisationsnummer);
         ok += 1;
@@ -65,6 +72,11 @@ export class OwnershipBvIngestionService {
    * Rebuild BV-sourced ownership rows for one org from bv_parsed.v_fi_organisation_latest.
    */
   async syncFromLatestFiSnapshot(tenantId: string, organisationsnummer: string): Promise<void> {
+    const safeTenantId = tenantId?.trim();
+    const safeOrg = organisationsnummer?.trim();
+    if (!safeTenantId || !safeOrg) {
+      return;
+    }
     const fiRows = await this.dataSource.query<FiLatestRow[]>(
       `
       SELECT id::text AS id,
@@ -77,17 +89,17 @@ export class OwnershipBvIngestionService {
       WHERE tenant_id = $1::uuid AND organisationsnummer = $2
       LIMIT 1
       `,
-      [tenantId, organisationsnummer],
+      [safeTenantId, safeOrg],
     );
     const fi = fiRows[0];
     if (!fi?.raw_item || typeof fi.raw_item !== 'object') {
-      this.logger.debug(`No FI parsed snapshot for ${organisationsnummer} (tenant ${tenantId}); skipping ingest`);
+      this.logger.debug(`No FI parsed snapshot for ${safeOrg} (tenant ${safeTenantId}); skipping ingest`);
       return;
     }
 
     const rawItem = fi.raw_item as Record<string, unknown>;
     const fiSnapshotId = Number(fi.id);
-    const edges = extractOwnershipEdgesFromFiOrganisationRaw(rawItem, organisationsnummer);
+    const edges = extractOwnershipEdgesFromFiOrganisationRaw(rawItem, safeOrg);
     const shareSummary = extractAktieslagVotingSummary(rawItem);
 
     const validFrom = fi.payload_created_at ? new Date(fi.payload_created_at) : new Date();
@@ -104,7 +116,7 @@ export class OwnershipBvIngestionService {
         })
         .where({
           tenantId,
-          ownedOrganisationNumber: organisationsnummer,
+          ownedOrganisationNumber: safeOrg,
           isCurrent: true,
           ingestionSource: BV_FI_ORG_ENGAGEMENT_INGESTION_SOURCE,
         })
