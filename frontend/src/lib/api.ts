@@ -603,6 +603,32 @@ export const api = {
       txt: { objectKey: string; url: string; expiresInSeconds: number };
     }>(`/bolagsverket-bulk/runs/${encodeURIComponent(runId)}/files`);
   },
+  async getBulkRuntimeSafety() {
+    return request<{
+      status: 'ok' | 'warning';
+      checkedAt: string;
+      redis: {
+        maxmemoryPolicy: string | null;
+        expectedPolicy: string;
+        safeForBullQueues: boolean;
+        error: string | null;
+      };
+      bulkIngestionSafety: {
+        batchSize: number;
+        maxTxtBytes: number;
+        yieldEveryLines: number;
+        baseChunkPauseMs: number;
+        autoThrottleEnabled: boolean;
+        autoThrottleMaxPauseMs: number;
+        autoThrottleMemWarnMb: number;
+        autoThrottleMemHardMb: number;
+        autoThrottleLagWarnMs: number;
+        autoThrottleLagHardMs: number;
+        queueConcurrency: number;
+      };
+      warnings: string[];
+    }>('/bolagsverket-bulk/ops/runtime-safety');
+  },
   async exportBulkOpsCsv(
     type: 'tenant_usage' | 'run_deltas',
     filters?: { weekStart?: string; tenantId?: string; planCode?: string },

@@ -308,6 +308,7 @@ Sensitive operations are platform-admin only (role + optional platform tenant ga
 | GET | `/bolagsverket-bulk/runs` | List weekly runs | JWT + scope `companies:read` + platform-admin check |
 | GET | `/bolagsverket-bulk/runs/:runId/files` | Get presigned ZIP/TXT archive links | same |
 | GET | `/bolagsverket-bulk/ops/dashboard` | Ops dashboard summary (+ filters + tenant paging + charts) | same |
+| GET | `/bolagsverket-bulk/ops/runtime-safety` | Startup/runtime safety report (Redis eviction policy + ingestion throttle settings) | same |
 | GET | `/bolagsverket-bulk/ops/dashboard/export.csv` | Export `tenant_usage` / `run_deltas` CSV (+ audit trail) | same |
 | GET | `/bolagsverket-bulk/companies` | List shallow universe | JWT + scope `companies:read` |
 | GET | `/bolagsverket-bulk/companies/:organisationNumber` | Shallow company detail | JWT + scope `companies:read` |

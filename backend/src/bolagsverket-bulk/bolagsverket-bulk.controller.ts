@@ -80,6 +80,12 @@ export class BolagsverketBulkController {
     });
   }
 
+  @Get('ops/runtime-safety')
+  getRuntimeSafety(@Req() req: Request) {
+    this.assertPlatformAdmin(req);
+    return this.bulkService.getRuntimeSafetyReport();
+  }
+
   @Get('ops/dashboard/export.csv')
   async exportOpsDashboardCsv(
     @Req() req: Request,

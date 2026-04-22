@@ -648,6 +648,58 @@ export class BolagsverketBulkService {
     };
   }
 
+  async getRuntimeSafetyReport(): Promise<Record<string, unknown>> {
+    const expectedPolicy = 'noeviction';
+    let redisPolicy: string | null = null;
+    let redisInfoError: string | null = null;
+    try {
+      const client = (await this.queue.client) as {
+        config: (subcommand: string, key: string) => Promise<string[]>;
+      };
+      const rows = await client.config('GET', 'maxmemory-policy');
+      redisPolicy = Array.isArray(rows) && rows.length >= 2 ? rows[1] : null;
+    } catch (err) {
+      redisInfoError = err instanceof Error ? err.message : String(err);
+    }
+
+    const cfg = {
+      batchSize: Number(this.config.get<number>('BV_BULK_BATCH_SIZE', 500)),
+      maxTxtBytes: Number(this.config.get<number>('BV_BULK_MAX_TXT_BYTES', 350_000_000)),
+      yieldEveryLines: Number(this.config.get<number>('BV_BULK_YIELD_EVERY_LINES', 5000)),
+      baseChunkPauseMs: Number(this.config.get<number>('BV_BULK_CHUNK_PAUSE_MS', 5)),
+      autoThrottleEnabled:
+        String(this.config.get<string>('BV_BULK_AUTO_THROTTLE_ENABLED', 'true')).toLowerCase() === 'true',
+      autoThrottleMaxPauseMs: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MAX_PAUSE_MS', 100)),
+      autoThrottleMemWarnMb: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MEM_WARN_MB', 350)),
+      autoThrottleMemHardMb: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MEM_HARD_MB', 500)),
+      autoThrottleLagWarnMs: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_EVENT_LOOP_WARN_MS', 80)),
+      autoThrottleLagHardMs: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_EVENT_LOOP_HARD_MS', 140)),
+      queueConcurrency: 1,
+    };
+
+    const warnings: string[] = [];
+    if (!redisPolicy) warnings.push('Unable to read Redis maxmemory-policy.');
+    if (redisPolicy && redisPolicy !== expectedPolicy) {
+      warnings.push(`Redis eviction policy is "${redisPolicy}" (recommended "${expectedPolicy}" for queues).`);
+    }
+    if (cfg.batchSize > 1000) warnings.push('BV_BULK_BATCH_SIZE is high for low-memory tiers; prefer <= 500.');
+    if (!cfg.autoThrottleEnabled) warnings.push('Auto-throttle is disabled; ingestion may impact API latency on small instances.');
+    if (cfg.autoThrottleMaxPauseMs < 20) warnings.push('Auto-throttle max pause is low; burst pressure may still occur under load.');
+
+    return {
+      status: warnings.length === 0 ? 'ok' : 'warning',
+      checkedAt: new Date().toISOString(),
+      redis: {
+        maxmemoryPolicy: redisPolicy,
+        expectedPolicy,
+        safeForBullQueues: redisPolicy === expectedPolicy,
+        error: redisInfoError,
+      },
+      bulkIngestionSafety: cfg,
+      warnings,
+    };
+  }
+
   private async applyStaleEnrichedPolicy(): Promise<void> {
     const days = Math.max(1, Number(this.config.get<number>('BV_BULK_ENRICH_STALE_DAYS', 30)));
     await this.currentRepo

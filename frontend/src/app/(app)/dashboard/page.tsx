@@ -49,6 +49,8 @@ export default function DashboardPage() {
   const [opsLoading, setOpsLoading] = useState(false);
   const [forceSourceUrl, setForceSourceUrl] = useState('');
   const [opsActionMsg, setOpsActionMsg] = useState('');
+  const [runtimeSafety, setRuntimeSafety] = useState<Awaited<ReturnType<typeof api.getBulkRuntimeSafety>> | null>(null);
+  const [runtimeSafetyNowTick, setRuntimeSafetyNowTick] = useState(Date.now());
 
   useEffect(() => {
     Promise.all([
@@ -68,6 +70,12 @@ export default function DashboardPage() {
           ops,
           adminOpsAccess: !!ops,
         });
+        if (ops) {
+          void api
+            .getBulkRuntimeSafety()
+            .then(setRuntimeSafety)
+            .catch(() => setRuntimeSafety(null));
+        }
       })
       .catch((err: { message?: string }) => setError(err?.message ?? 'Could not load dashboard.'));
   }, []);
@@ -83,7 +91,10 @@ export default function DashboardPage() {
         tenantPage,
         tenantLimit,
       })
-      .then((ops) => setData((prev) => (prev ? { ...prev, ops } : prev)))
+      .then((ops) => {
+        setData((prev) => (prev ? { ...prev, ops } : prev));
+        return api.getBulkRuntimeSafety().then(setRuntimeSafety).catch(() => setRuntimeSafety(null));
+      })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed loading ops dashboard'))
       .finally(() => setOpsLoading(false));
   };
@@ -102,6 +113,7 @@ export default function DashboardPage() {
       .then((ops) => {
         setTenantPage(nextPage);
         setData((prev) => (prev ? { ...prev, ops } : prev));
+        return api.getBulkRuntimeSafety().then(setRuntimeSafety).catch(() => setRuntimeSafety(null));
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed loading ops dashboard'))
       .finally(() => setOpsLoading(false));
@@ -127,8 +139,30 @@ export default function DashboardPage() {
       .catch((e) => setError(e instanceof Error ? e.message : 'CSV export failed'));
   };
 
+  useEffect(() => {
+    if (!data?.adminOpsAccess) return;
+    const intervalMs = 45_000;
+    const timer = setInterval(() => {
+      void api
+        .getBulkRuntimeSafety()
+        .then((s) => {
+          setRuntimeSafety(s);
+          setRuntimeSafetyNowTick(Date.now());
+        })
+        .catch(() => void 0);
+    }, intervalMs);
+    const tickTimer = setInterval(() => setRuntimeSafetyNowTick(Date.now()), 1000);
+    return () => {
+      clearInterval(timer);
+      clearInterval(tickTimer);
+    };
+  }, [data?.adminOpsAccess]);
+
   if (error) return <ErrorState title="Dashboard unavailable" message={error} />;
   if (!data) return <LoadingSkeleton lines={6} />;
+  const runtimeSecondsAgo = runtimeSafety?.checkedAt
+    ? Math.max(0, Math.floor((runtimeSafetyNowTick - new Date(runtimeSafety.checkedAt).getTime()) / 1000))
+    : null;
 
   return (
     <section className="space-y-6">
@@ -236,6 +270,25 @@ export default function DashboardPage() {
               </p>
               <p className="text-[10px] uppercase text-muted-foreground">{data.ops.weekly_run.health_score.color}</p>
             </article>
+            {runtimeSafety ? (
+              <article className="border border-border-light p-3">
+                <p className="mono-label text-[10px] text-muted-foreground">Runtime safety</p>
+                <p
+                  className={`mt-1 text-2xl ${
+                    runtimeSafety.status === 'ok'
+                      ? 'text-emerald-700'
+                      : runtimeSafety.warnings.length <= 2
+                        ? 'text-amber-700'
+                        : 'text-destructive'
+                  }`}
+                >
+                  {runtimeSafety.status === 'ok' ? 'GREEN' : runtimeSafety.warnings.length <= 2 ? 'YELLOW' : 'RED'}
+                </p>
+                <p className="text-[10px] uppercase text-muted-foreground">
+                  Redis: {runtimeSafety.redis.maxmemoryPolicy ?? 'unknown'}
+                </p>
+              </article>
+            ) : null}
           </div>
           {data.ops.weekly_run.health_score.reasons.length > 0 ? (
             <ul className="list-inside list-disc text-xs text-muted-foreground">
@@ -243,6 +296,66 @@ export default function DashboardPage() {
                 <li key={r}>{r}</li>
               ))}
             </ul>
+          ) : null}
+          {runtimeSafety ? (
+            <article className="border border-border-light p-4">
+              <div className="flex items-center justify-between">
+                <p className="mono-label text-[10px] text-muted-foreground">Runtime safety diagnostics</p>
+                <div className="flex items-center gap-2">
+                  {runtimeSecondsAgo != null ? (
+                    <p className="text-[10px] text-muted-foreground">Last checked {runtimeSecondsAgo}s ago</p>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="min-h-8 px-3 py-1 text-[10px]"
+                    onClick={() => {
+                      void api
+                        .getBulkRuntimeSafety()
+                        .then((s) => {
+                          setRuntimeSafety(s);
+                          setRuntimeSafetyNowTick(Date.now());
+                        })
+                        .catch((e) => setError(e instanceof Error ? e.message : 'Failed loading runtime safety'));
+                    }}
+                  >
+                    Refresh safety
+                  </Button>
+                </div>
+              </div>
+              <div className="mt-2 grid gap-3 text-xs md:grid-cols-3">
+                <div className="border border-border-light p-2">
+                  <p className="font-semibold">Redis policy</p>
+                  <p className="mt-1 font-mono">{runtimeSafety.redis.maxmemoryPolicy ?? 'unknown'}</p>
+                  <p className="text-muted-foreground">Expected: {runtimeSafety.redis.expectedPolicy}</p>
+                </div>
+                <div className="border border-border-light p-2">
+                  <p className="font-semibold">Throttle</p>
+                  <p className="mt-1 font-mono">
+                    auto={String(runtimeSafety.bulkIngestionSafety.autoThrottleEnabled)} / basePause={runtimeSafety.bulkIngestionSafety.baseChunkPauseMs}ms
+                  </p>
+                  <p className="text-muted-foreground">maxPause={runtimeSafety.bulkIngestionSafety.autoThrottleMaxPauseMs}ms</p>
+                </div>
+                <div className="border border-border-light p-2">
+                  <p className="font-semibold">Ingestion limits</p>
+                  <p className="mt-1 font-mono">
+                    batch={runtimeSafety.bulkIngestionSafety.batchSize} / yield={runtimeSafety.bulkIngestionSafety.yieldEveryLines}
+                  </p>
+                  <p className="text-muted-foreground">
+                    maxTXT={Math.round(runtimeSafety.bulkIngestionSafety.maxTxtBytes / (1024 * 1024))}MB
+                  </p>
+                </div>
+              </div>
+              {runtimeSafety.warnings.length > 0 ? (
+                <ul className="mt-2 list-inside list-disc text-xs text-muted-foreground">
+                  {runtimeSafety.warnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-xs text-emerald-700">No runtime safety warnings detected.</p>
+              )}
+            </article>
           ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
