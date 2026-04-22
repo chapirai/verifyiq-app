@@ -532,6 +532,19 @@ export class BolagsverketService {
 
     const normalisedData = this.mapper.map(highValueDataset, organisationInformation, identitetsbeteckning);
 
+    // Align lookup / snapshot `company` with HVD dokumentlista (same source as `documents` on the profile).
+    // Mapper leaves documentList null; filling here avoids an empty list in the API response when lista succeeded.
+    const dokumentRows = (documents?.dokument ?? []).filter((d) => !d.fel);
+    if (dokumentRows.length > 0) {
+      normalisedData.documentList = dokumentRows.map((d) => ({
+        dokumentId: d.dokumentId ?? d.DokumentId,
+        filformat: d.filformat,
+        rapporteringsperiodTom: d.rapporteringsperiodTom,
+        registreringstidpunkt: d.registreringstidpunkt,
+        dokumenttyp: typeof d.dokumenttyp === 'string' ? d.dokumenttyp : undefined,
+      }));
+    }
+
     let bolagsverketApiCallCount = ENRICH_API_CALL_COUNT_BASE + (vhEnabled ? 1 : 0);
     let organisationEngagementsAggregated: OrganisationsengagemangResponse | null = null;
     let relatedPersonInformation: Record<string, PersonResponse> | undefined;

@@ -2147,6 +2147,14 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
         </div>
       ) : null}
 
+      {tab === 'financials' ? (
+        <WorkspaceCallout
+          tone="info"
+          title="Two separate financial sources"
+          message="Årsredovisning below uses GET /annual-reports/companies/…/financial-comparison and …/workspace-read-model (parsed iXBRL from HVD ZIPs stored in your tenant). It does not call Företagsinformation v4. The FI finansiella rapporter table under it reads only bv_read.company_fi_reports_current from Bolagsverket FI — that block can stay empty while annual-report tables and HVD document downloads still work."
+        />
+      ) : null}
+
       {tab === 'annualParsed' || tab === 'financials' ? (
         <Panel title="Årsredovisning — extraherade nyckeltal (iXBRL)" badge="annual_report_xbrl + serving">
           <AnnualReportsWorkspacePanel orgNumber={org} />
