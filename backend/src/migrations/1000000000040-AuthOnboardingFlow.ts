@@ -4,6 +4,8 @@ export class AuthOnboardingFlow1000000000040 implements MigrationInterface {
   name = 'AuthOnboardingFlow1000000000040';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+
     await queryRunner.query(`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS status VARCHAR(64) NOT NULL DEFAULT 'active',
