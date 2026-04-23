@@ -4,10 +4,10 @@ const VIEWBOX_WIDTH = 1000;
 const VIEWBOX_HEIGHT = 520;
 
 const frame = {
-  left: 120,
-  right: 920,
-  top: 80,
-  bottom: 430,
+  left: Math.round(VIEWBOX_WIDTH * 0.1),
+  right: Math.round(VIEWBOX_WIDTH * 0.9),
+  top: Math.round(VIEWBOX_HEIGHT * 0.12),
+  bottom: Math.round(VIEWBOX_HEIGHT * 0.85),
 };
 
 function curveY(x: number): number {
@@ -17,13 +17,13 @@ function curveY(x: number): number {
 }
 
 function rawDots(): Dot[] {
-  const rows = 6;
+  const rows = 7;
   const cols = 5;
   const dots: Dot[] = [];
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const x = frame.left + 24 + c * 38 + (r % 2) * 6;
-      const y = frame.bottom - 18 - r * 44 + (c % 2) * 6;
+      const x = frame.left + 18 + c * 40 + (r % 2) * 8;
+      const y = frame.bottom - 12 - r * 42 + (c % 2) * 7;
       dots.push({ x, y, r: 3, opacity: 0.25 + ((r + c) % 3) * 0.03 });
     }
   }
@@ -32,10 +32,10 @@ function rawDots(): Dot[] {
 
 function structuredClusters(): Dot[] {
   const centers = [
-    { x: 430, y: 286 },
-    { x: 500, y: 248 },
-    { x: 562, y: 210 },
-    { x: 612, y: 178 },
+    { x: 420, y: curveY(420) + 8 },
+    { x: 500, y: curveY(500) + 4 },
+    { x: 560, y: curveY(560) - 2 },
+    { x: 610, y: curveY(610) - 8 },
   ];
   const offsets = [
     { x: -8, y: -8 },
@@ -59,11 +59,11 @@ function structuredClusters(): Dot[] {
 }
 
 function verifiedDots(): Dot[] {
-  const xs = [702, 748, 790, 828, 862];
+  const xs = [700, 740, 780, 822, 860, 890];
   return xs.map((x, i) => ({
     x,
-    y: curveY(x) - (i % 2 === 0 ? 0 : 6),
-    r: i === 2 ? 6 : 5,
+    y: curveY(x) - (i % 2 === 0 ? 2 : 8),
+    r: i === 2 || i === 4 ? 6 : 5,
     opacity: 0.9,
   }));
 }
@@ -82,14 +82,14 @@ export function DataMaturityGraph() {
   const raw = rawDots();
   const structured = structuredClusters();
   const verified = verifiedDots();
-  const keyNodeX = 640;
-  const keyNodeY = curveY(keyNodeX);
+  const keyNodeX = 650;
+  const keyNodeY = curveY(keyNodeX) - 4;
 
   return (
     <div className="mt-6 w-full rounded-[8px] border border-foreground/15 px-12 py-10">
       <svg
         viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
-        className="h-[85%] min-h-[360px] w-full"
+        className="h-[88%] min-h-[420px] w-full"
         role="img"
         aria-label="Graph showing progression from unstructured data to decision-ready outputs"
       >
@@ -99,26 +99,26 @@ export function DataMaturityGraph() {
         </g>
 
         <g aria-label="axis labels" fill="currentColor">
-          <text x={(frame.left + frame.right) / 2} y={frame.bottom + 48} textAnchor="middle" fontSize="12" letterSpacing="0.08em">
+          <text x={(frame.left + frame.right) / 2} y={frame.bottom + 52} textAnchor="middle" fontSize="12" letterSpacing="0.08em">
             DATA MATURITY
           </text>
-          <text x={frame.left + (frame.right - frame.left) * 0.1} y={frame.bottom + 24} textAnchor="middle" fontSize="12" fillOpacity="0.7">
+          <text x={frame.left + (frame.right - frame.left) * 0.1} y={frame.bottom + 28} textAnchor="middle" fontSize="12" fillOpacity="0.7">
             Raw
           </text>
-          <text x={frame.left + (frame.right - frame.left) * 0.5} y={frame.bottom + 24} textAnchor="middle" fontSize="12" fillOpacity="0.7">
+          <text x={frame.left + (frame.right - frame.left) * 0.5} y={frame.bottom + 28} textAnchor="middle" fontSize="12" fillOpacity="0.7">
             Structured
           </text>
-          <text x={frame.left + (frame.right - frame.left) * 0.9} y={frame.bottom + 24} textAnchor="middle" fontSize="12" fillOpacity="0.7">
+          <text x={frame.left + (frame.right - frame.left) * 0.9} y={frame.bottom + 28} textAnchor="middle" fontSize="12" fillOpacity="0.7">
             Verified
           </text>
 
           <text
-            x={40}
+            x={36}
             y={(frame.top + frame.bottom) / 2}
             textAnchor="middle"
             fontSize="12"
             letterSpacing="0.08em"
-            transform={`rotate(-90 40 ${(frame.top + frame.bottom) / 2})`}
+            transform={`rotate(-90 36 ${(frame.top + frame.bottom) / 2})`}
           >
             DECISION CONFIDENCE
           </text>
@@ -132,7 +132,7 @@ export function DataMaturityGraph() {
 
         <g aria-label="confidence progression curve">
           <path
-            d={`M ${frame.left + 8} ${frame.bottom - 6} C 300 390, 470 260, 700 150 C 780 116, 850 90, ${frame.right - 8} ${frame.top + 12}`}
+            d={`M ${frame.left + 10} ${frame.bottom - 10} C 280 430, 430 300, 590 200 C 710 126, 810 84, ${frame.right - 8} ${frame.top + 8}`}
             fill="none"
             stroke="currentColor"
             strokeWidth="2.5"
@@ -141,7 +141,7 @@ export function DataMaturityGraph() {
 
         <g aria-label="raw unstructured data points">
           <DotCloud dots={raw} />
-          <text x={frame.left + 18} y={frame.bottom - 292} fontSize="12" fillOpacity="0.6">
+          <text x={frame.left + 8} y={frame.bottom - 320} fontSize="12" fillOpacity="0.6">
             Unstructured data
           </text>
         </g>
@@ -152,20 +152,20 @@ export function DataMaturityGraph() {
 
         <g aria-label="unified company profile key node">
           <circle cx={keyNodeX} cy={keyNodeY} r={8} fill="currentColor" />
-          <text x={keyNodeX} y={keyNodeY - 16} textAnchor="middle" fontSize="12" fontWeight="500">
+          <text x={keyNodeX} y={keyNodeY - 22} textAnchor="middle" fontSize="12" fontWeight="500">
             Unified Company Profile
           </text>
         </g>
 
         <g aria-label="verified high-confidence outputs">
           <DotCloud dots={verified} />
-          <text x={882} y={156} fontSize="12" fillOpacity="0.8">
+          <text x={904} y={150} fontSize="12" fillOpacity="0.8">
             Risk signals
           </text>
-          <text x={882} y={174} fontSize="12" fillOpacity="0.8">
+          <text x={904} y={172} fontSize="12" fillOpacity="0.8">
             Flags
           </text>
-          <text x={882} y={192} fontSize="12" fillOpacity="0.8">
+          <text x={904} y={194} fontSize="12" fillOpacity="0.8">
             Decision-ready output
           </text>
         </g>
