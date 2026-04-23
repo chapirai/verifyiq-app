@@ -428,17 +428,23 @@ export class BolagsverketBulkService {
       this.usageEventRepo
         .createQueryBuilder('u')
         .select('u.tenantId', 'tenantId')
-        .addSelect(`COALESCE(SUM(CASE WHEN (u.costImpact->>'apiCallCount') ~ '^[0-9]+$' THEN (u.costImpact->>'apiCallCount')::int ELSE 0 END), 0)`, 'apiCalls')
+        .addSelect(
+          `COALESCE(SUM(CASE WHEN (u.cost_impact->>'apiCallCount') ~ '^[0-9]+$' THEN (u.cost_impact->>'apiCallCount')::int ELSE 0 END), 0)`,
+          'apiCalls',
+        )
         .where('u.createdAt >= :from', { from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) })
         .groupBy('u.tenantId')
         .getRawMany<{ tenantId: string; apiCalls: string }>(),
       this.usageEventRepo
         .createQueryBuilder('u')
-        .select(`DATE_TRUNC('day', u.createdAt)`, 'day')
-        .addSelect(`COALESCE(SUM(CASE WHEN (u.costImpact->>'apiCallCount') ~ '^[0-9]+$' THEN (u.costImpact->>'apiCallCount')::int ELSE 0 END), 0)`, 'apiCalls')
+        .select(`DATE_TRUNC('day', u.created_at)`, 'day')
+        .addSelect(
+          `COALESCE(SUM(CASE WHEN (u.cost_impact->>'apiCallCount') ~ '^[0-9]+$' THEN (u.cost_impact->>'apiCallCount')::int ELSE 0 END), 0)`,
+          'apiCalls',
+        )
         .where('u.createdAt >= :from', { from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) })
-        .groupBy(`DATE_TRUNC('day', u.createdAt)`)
-        .orderBy(`DATE_TRUNC('day', u.createdAt)`, 'ASC')
+        .groupBy(`DATE_TRUNC('day', u.created_at)`)
+        .orderBy(`DATE_TRUNC('day', u.created_at)`, 'ASC')
         .getRawMany<{ day: string; apiCalls: string }>(),
     ]);
 

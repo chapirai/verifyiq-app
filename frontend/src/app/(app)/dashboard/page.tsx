@@ -20,14 +20,15 @@ function weekToIsoDate(weekVal: string): string | undefined {
   return d.toISOString().slice(0, 10);
 }
 
+/** ISO-style week label using UTC so SSR and browser agree (avoids hydration mismatches on `<input type="week" />`). */
 function defaultWeekInput(): string {
   const now = new Date();
-  const day = now.getDay() || 7;
-  const thursday = new Date(now);
-  thursday.setDate(now.getDate() + (4 - day));
-  const yearStart = new Date(thursday.getFullYear(), 0, 1);
+  const day = now.getUTCDay() || 7;
+  const thursday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  thursday.setUTCDate(thursday.getUTCDate() + (4 - day));
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
   const week = Math.ceil((((thursday.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${thursday.getFullYear()}-W${String(week).padStart(2, '0')}`;
+  return `${thursday.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
 function planLabel(planCode: string): string {
