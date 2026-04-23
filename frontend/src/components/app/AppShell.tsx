@@ -21,6 +21,7 @@ const navItems: Array<{ href: Route; label: string }> = [
   { href: '/api-keys', label: 'API access' },
   { href: '/api-oauth-clients', label: 'OAuth' },
   { href: '/api-sandbox', label: 'Sandbox' },
+  { href: '/help', label: 'User guide' },
   { href: '/settings', label: 'Settings' },
 ];
 
