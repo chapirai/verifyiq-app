@@ -10,6 +10,7 @@ export default () => ({
   REDIS_HOST: process.env.REDIS_HOST ?? 'localhost',
   REDIS_PORT: Number(process.env.REDIS_PORT ?? 6379),
   REDIS_PASSWORD: process.env.REDIS_PASSWORD ?? '',
+  REDIS_TLS: process.env.REDIS_TLS ?? 'false',
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
   INTEGRATION_TOKEN_ENCRYPTION_KEY: process.env.INTEGRATION_TOKEN_ENCRYPTION_KEY,

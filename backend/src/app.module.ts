@@ -70,8 +70,15 @@ import { BolagsverketBulkModule } from './bolagsverket-bulk/bolagsverket-bulk.mo
           host: config.getOrThrow<string>('REDIS_HOST'),
           port: config.getOrThrow<number>('REDIS_PORT'),
           password: config.get<string>('REDIS_PASSWORD') || undefined,
+          tls:
+            String(config.get<string>('REDIS_TLS', 'false')).toLowerCase() === 'true'
+              ? { rejectUnauthorized: false }
+              : undefined,
           enableReadyCheck: false,
           maxRetriesPerRequest: null,
+          connectTimeout: 15_000,
+          keepAlive: 10_000,
+          reconnectOnError: () => true,
           retryStrategy: (times: number) => Math.min(2000, Math.max(100, times * 100)),
         },
       }),

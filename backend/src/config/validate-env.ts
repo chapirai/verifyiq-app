@@ -12,6 +12,7 @@ const envSchema = z.object({
   REDIS_HOST: z.string().min(1),
   REDIS_PORT: z.coerce.number().int().positive(),
   REDIS_PASSWORD: z.string().default(''),
+  REDIS_TLS: z.enum(['true', 'false']).optional(),
   JWT_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
   INTEGRATION_TOKEN_ENCRYPTION_KEY: z.string().min(16).optional(),

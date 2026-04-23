@@ -21,8 +21,16 @@ export class ApiQuotaService {
       host: this.config.getOrThrow<string>('REDIS_HOST'),
       port: this.config.getOrThrow<number>('REDIS_PORT'),
       password: this.config.get<string>('REDIS_PASSWORD') || undefined,
+      tls:
+        String(this.config.get<string>('REDIS_TLS', 'false')).toLowerCase() === 'true'
+          ? { rejectUnauthorized: false }
+          : undefined,
       lazyConnect: true,
+      connectTimeout: 15_000,
+      keepAlive: 10_000,
+      reconnectOnError: () => true,
       maxRetriesPerRequest: 2,
+      retryStrategy: (times: number) => Math.min(2000, Math.max(100, times * 100)),
     });
     this.redis.on('error', (err: unknown) => {
       const now = Date.now();
