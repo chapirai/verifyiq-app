@@ -1,6 +1,7 @@
 import { Footer } from '@/components/sections/Footer';
 import { Navbar } from '@/components/sections/Navbar';
 import { Pricing } from '@/components/sections/Pricing';
+import { DataMaturityGraph } from '@/components/sections/DataMaturityGraph';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Container';
 import {
@@ -115,76 +116,7 @@ export default function HomePage() {
               <div>
                 <p className="mono-label text-xs text-muted-foreground">{visualBlock.kicker}</p>
                 <p className="font-display mt-2 text-2xl text-foreground">{visualBlock.title}</p>
-                <div
-                  className="group relative mt-6 max-w-md border-2 border-foreground bg-background p-0 transition-all duration-100 lg:ml-auto"
-                  style={{ width: '100%' }}
-                >
-                  <div className="border-2 border-foreground p-0 transition-all duration-300 [transition-property:transform] group-hover:border-4 group-hover:duration-100">
-                    <div className="relative aspect-[16/10] overflow-hidden border-0 border-foreground p-4 md:p-5">
-                      <svg viewBox="0 0 640 320" className="h-full w-full" aria-label="Data maturity and decision confidence graph">
-                        <rect x="0" y="0" width="640" height="320" fill="white" />
-                        <line x1="72" y1="266" x2="610" y2="266" stroke="currentColor" strokeWidth="2" />
-                        <line x1="72" y1="266" x2="72" y2="28" stroke="currentColor" strokeWidth="2" />
-                        <text x="610" y="292" textAnchor="end" fontSize="13" className="font-mono">
-                          Data maturity
-                        </text>
-                        <text x="22" y="36" fontSize="13" className="font-mono">
-                          Decision confidence
-                        </text>
-                        <text x="84" y="286" fontSize="12" className="font-mono">
-                          Raw
-                        </text>
-                        <text x="292" y="286" fontSize="12" className="font-mono">
-                          Structured
-                        </text>
-                        <text x="520" y="286" fontSize="12" className="font-mono">
-                          Verified
-                        </text>
-
-                        <circle cx="116" cy="220" r="4" fill="currentColor" opacity="0.35" />
-                        <circle cx="136" cy="188" r="3.5" fill="currentColor" opacity="0.3" />
-                        <circle cx="160" cy="238" r="4" fill="currentColor" opacity="0.35" />
-                        <circle cx="178" cy="205" r="3.5" fill="currentColor" opacity="0.28" />
-                        <circle cx="202" cy="226" r="4" fill="currentColor" opacity="0.3" />
-                        <text x="104" y="168" fontSize="12" className="font-mono">
-                          Unstructured inputs
-                        </text>
-
-                        <circle cx="320" cy="182" r="6" fill="currentColor" opacity="0.55" />
-                        <circle cx="340" cy="172" r="6" fill="currentColor" opacity="0.6" />
-                        <circle cx="360" cy="178" r="6" fill="currentColor" opacity="0.5" />
-                        <circle cx="334" cy="196" r="6" fill="currentColor" opacity="0.52" />
-                        <circle cx="354" cy="196" r="6" fill="currentColor" opacity="0.56" />
-                        <rect x="272" y="132" width="166" height="28" fill="white" stroke="currentColor" strokeWidth="1.5" />
-                        <text x="355" y="150" textAnchor="middle" fontSize="12">
-                          Unified Company Profile
-                        </text>
-
-                        <circle cx="510" cy="116" r="7" fill="currentColor" />
-                        <circle cx="536" cy="98" r="8" fill="currentColor" />
-                        <circle cx="560" cy="82" r="7" fill="currentColor" />
-                        <line x1="524" y1="94" x2="590" y2="62" stroke="currentColor" strokeWidth="2" />
-                        <text x="564" y="58" fontSize="12" className="font-mono">
-                          Decision ready
-                        </text>
-                        <text x="472" y="138" fontSize="12" className="font-mono">
-                          Risk signals
-                        </text>
-
-                        <path
-                          d="M94,228 C168,226 232,214 286,188 C340,162 404,138 474,108 C520,88 552,76 582,62"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeDasharray="6 6"
-                        />
-                        <text x="226" y="84" fontSize="12" className="font-mono">
-                          Progression: noisy → structured → high-confidence
-                        </text>
-                      </svg>
-                    </div>
-                  </div>
-                </div>
+                <DataMaturityGraph />
                 <ol className="mt-4 space-y-2 text-sm md:text-base">
                   {visualBlock.steps.map((step, i) => (
                     <li key={step} className="flex items-start gap-2 border-b border-border-light pb-1">
@@ -299,11 +231,6 @@ export default function HomePage() {
         <section id="workflow" className="site-divider py-24 md:py-32">
           <Container>
             <p className="mono-label text-xs text-muted-foreground">{workflow.kicker}</p>
-            <div className="mt-4 overflow-x-auto pb-1">
-              <h2 className="min-w-max font-display text-[clamp(1.5rem,4vw,4.4rem)] leading-[1] tracking-tight text-foreground whitespace-nowrap">
-                {workflow.line}
-              </h2>
-            </div>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground md:text-lg">{workflow.sub}</p>
             <div className="mt-10 border-t-4 border-foreground pt-8">
               <ol className="grid gap-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
