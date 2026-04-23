@@ -535,7 +535,7 @@ export default function DashboardPage() {
         </section>
       ) : (
         <article className="border border-border-light p-4 text-sm text-muted-foreground">
-          Platform operations dashboard is visible to platform admin only.
+          Operations dashboard is currently unavailable.
         </article>
       )}
       <div className="grid gap-4 lg:grid-cols-2">

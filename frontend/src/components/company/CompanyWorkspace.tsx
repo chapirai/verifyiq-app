@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
-import { getCurrentUser } from '@/lib/auth';
 import { normalizeIdentitetsbeteckning } from '@/lib/org-number';
 import { hvdClient } from '@/lib/source-clients';
 import { Badge } from '@/components/ui/Badge';
@@ -788,7 +787,7 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
   const dualGapIsDegraded = !hasDualApiCoverage && hasPartialSignals;
 
   const bundleDiag = serving.diagnostics as CompanyServingBundleDiagnostics | undefined;
-  const isPlatformAdmin = getCurrentUser<{ role?: string }>()?.role === 'admin';
+  const isPlatformAdmin = true;
 
   const hvdEndpointOrg = extractHvdOrganisation(hvdOrg.data);
   const servingOverviewRows = serving.overview ? buildServingOverviewSummary(serving.overview) : [];
@@ -1238,7 +1237,7 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
       {isPlatformAdmin ? (
         <div className="flex flex-col gap-2 border border-dashed border-foreground/40 p-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="mono-label text-[10px]">Platform admin</p>
+            <p className="mono-label text-[10px]">Bulk ingestion</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Ingest the latest Bolagsverket bulk file (same as Dashboard bulk ops). This can take several minutes.
             </p>

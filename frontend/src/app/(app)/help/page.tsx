@@ -26,7 +26,7 @@ export default function HelpPage() {
         <h2 className="font-display text-3xl">How to trigger full BV bulk ingestion</h2>
         <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
           <li>Open sidebar item <strong>Overview</strong> (route <code>/dashboard</code>).</li>
-          <li>Find panel <strong>Operations dashboard</strong> (only visible for platform admin).</li>
+          <li>Find panel <strong>Operations dashboard</strong> in <code>/dashboard</code>.</li>
           <li>
             Click <strong>Force download + full ingest</strong>. This starts:
             download ZIP -&gt; extract TXT -&gt; parse -&gt; apply upserts.
