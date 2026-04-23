@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
+import { AuthShell } from '@/components/auth/AuthShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api, ApiError } from '@/lib/api';
@@ -34,25 +35,32 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="site-divider min-h-screen py-20">
-      <div className="editorial-container max-w-2xl">
-        <div className="border-2 border-foreground p-8 md:p-10">
-          <p className="mono-label text-[10px]">Account Access</p>
-          <h1 className="font-display mt-4 text-5xl">Login</h1>
-          <form className="mt-10 space-y-5" onSubmit={onSubmit}>
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Work email" type="email" required />
-            <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" required />
-            {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? 'Signing in...' : 'Sign in'}
-            </Button>
-          </form>
-          <div className="mt-6 flex justify-between text-sm">
-            <Link href="/forgot-password" className="underline underline-offset-4">Forgot password</Link>
-            <Link href="/signup" className="underline underline-offset-4">Create account</Link>
-          </div>
+    <AuthShell
+      kicker="Account access"
+      title="Login"
+      footer={
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <Link href="/forgot-password" className="link-auth w-fit">
+            Forgot password
+          </Link>
+          <Link href="/signup" className="link-auth w-fit sm:text-right">
+            Create account
+          </Link>
         </div>
-      </div>
-    </main>
+      }
+    >
+      <form className="mt-10 space-y-5" onSubmit={onSubmit}>
+        <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Work email" type="email" required />
+        <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" required />
+        {error ? (
+          <p className="border-l-4 border-foreground pl-3 text-sm text-muted-foreground" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <Button type="submit" className="w-full" disabled={submitting}>
+          {submitting ? 'Signing in...' : 'Sign in'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
+import { AuthShell } from '@/components/auth/AuthShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
@@ -34,7 +35,7 @@ export default function ResetPasswordPage() {
     setSubmitting(true);
     try {
       await api.resetPassword(token, password);
-      setMessage('Password reset successful. You can now log in.');
+      setMessage('Password reset successful. You can now sign in.');
     } catch (err) {
       const text = err instanceof Error ? err.message : 'Reset failed.';
       setError(text);
@@ -44,23 +45,48 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <main className="site-divider min-h-screen py-20">
-      <div className="editorial-container max-w-2xl">
-        <div className="border-2 border-foreground p-8 md:p-10">
-          <p className="mono-label text-[10px]">Reset Link</p>
-          <h1 className="font-display mt-4 text-5xl">Reset password</h1>
-          <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-            <Input type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            <Input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-            {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
-            {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-            <Button className="w-full" disabled={submitting}>{submitting ? 'Saving...' : 'Reset password'}</Button>
-          </form>
-          <p className="mt-6 text-sm">
-            Return to <Link href="/login" className="underline underline-offset-4">login</Link>
+    <AuthShell
+      kicker="Password reset"
+      title="Set a new password"
+      lead="Choose a new password for your account."
+      footer={
+        <p className="text-sm text-muted-foreground">
+          Return to{' '}
+          <Link href="/login" className="link-auth">
+            sign in
+          </Link>
+        </p>
+      }
+    >
+      <form className="mt-10 space-y-5" onSubmit={onSubmit}>
+        <Input
+          type="password"
+          placeholder="New password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <Input
+          type="password"
+          placeholder="Confirm new password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+        />
+        {error ? (
+          <p className="border-l-4 border-foreground pl-3 text-sm text-muted-foreground" role="alert">
+            {error}
           </p>
-        </div>
-      </div>
-    </main>
+        ) : null}
+        {message ? (
+          <p className="border-l-4 border-foreground pl-3 text-sm text-foreground" role="status">
+            {message}
+          </p>
+        ) : null}
+        <Button className="w-full" type="submit" disabled={submitting}>
+          {submitting ? 'Saving...' : 'Update password'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

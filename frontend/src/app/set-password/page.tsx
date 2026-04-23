@@ -1,11 +1,11 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { AuthShell } from '@/components/auth/AuthShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
-import { useEffect } from 'react';
 
 export default function SetPasswordPage() {
   const [token, setToken] = useState('');
@@ -35,7 +35,7 @@ export default function SetPasswordPage() {
     setSubmitting(true);
     try {
       await api.setPassword(token, password);
-      setMessage('Password set. Redirecting to app...');
+      setMessage('Password set. Redirecting to the app...');
       window.location.href = '/dashboard';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not set password.');
@@ -45,26 +45,41 @@ export default function SetPasswordPage() {
   };
 
   return (
-    <main className="site-divider min-h-screen py-20">
-      <div className="editorial-container max-w-2xl">
-        <div className="border-2 border-foreground p-8 md:p-10">
-          <p className="mono-label text-[10px]">Set password</p>
-          <h1 className="font-display mt-4 text-5xl">Create your password</h1>
-          <form className="mt-10 space-y-5" onSubmit={onSubmit}>
-            <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            <Input type="password" placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-            {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
-            {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? 'Saving...' : 'Set password'}
-            </Button>
-          </form>
-          <p className="mt-6 text-sm">
-            <Link href="/login" className="underline underline-offset-4">Back to login</Link>
+    <AuthShell
+      kicker="Account setup"
+      title="Create your password"
+      lead="This completes your email verification. Use a strong password you have not used elsewhere."
+      footer={
+        <p className="text-sm text-muted-foreground">
+          <Link href="/login" className="link-auth">
+            Back to sign in
+          </Link>
+        </p>
+      }
+    >
+      <form className="mt-10 space-y-5" onSubmit={onSubmit}>
+        <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <Input
+          type="password"
+          placeholder="Confirm password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+        />
+        {error ? (
+          <p className="border-l-4 border-foreground pl-3 text-sm text-muted-foreground" role="alert">
+            {error}
           </p>
-        </div>
-      </div>
-    </main>
+        ) : null}
+        {message ? (
+          <p className="border-l-4 border-foreground pl-3 text-sm text-foreground" role="status">
+            {message}
+          </p>
+        ) : null}
+        <Button type="submit" className="w-full" disabled={submitting}>
+          {submitting ? 'Saving...' : 'Set password'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }
-

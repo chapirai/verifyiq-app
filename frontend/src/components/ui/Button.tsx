@@ -14,7 +14,11 @@ interface ButtonProps {
 
 export function Button({ children, href, variant = 'primary', className = '', onClick, type = 'button', disabled }: ButtonProps) {
   const variantClass =
-    variant === 'primary' ? 'btn-primary' : variant === 'secondary' ? 'btn-secondary' : 'bg-transparent border-0 px-0 py-0 underline underline-offset-4';
+    variant === 'primary'
+      ? 'btn-primary'
+      : variant === 'secondary'
+        ? 'btn-secondary'
+        : 'bg-transparent border-0 px-0 py-0 underline-offset-4 hover:underline';
   const classes = `focus-outline ${variant === 'ghost' ? '' : 'btn-base'} ${variantClass} ${className}`;
 
   if (href) {

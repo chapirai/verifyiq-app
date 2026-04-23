@@ -17,12 +17,13 @@ services:
       timeout: 5s
       retries: 10
 
+  # maxmemory-policy=noeviction: required for reliable BullMQ / quota usage (no silent key eviction)
   redis:
     image: redis:7-alpine
     container_name: verifyiq-redis
     restart: unless-stopped
     command: >-
-      sh -c "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-server --requirepass \"$$REDIS_PASSWORD\"; else redis-server; fi"
+      sh -c "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-server --maxmemory-policy noeviction --requirepass \"$$REDIS_PASSWORD\"; else redis-server --maxmemory-policy noeviction; fi"
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     ports:

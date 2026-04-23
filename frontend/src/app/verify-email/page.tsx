@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { AuthShell } from '@/components/auth/AuthShell';
 import { api } from '@/lib/api';
 
 type VerifyState = 'loading' | 'success' | 'invalid' | 'expired' | 'error';
@@ -36,27 +37,35 @@ export default function VerifyEmailPage() {
       });
   }, [token]);
 
+  const title =
+    state === 'loading'
+      ? 'Verifying'
+      : state === 'success'
+        ? 'Verified'
+        : state === 'expired'
+          ? 'Link expired'
+          : 'Verification issue';
+
   return (
-    <main className="site-divider min-h-screen py-20">
-      <div className="editorial-container max-w-2xl">
-        <div className="border-2 border-foreground p-8 md:p-10">
-          <p className="mono-label text-[10px]">Verify email</p>
-          <h1 className="font-display mt-4 text-5xl">
-            {state === 'loading' ? 'Verifying...' : state === 'success' ? 'Verified' : 'Verification issue'}
-          </h1>
-          <p className="mt-4 text-muted-foreground">
-            {state === 'loading' && 'Checking your verification link.'}
-            {state === 'success' && 'Email verified. Redirecting to password setup.'}
-            {state === 'invalid' && 'This verification link is invalid.'}
-            {state === 'expired' && 'This verification link has expired.'}
-            {state === 'error' && (message || 'We could not verify your email.')}
-          </p>
-          <p className="mt-6 text-sm">
-            <Link href="/verify-email-pending" className="underline underline-offset-4">Request a new verification link</Link>
-          </p>
-        </div>
-      </div>
-    </main>
+    <AuthShell
+      kicker="Email"
+      title={title}
+      lead={
+        <>
+          {state === 'loading' && 'Checking your verification link.'}
+          {state === 'success' && 'Email verified. Taking you to password setup.'}
+          {state === 'invalid' && 'This verification link is not valid.'}
+          {state === 'expired' && 'This verification link has expired.'}
+          {state === 'error' && (message || 'We could not verify your email.')}
+        </>
+      }
+      footer={
+        <p className="text-sm text-muted-foreground">
+          <Link href="/verify-email-pending" className="link-auth">
+            Request a new verification link
+          </Link>
+        </p>
+      }
+    />
   );
 }
-

@@ -26,7 +26,11 @@ const config: Config = {
         instant: '100ms',
       },
       maxWidth: {
-        content: '1280px',
+        /* Editorial column: ~1152px (Tailwind 6xl) per Minimalist Monochrome */
+        content: '72rem',
+      },
+      fontSize: {
+        'display-hero': ['clamp(3rem,12vw,10rem)', { lineHeight: '0.95', letterSpacing: '-0.05em' }],
       },
     },
   },

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
+import { AuthShell } from '@/components/auth/AuthShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
@@ -20,29 +21,45 @@ export default function ForgotPasswordPage() {
       setMessage('If the account exists, a reset link has been sent.');
     } catch (err) {
       const text = err instanceof Error ? err.message.toLowerCase() : '';
-      setMessage(text.includes('too many') ? 'Please wait before requesting again.' : 'If the account exists, a reset link has been sent.');
+      setMessage(
+        text.includes('too many') ? 'Please wait before requesting again.' : 'If the account exists, a reset link has been sent.',
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <main className="site-divider min-h-screen py-20">
-      <div className="editorial-container max-w-2xl">
-        <div className="border-2 border-foreground p-8 md:p-10">
-          <p className="mono-label text-[10px]">Credential Recovery</p>
-          <h1 className="font-display mt-4 text-5xl">Forgot password</h1>
-          <p className="mt-4 text-muted-foreground">Enter your email and we will send a reset link if an account exists.</p>
-          <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-            <Input placeholder="Work email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
-            <Button className="w-full" disabled={submitting}>{submitting ? 'Sending...' : 'Request reset link'}</Button>
-          </form>
-          <p className="mt-6 text-sm">
-            Back to <Link href="/login" className="underline underline-offset-4">login</Link>
+    <AuthShell
+      kicker="Credential recovery"
+      title="Forgot password"
+      lead="Enter your work email. If an account exists, we will send a reset link."
+      footer={
+        <p className="text-sm text-muted-foreground">
+          Back to{' '}
+          <Link href="/login" className="link-auth">
+            sign in
+          </Link>
+        </p>
+      }
+    >
+      <form className="mt-10 space-y-5" onSubmit={onSubmit}>
+        <Input
+          placeholder="Work email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        {message ? (
+          <p className="border-l-4 border-foreground pl-3 text-sm text-muted-foreground" role="status">
+            {message}
           </p>
-        </div>
-      </div>
-    </main>
+        ) : null}
+        <Button className="w-full" type="submit" disabled={submitting}>
+          {submitting ? 'Sending...' : 'Request reset link'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }
