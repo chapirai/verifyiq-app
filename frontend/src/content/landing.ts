@@ -66,7 +66,7 @@ export const controlQuote = {
 
 export const visualBlock = {
   kicker: 'How it works',
-  title: 'From raw data to decision-ready insight',
+  title: 'From registry data to decision',
   steps: [
     'Company lookup',
     'Ownership resolution (UBO)',
@@ -139,15 +139,15 @@ export const accessTiers = [
 
 export const workflow = {
   kicker: 'Workflow',
-  line: 'Search → understand → verify → document → decide',
+  line: 'Source → Resolve → Analyze → Validate → Decide',
   sub: 'From first lookup to final decision — with full traceability.',
 } as const;
 
 const workflowSteps = [
-  { n: '01', label: 'Search' },
-  { n: '02', label: 'Understand' },
-  { n: '03', label: 'Verify' },
-  { n: '04', label: 'Document' },
+  { n: '01', label: 'Source' },
+  { n: '02', label: 'Resolve' },
+  { n: '03', label: 'Analyze' },
+  { n: '04', label: 'Validate' },
   { n: '05', label: 'Decide' },
 ] as const;
 export { workflowSteps };

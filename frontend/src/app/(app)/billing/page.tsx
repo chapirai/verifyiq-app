@@ -16,7 +16,7 @@ type PlanPresentation = {
 
 function planPresentation(plan: BillingPlan): PlanPresentation {
   const code = plan.code.toLowerCase();
-  if (code.includes('enterprise')) {
+  if (code === 'pro' || code.includes('enterprise')) {
     return {
       name: 'Enterprise',
       pathLabel: 'Enterprise',
@@ -24,7 +24,7 @@ function planPresentation(plan: BillingPlan): PlanPresentation {
       intent: 'enterprise',
     };
   }
-  if (code.includes('growth') || code.includes('professional') || code.includes('pro')) {
+  if (code === 'basic' || code.includes('growth') || code.includes('professional')) {
     return {
       name: 'Growth',
       pathLabel: 'API access',
@@ -44,8 +44,8 @@ function planPresentation(plan: BillingPlan): PlanPresentation {
 function subscriptionPathLabel(planCode?: string): string {
   if (!planCode) return 'None';
   const code = planCode.toLowerCase();
-  if (code.includes('enterprise')) return 'Enterprise';
-  if (code.includes('growth') || code.includes('professional') || code.includes('pro')) return 'API access';
+  if (code === 'pro' || code.includes('enterprise')) return 'Enterprise';
+  if (code === 'basic' || code.includes('growth') || code.includes('professional')) return 'API access';
   return 'Self-serve';
 }
 
@@ -93,7 +93,13 @@ export default function BillingPage() {
             <h2 className="font-display mt-2 text-3xl">{planPresentation(plan).name}</h2>
             <p className="mono-label mt-2 text-[10px] opacity-80">Path: {planPresentation(plan).pathLabel}</p>
             <p className="mt-2 text-lg">
-              {plan.monthlyPriceCents > 0 ? `${(plan.monthlyPriceCents / 100).toFixed(0)} ${plan.currency}/month` : 'Custom pricing'}
+              {plan.monthlyPriceCents === 0
+                ? 'Free'
+                : `${new Intl.NumberFormat('sv-SE', {
+                    style: 'currency',
+                    currency: plan.currency,
+                    maximumFractionDigits: 0,
+                  }).format(plan.monthlyPriceCents / 100)}/month`}
             </p>
             {planPresentation(plan).intent === 'enterprise' ? (
               <Button

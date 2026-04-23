@@ -1,45 +1,6 @@
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Container';
-
-const plans = [
-  {
-    name: 'Starter',
-    price: 'SEK 990',
-    period: '/month',
-    intent: 'self-serve',
-    bullets: [
-      'For analysts and small teams',
-      'Company lookup, ownership, and financial context',
-      'Decision notes and export-ready snapshots',
-    ],
-    cta: 'Start self-serve',
-  },
-  {
-    name: 'Growth',
-    price: 'SEK 4 900',
-    period: '/month',
-    intent: 'api',
-    bullets: [
-      'For risk and compliance operations',
-      'Monitoring, alerts, and team workflows',
-      'API access for internal systems',
-    ],
-    cta: 'Choose Growth',
-    featured: true,
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    intent: 'enterprise',
-    bullets: [
-      'For regulated and large-scale environments',
-      'Bulk access, custom onboarding, and controls',
-      'Commercial and security alignment',
-    ],
-    cta: 'Talk to sales',
-  },
-];
+import { formatSekMonthly, publicPlans } from '@/content/pricing';
 
 export function Pricing() {
   return (
@@ -53,15 +14,15 @@ export function Pricing() {
         </p>
 
         <div className="mt-16 grid gap-6 lg:grid-cols-3">
-          {plans.map((plan) => (
+          {publicPlans.map((plan) => (
             <article
-              key={plan.name}
+              key={plan.marketingName}
               className={`border-2 border-foreground p-8 ${plan.featured ? 'lg:-mt-8 lg:mb-[-2rem] bg-foreground text-background' : 'bg-background text-foreground'}`}
             >
-              <h3 className="font-display text-4xl">{plan.name}</h3>
+              <h3 className="font-display text-4xl">{plan.marketingName}</h3>
               <div className="mt-6 flex items-end gap-2">
-                <p className="display-heading text-6xl">{plan.price}</p>
-                {plan.period ? <p className="text-lg">{plan.period}</p> : null}
+                <p className="display-heading text-6xl">{formatSekMonthly(plan.monthlyPriceCents)}</p>
+                {plan.monthlyPriceCents != null ? <p className="text-lg">/month</p> : null}
               </div>
 
               <ul className="mt-8 space-y-3">
@@ -73,7 +34,7 @@ export function Pricing() {
               </ul>
 
               <Button
-                href={`/signup?intent=${encodeURIComponent(plan.intent)}`}
+                href={`/signup?intent=${encodeURIComponent(plan.intent)}&plan=${encodeURIComponent(plan.marketingName)}&planCode=${encodeURIComponent(plan.planCode)}`}
                 variant={plan.featured ? 'secondary' : 'primary'}
                 className={`mt-10 w-full ${plan.featured ? 'border-background text-background hover:bg-background hover:text-foreground' : ''}`}
               >

@@ -6,12 +6,19 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { formatSekMonthly, publicPlans } from '@/content/pricing';
 import { api, ApiError } from '@/lib/api';
 
 function SignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const intent = searchParams.get('intent');
+  const selectedPlanCode = searchParams.get('planCode');
+  const selectedPlan =
+    publicPlans.find((p) => p.planCode === selectedPlanCode) ??
+    publicPlans.find((p) => p.intent === intent) ??
+    null;
+  const selectedPlanName = searchParams.get('plan') ?? selectedPlan?.marketingName ?? 'Starter';
   const intentLabel =
     intent === 'api'
       ? 'API access'
@@ -62,6 +69,13 @@ function SignupPageContent() {
           <div className="border-l-2 border-foreground pl-3">
             <p className="mono-label text-[10px] text-muted-foreground">Selected path</p>
             <p className="text-sm text-foreground">{intentLabel}</p>
+          </div>
+          <div className="border-l-2 border-foreground pl-3">
+            <p className="mono-label text-[10px] text-muted-foreground">Selected plan</p>
+            <p className="text-sm text-foreground">
+              {selectedPlanName}
+              {selectedPlan ? ` · ${formatSekMonthly(selectedPlan.monthlyPriceCents)}${selectedPlan.monthlyPriceCents != null ? '/month' : ''}` : ''}
+            </p>
           </div>
           <div className="border-l-2 border-foreground pl-3">
             <p className="mono-label text-[10px] text-muted-foreground">What happens next</p>
