@@ -91,6 +91,27 @@ function formatMoneyAmount(amount: string | null | undefined, currency: string |
   return `${n.toLocaleString()} ${currency ?? ''}`.trim();
 }
 
+function boolWord(v: unknown): 'Yes' | 'No' {
+  return v === true || String(v).toLowerCase() === 'true' ? 'Yes' : 'No';
+}
+
+function riskWord(v: unknown): string {
+  const s = String(v ?? 'unknown').toLowerCase();
+  if (s === 'high' || s === 'critical') return 'High';
+  if (s === 'medium' || s === 'elevated') return 'Medium';
+  if (s === 'low') return 'Low';
+  return s === 'unknown' ? 'Unknown' : s;
+}
+
+function anomalyExplanation(code: string): string {
+  const c = code.toLowerCase();
+  if (c.includes('ownership_cycle')) return 'Detected circular ownership links that may hide true control.';
+  if (c.includes('unknown_edge')) return 'Ownership links exist but some percentages are missing or unresolved.';
+  if (c.includes('nomin')) return 'Possible nominee or proxy structure reducing transparency.';
+  if (c.includes('high')) return 'Model flagged this as a high-risk structural pattern.';
+  return 'Pattern flagged by the ownership-analysis model.';
+}
+
 function WorkspaceCallout({ tone, title, message }: { tone: 'warn' | 'danger' | 'info'; title: string; message: string }) {
   const cls =
     tone === 'danger'
@@ -1590,20 +1611,34 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                 <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <dt className="mono-label text-[10px] text-muted-foreground">Ownership links</dt>
-                    <dd>{String((ownershipGraph?.dataCoverage as Record<string, unknown> | undefined)?.hasOwnershipLinks ?? false)}</dd>
+                    <dd title="Yes = ownership edges exist in the dataset. No = no ownership-link rows found.">
+                      {boolWord((ownershipGraph?.dataCoverage as Record<string, unknown> | undefined)?.hasOwnershipLinks ?? false)}
+                    </dd>
                   </div>
                   <div>
                     <dt className="mono-label text-[10px] text-muted-foreground">Declared beneficial owners</dt>
-                    <dd>{String((ownershipGraph?.dataCoverage as Record<string, unknown> | undefined)?.hasBeneficialOwnerRows ?? false)}</dd>
+                    <dd title="Yes = one or more declared beneficial-owner rows exist.">
+                      {boolWord(
+                        (ownershipGraph?.dataCoverage as Record<string, unknown> | undefined)?.hasBeneficialOwnerRows ?? false,
+                      )}
+                    </dd>
                   </div>
                   <div>
                     <dt className="mono-label text-[10px] text-muted-foreground">VH register snapshot</dt>
-                    <dd>{String((ownershipGraph?.dataCoverage as Record<string, unknown> | undefined)?.hasVerkligaHuvudmanSnapshot ?? false)}</dd>
+                    <dd title="Yes = a Bolagsverket VH snapshot is stored for this org.">
+                      {boolWord(
+                        (ownershipGraph?.dataCoverage as Record<string, unknown> | undefined)?.hasVerkligaHuvudmanSnapshot ??
+                          false,
+                      )}
+                    </dd>
                   </div>
                   <div>
                     <dt className="mono-label text-[10px] text-muted-foreground">Opacity risk</dt>
-                    <dd className="uppercase">
-                      {String((ownershipGraph?.dataCoverage as Record<string, unknown> | undefined)?.opaqueOwnershipRisk ?? '—')}
+                    <dd
+                      className="uppercase"
+                      title="High = structure likely contains opaque or unresolved control paths."
+                    >
+                      {riskWord((ownershipGraph?.dataCoverage as Record<string, unknown> | undefined)?.opaqueOwnershipRisk ?? '—')}
                     </dd>
                   </div>
                 </dl>
@@ -1614,6 +1649,18 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                   Analyst-priority anomalies and suspicious path flags are ranked by risk tiers, with optional async precompute
                   on high-traffic companies.
                 </p>
+                <details className="mb-3 border border-border-light p-3 text-xs">
+                  <summary className="cursor-pointer font-mono uppercase tracking-widest text-[10px]">
+                    How to read priority / tier / anomaly / count / severity
+                  </summary>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+                    <li><strong>Priority</strong>: analyst order (lower number = review first).</li>
+                    <li><strong>Tier</strong>: model risk bucket (low/medium/high).</li>
+                    <li><strong>Anomaly</strong>: exact detected pattern code.</li>
+                    <li><strong>Count</strong>: number of times the pattern appears in this graph.</li>
+                    <li><strong>Severity</strong>: technical impact estimate for that anomaly.</li>
+                  </ul>
+                </details>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
@@ -1662,8 +1709,8 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                         </div>
                         <div className="border border-border-light p-2 text-xs">
                           <p className="mono-label text-[10px] text-muted-foreground">Cache</p>
-                          <p className="mt-1 text-sm">
-                            {String(((adv.cache as Record<string, unknown> | undefined)?.hit ?? false) ? 'hit' : 'miss')}
+                          <p className="mt-1 text-sm" title="Hit = reused cached advanced graph; Miss = recomputed from source rows.">
+                            {((adv.cache as Record<string, unknown> | undefined)?.hit ?? false) ? 'Hit' : 'Miss'}
                           </p>
                         </div>
                       </div>
@@ -1680,11 +1727,20 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                         <tbody>
                           {anomalies.map((a, idx) => (
                             <tr key={`${String(a.code ?? idx)}-${idx}`}>
-                              <td className="font-mono text-xs">{String(a.analystPriority ?? '—')}</td>
-                              <td className="font-mono text-xs">{String(a.riskTier ?? '—')}</td>
-                              <td>{String(a.code ?? '—')}</td>
-                              <td>{String(a.count ?? '—')}</td>
-                              <td>{String(a.severity ?? '—')}</td>
+                              <td className="font-mono text-xs" title="Analyst order; lower = investigate earlier.">
+                                {String(a.analystPriority ?? '—')}
+                              </td>
+                              <td
+                                className="font-mono text-xs"
+                                title="Risk tier from model; high means likely stronger ownership-risk signal."
+                              >
+                                {riskWord(a.riskTier ?? '—')}
+                              </td>
+                              <td title={anomalyExplanation(String(a.code ?? ''))}>{String(a.code ?? '—')}</td>
+                              <td title="Occurrences of this anomaly in the graph.">{String(a.count ?? '—')}</td>
+                              <td title="Technical severity score label for this anomaly.">
+                                {riskWord(a.severity ?? '—')}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1699,7 +1755,7 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                               <li key={`${String(f.code ?? idx)}-${idx}`} className="border border-border-light p-2">
                                 <p className="font-medium">
                                   {String(f.code ?? 'flag')} ·{' '}
-                                  <span className="font-mono text-xs">{String(f.riskTier ?? '—')}</span>
+                                  <span className="font-mono text-xs">{riskWord(f.riskTier ?? '—')}</span>
                                 </p>
                                 <p className="text-xs text-muted-foreground">{String(f.reason ?? '—')}</p>
                                 {f.summary ? <p className="mt-1 text-xs">{String(f.summary)}</p> : null}
@@ -1791,8 +1847,12 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
                             <tr key={`${String(row.key ?? idx)}`}>
                               <td>{String(row.label ?? '—')}</td>
                               <td className="font-mono text-[10px]">{String(row.status ?? '—')}</td>
-                              <td>{String(row.registerListed ?? false)}</td>
-                              <td>{String(row.shareChainDerivedMeetsThreshold ?? false)}</td>
+                              <td title="Yes = listed in stored VH register snapshot.">
+                                {boolWord(row.registerListed ?? false)}
+                              </td>
+                              <td title="Yes = ownership-chain model derived this person at or above threshold.">
+                                {boolWord(row.shareChainDerivedMeetsThreshold ?? false)}
+                              </td>
                               <td>{row.calculatedEffectiveOwnership != null ? String(row.calculatedEffectiveOwnership) : '—'}</td>
                               <td>{row.calculatedEffectiveControl != null ? String(row.calculatedEffectiveControl) : '—'}</td>
                             </tr>

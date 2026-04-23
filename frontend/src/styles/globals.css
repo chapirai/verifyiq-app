@@ -62,6 +62,7 @@ body.min-mono-canvas > * {
 
 body {
   background: var(--background);
+  overflow-x: hidden;
 }
 
 a {

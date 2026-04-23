@@ -119,7 +119,18 @@ export function AnnualReportsWorkspacePanel({ orgNumber }: { orgNumber: string }
   const hasRead = readModel && readModel.headerId;
 
   if (error && !hasComparison && !hasRead) {
-    return <p className="text-sm text-destructive">{error}</p>;
+    const tokenIssue = error.toLowerCase().includes('invalid or missing access token');
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-destructive">{error}</p>
+        {tokenIssue ? (
+          <p className="text-xs text-muted-foreground">
+            Your session token expired. Re-authenticate, then reload this panel. The app now retries once after refresh,
+            but a fully expired refresh token still requires login.
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   if (!hasComparison && !hasRead) {
@@ -147,6 +158,18 @@ export function AnnualReportsWorkspacePanel({ orgNumber }: { orgNumber: string }
           Partial load: {partialWarning}
         </p>
       ) : null}
+      <details className="border border-border-light bg-muted/15 p-3 text-xs">
+        <summary className="cursor-pointer font-mono uppercase tracking-widest text-[10px]">
+          How to interpret annual-report fields
+        </summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+          <li><strong>Current</strong> = latest fiscal period value for that line.</li>
+          <li><strong>Prior</strong> = previous fiscal period value for the same line.</li>
+          <li><strong>Summary layer</strong> = normalized key figures for fast overview.</li>
+          <li><strong>Statement tables</strong> = mapped iXBRL lines grouped by statement type.</li>
+          <li><strong>Raw facts</strong> = direct extracted facts (debug evidence layer).</li>
+        </ul>
+      </details>
       {hasRead && readModel && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">

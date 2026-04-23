@@ -34,6 +34,7 @@ import type { CompanyDecisionInsight, CompanyDecisionInsightSnapshot } from '@/t
 import type { SimilarCompaniesResponse, SourcingParseResult } from '@/types/sourcing';
 
 const API_BASE_URL = API_V1_BASE_URL;
+const AUTH_PATHS = ['/auth/login', '/auth/signup', '/auth/refresh', '/auth/verify-email'];
 
 export class ApiError extends Error {
   status: number;
@@ -47,23 +48,30 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getAccessToken();
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(init?.headers ?? {}),
-      },
-      cache: 'no-store',
-    });
-  } catch (e: unknown) {
-    const hint = e instanceof Error ? e.message : String(e);
-    throw new ApiError(`Network error while calling ${path}: ${hint}`, 0, { path, cause: hint });
-  }
+  const perform = async (token?: string | null) => {
+    try {
+      return await fetch(`${API_BASE_URL}${path}`, {
+        ...init,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(init?.headers ?? {}),
+        },
+        cache: 'no-store',
+      });
+    } catch (e: unknown) {
+      const hint = e instanceof Error ? e.message : String(e);
+      throw new ApiError(`Network error while calling ${path}: ${hint}`, 0, { path, cause: hint });
+    }
+  };
 
+  let res = await perform(getAccessToken());
+  if (res.status === 401 && !AUTH_PATHS.some(p => path.startsWith(p))) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      res = await perform(refreshed);
+    }
+  }
   if (!res.ok) {
     let details: unknown = null;
     try {
@@ -71,30 +79,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       details = await res.text();
     }
-
-    if (res.status === 401) {
-      clearSession();
-    }
-
-    const message = typeof details === 'object' && details && 'message' in details
-      ? String((details as { message?: string }).message)
-      : 'Request failed';
+    if (res.status === 401) clearSession();
+    const message =
+      typeof details === 'object' && details && 'message' in details
+        ? String((details as { message?: string }).message)
+        : 'Request failed';
     throw new ApiError(message, res.status, details);
   }
-
   return (await res.json()) as T;
 }
 
 async function requestText(path: string, init?: RequestInit): Promise<string> {
-  const token = getAccessToken();
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-    cache: 'no-store',
-  });
+  const perform = async (token?: string | null) =>
+    fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {}),
+      },
+      cache: 'no-store',
+    });
+  let res = await perform(getAccessToken());
+  if (res.status === 401 && !AUTH_PATHS.some(p => path.startsWith(p))) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      res = await perform(refreshed);
+    }
+  }
   if (!res.ok) {
     let details: unknown = null;
     try {
@@ -108,6 +119,39 @@ async function requestText(path: string, init?: RequestInit): Promise<string> {
     throw new ApiError(message, res.status, details);
   }
   return res.text();
+}
+
+let refreshInFlight: Promise<string | null> | null = null;
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return null;
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        clearSession();
+        return null;
+      }
+      const data = (await res.json()) as AuthTokens;
+      if (!data?.accessToken || !data?.refreshToken || !data?.user) {
+        clearSession();
+        return null;
+      }
+      setSession(data.accessToken, data.refreshToken, data.user);
+      return data.accessToken;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
 }
 
 export const api = {

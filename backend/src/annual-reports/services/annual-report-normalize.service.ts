@@ -25,7 +25,13 @@ import { CompanyAnnualReportPeriodEntity } from '../entities/company-annual-repo
 import type { AnnualReportPeriodKind } from '../entities/company-annual-report-financial.entity';
 import { AnnualReportPrimaryContextService } from './annual-report-primary-context.service';
 
-type PeriodEndMap = Map<string, { end?: Date | null; start?: Date | null; instant?: Date | null }>;
+type ContextInfo = {
+  end?: Date | null;
+  start?: Date | null;
+  instant?: Date | null;
+  hasDimensions: boolean;
+};
+type PeriodEndMap = Map<string, ContextInfo>;
 
 @Injectable()
 export class AnnualReportNormalizeService {
@@ -62,6 +68,7 @@ export class AnnualReportNormalizeService {
         end: c.periodEnd ?? null,
         start: c.periodStart ?? null,
         instant: c.periodInstant ?? null,
+        hasDimensions: Object.keys(c.dimensions ?? {}).length > 0,
       });
     }
     return m;
@@ -215,10 +222,11 @@ export class AnnualReportNormalizeService {
     const key = this.ctxMapKey(fact.parseRunId, fact.contextRef);
     const c = ctxById.get(key);
     if (!c) return 'unknown';
-    if (c.instant && currentEnd && c.instant.getTime() === currentEnd.getTime()) return 'instant';
+    if (c.instant && currentEnd && c.instant.getTime() === currentEnd.getTime()) return 'current';
+    if (c.instant && priorEnd && c.instant.getTime() === priorEnd.getTime()) return 'prior';
     if (c.end && currentEnd && c.end.getTime() === currentEnd.getTime()) return 'current';
     if (c.end && priorEnd && c.end.getTime() === priorEnd.getTime()) return 'prior';
-    if (c.instant) return 'instant';
+    if (c.instant) return 'unknown';
     if (c.end) return 'unknown';
     return 'unknown';
   }
@@ -227,13 +235,18 @@ export class AnnualReportNormalizeService {
     rule: CanonicalMappingRule,
     f: AnnualReportXbrlFactEntity,
     periodKind: AnnualReportPeriodKind,
+    context: ContextInfo | undefined,
   ): number {
     let s = rule.priority;
     if (periodKind === 'current' || periodKind === 'instant') s += 40;
     if (periodKind === 'prior') s += 35;
+    if (periodKind === 'unknown') s -= 30;
     if (!f.isNil && f.valueNumeric != null) s += 15;
+    if (f.valueNumeric == null && f.valueText) s -= 6;
     if (f.unitRef) s += 3;
     if (f.decimals != null && f.decimals >= 0) s += 1;
+    if (context?.hasDimensions) s -= 20;
+    else s += 8;
     return s;
   }
 
@@ -256,10 +269,11 @@ export class AnnualReportNormalizeService {
       const rule = this.matchRule(f.conceptQname, FINANCIAL_RULES);
       if (!rule) continue;
       const periodKind = this.periodKindForFact(ctxById, f, currentEnd, priorEnd);
+      const context = ctxById.get(this.ctxMapKey(f.parseRunId, f.contextRef));
       if (periodKind === 'unknown' && !f.isNil) {
         /* still allow unknown bucket for comparative edge cases */
       }
-      const score = this.scoreFact(rule, f, periodKind);
+      const score = this.scoreFact(rule, f, periodKind, context);
       const key = `${rule.canonicalField}::${periodKind}`;
       const prev = winners.get(key);
       if (!prev || score > prev.score) {
@@ -306,7 +320,8 @@ export class AnnualReportNormalizeService {
         const rule = this.matchRule(f.conceptQname, rules);
         if (!rule) continue;
         const pk = this.periodKindForFact(ctxById, f, currentEnd, priorEnd);
-        const sc = this.scoreFact(rule, f, pk);
+        const context = ctxById.get(this.ctxMapKey(f.parseRunId, f.contextRef));
+        const sc = this.scoreFact(rule, f, pk, context);
         if (!best || sc > best.score) best = { f, score: sc };
       }
       if (!best) return;

@@ -9,7 +9,7 @@ export function Navbar() {
           <span className="h-4 w-4 shrink-0 border-2 border-foreground bg-foreground" aria-hidden />
           <p className="mono-label text-[11px] text-foreground">Nordic Data Company</p>
         </div>
-        <nav className="hidden min-h-11 flex-wrap items-center justify-center gap-x-6 gap-y-2 lg:gap-x-8" aria-label="Page sections">
+        <nav className="hidden min-h-11 flex-wrap items-center justify-center gap-x-6 gap-y-2 md:flex lg:gap-x-8" aria-label="Page sections">
           <a
             className="focus-outline mono-label inline-flex min-h-11 min-w-0 items-center border-b-2 border-transparent px-0 py-2 text-[11px] text-muted-foreground hover:border-foreground hover:text-foreground"
             href="#product"
