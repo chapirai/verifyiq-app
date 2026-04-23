@@ -1,7 +1,6 @@
 import { Footer } from '@/components/sections/Footer';
 import { Navbar } from '@/components/sections/Navbar';
 import { Pricing } from '@/components/sections/Pricing';
-import { DataMaturityGraph } from '@/components/sections/DataMaturityGraph';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Container';
 import {
@@ -116,7 +115,6 @@ export default function HomePage() {
               <div>
                 <p className="mono-label text-xs text-muted-foreground">{visualBlock.kicker}</p>
                 <p className="font-display mt-2 text-2xl text-foreground">{visualBlock.title}</p>
-                <DataMaturityGraph />
                 <ol className="mt-4 space-y-2 text-sm md:text-base">
                   {visualBlock.steps.map((step, i) => (
                     <li key={step} className="flex items-start gap-2 border-b border-border-light pb-1">
