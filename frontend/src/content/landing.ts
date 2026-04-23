@@ -1,11 +1,11 @@
 /**
  * Public marketing copy for VerifyIQ / Nordic Data Company.
- * Grounded in the product as implemented: Swedish registry + Bolagsverket, persisted payloads, serving read models, iXBRL, multi-tenant APIs.
+ * Focused on decision support outcomes for customer-facing messaging.
  */
 export const siteSeo = {
   title: 'VerifyIQ | Nordic Data Company',
   description:
-    'Swedish company registry and financial intelligence: Bolagsverket-integrated data, traceable lineage, annual reports, and governed APIs for compliance, credit, and M&A teams.',
+    'Make defensible company decisions with ownership, financials, and control structures in one clear view.',
 } as const;
 
 export const company = {
@@ -16,34 +16,35 @@ export const company = {
 export const hero = {
   kicker: 'Nordic Data Company',
   line1: 'VerifyIQ',
-  line2: 'Swedish company intelligence',
-  sub: 'Registry, ownership, and financials — with traceable lineage and governed access.',
-  lead: `A multi-tenant platform for Swedish company registry and financial data. It connects to Bolagsverket (HVD, Företagsinformation, FI-related organisation data, documents, officers, cases, and more), persists raw API payloads, materializes normalized serving read models, and supports annual report and iXBRL ingestion — with tenant security, billing and audit hooks, and APIs for your workflows.`,
-  ctaPrimary: 'Get access',
-  ctaSecondary: 'Sign in',
+  line2: 'Make decisions on companies you can defend',
+  sub: 'Ownership, financials, and control structures — resolved into one clear view, so you can assess risk, validate counterparties, and move faster.',
+  lead: 'Stop piecing together registry data, ownership structures, and filings manually. VerifyIQ gives you a complete, structured view of a company — ready for analysis, onboarding, or decisioning.',
+  support: 'Built for credit, compliance, and deal teams working with Swedish entities.',
+  ctaPrimary: 'Start a company lookup',
+  ctaSecondary: 'See how it works',
   /** Hero column — not duplicated in the inverted “at a glance” band */
   asidePoints: [
-    'Multi-tenant platform: dashboard users and API clients (OAuth, API keys, sandbox).',
-    'Source-integrated: Bolagsverket routes, annual reports, object storage, and parse jobs as deployed.',
-    'Operated as a product: entitlements, audit, usage, and billing hooks — not a one-off extract.',
+    'Built for teams making decisions, not just collecting data.',
+    'Covers ownership, financials, filings, and control context in one workflow.',
+    'Designed for reviewability, speed, and confidence under scrutiny.',
   ],
 } as const;
 
 export const atAGlance = [
   {
-    k: 'Source',
-    v: 'Bolagsverket-integrated',
-    s: 'High-value datasets, Finansinspektionen-related records, documents, and enrichment pipelines — not a static export.',
+    k: 'What you get',
+    v: 'Complete company profiles',
+    s: 'Ownership, financials, filings, and structure — in one place.',
   },
   {
-    k: 'Lineage',
-    v: 'Payloads & snapshots',
-    s: 'Raw API payloads, snapshot chains, and serving layers you can reason about when evidence matters.',
+    k: 'Why it matters',
+    v: 'Data you can rely on',
+    s: 'Traceable to source, structured for analysis, and consistent across cases.',
   },
   {
-    k: 'Access',
-    v: 'Tenant-governed APIs',
-    s: 'OAuth client credentials, API keys (live and sandbox), quotas, and per-tenant entitlements for machine and human users.',
+    k: 'How you use it',
+    v: 'Built into your workflow',
+    s: 'Search, enrich, monitor, and document decisions — without switching tools.',
   },
 ] as const;
 
@@ -53,9 +54,9 @@ export const productStory = {
   /** Body after the boxed drop cap (first character `dropCap` is rendered in a bordered square). */
   dropCap: 'V',
   body:
-    'VerifyIQ is built for operational teams in compliance, credit, M&A, and data engineering who need more than a spreadsheet. The product integrates with the Swedish business registry ecosystem: structured discovery, ownership clarity, verklig huvudman and control context, and — when a target justifies it — deeper retrieval of stored payloads and financial artefacts. Breadth stays affordable; depth stays on demand so cost and latency follow business priority.',
+    'VerifyIQ is built for teams that need to understand companies beyond surface-level data. It brings together registry data, ownership structures, and financials into a single, structured view — so you can assess control, risk, and legitimacy with confidence.',
   followUp:
-    'Under the surface, the same architecture supports BullMQ-backed jobs, object storage for reports and files, and observable change and monitoring — so the visible product sits on a stack built for production, not a thin demo layer.',
+    "Whether you're onboarding a customer, evaluating credit risk, or reviewing an acquisition target, you get the full context — not fragmented data.",
 } as const;
 
 export const controlQuote = {
@@ -64,19 +65,44 @@ export const controlQuote = {
 } as const;
 
 export const visualBlock = {
-  kicker: 'Lineage',
-  title: 'Raw payload to read model',
+  kicker: 'How it works',
+  title: 'From raw data to decision-ready insight',
+  steps: [
+    'Company lookup',
+    'Ownership resolution (UBO)',
+    'Financial + filing enrichment',
+    'Risk signals and flags',
+    'Decision snapshot (exportable)',
+  ],
   caption:
-    'Holds for illustration: a monochrome surface, sharp borders, and a hover that thickens the frame. No stock photography — the product is the evidence chain.',
+    'Every step is traceable to source data — so your decisions hold up in review.',
 } as const;
 
 export const capabilities = [
-  'Company discovery & index',
-  'Ownership & control signals',
-  'Risk, screening, and cases',
-  'On-demand Bolagsverket enrichment',
-  'Monitoring & change alerts',
-  'APIs, webhooks, bulk jobs, documents',
+  {
+    title: 'Company search & discovery',
+    detail: 'Find entities and understand structure instantly.',
+  },
+  {
+    title: 'Ownership & UBO mapping',
+    detail: 'See who actually controls the company.',
+  },
+  {
+    title: 'Financials & filings',
+    detail: 'Access structured reports and historical data.',
+  },
+  {
+    title: 'Risk & compliance workflows',
+    detail: 'Run checks, document reviews, and track decisions.',
+  },
+  {
+    title: 'Monitoring & alerts',
+    detail: 'Get notified when something changes.',
+  },
+  {
+    title: 'API & bulk access',
+    detail: 'Integrate directly into your internal systems.',
+  },
 ] as const;
 
 export const audiences = [
@@ -89,38 +115,38 @@ export const audiences = [
 export const principle = {
   /** Editorial testimonial: principle, not a fictional persona. */
   quote:
-    'We did not set out to ship another “black box” data feed. VerifyIQ is for teams that need the fetch, the store, and the line of sight to both.',
+    'A company is not a row in a dataset — it is a structure of ownership, control, and obligation. Your data should reflect that.',
   label: 'Product principle',
 } as const;
 
 export const accessTiers = [
   {
-    name: 'Sourcing',
-    blurb: 'Discovery, search, and triage across the tenant index — ideal for origination and short lists.',
+    name: 'Self-serve',
+    blurb: 'Start exploring companies directly in the platform.',
     elevated: false,
   },
   {
-    name: 'Platform',
-    blurb: 'Full workspace: enrichment, financial and annual-report workflows, monitoring, and integrations under your entitlements. The default “serious” tier.',
+    name: 'API access',
+    blurb: 'Integrate company data into your own workflows.',
     elevated: true,
   },
   {
-    name: 'Programme',
-    blurb: 'Enterprise-scale usage, co-managed onboarding, and operational support — aligned to your governance and rollout.',
+    name: 'Enterprise',
+    blurb: 'Custom setup, bulk data, and operational support.',
     elevated: false,
   },
 ] as const;
 
 export const workflow = {
   kicker: 'Workflow',
-  line: 'Request → store → serve → act',
-  sub: 'End-to-end flow from a question about a company to a recorded decision, with the payloads to back it.',
+  line: 'Search → understand → verify → document → decide',
+  sub: 'From first lookup to final decision — with full traceability.',
 } as const;
 
 const workflowSteps = [
-  { n: '01', label: 'Discover' },
-  { n: '02', label: 'Triage' },
-  { n: '03', label: 'Enrich' },
+  { n: '01', label: 'Search' },
+  { n: '02', label: 'Understand' },
+  { n: '03', label: 'Verify' },
   { n: '04', label: 'Document' },
   { n: '05', label: 'Decide' },
 ] as const;
@@ -151,8 +177,8 @@ export const faq = [
 
 export const finalCta = {
   kicker: 'Start',
-  title: 'Request access to VerifyIQ',
-  lead: 'We will follow up in line with your organisation and the plan that fits. No color accents, no empty promises — the same product you have read about above.',
+  title: 'Get access to VerifyIQ',
+  lead: 'Start with a company lookup, then scale to API and enterprise workflows as your team grows.',
 } as const;
 
 export const footer = {

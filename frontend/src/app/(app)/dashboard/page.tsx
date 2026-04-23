@@ -30,6 +30,13 @@ function defaultWeekInput(): string {
   return `${thursday.getFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
+function planLabel(planCode: string): string {
+  const code = String(planCode || '').toLowerCase();
+  if (code.includes('enterprise')) return 'Enterprise';
+  if (code.includes('growth') || code.includes('professional') || code.includes('pro')) return 'API access';
+  return 'Self-serve';
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<{
     companies: number;
@@ -166,7 +173,10 @@ export default function DashboardPage() {
 
   return (
     <section className="space-y-6">
-      <h1 className="font-display text-5xl">Operational overview</h1>
+      <h1 className="font-display text-5xl">Decision operations overview</h1>
+      <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+        Use this workspace to track decision workflow activity, data quality, and usage by customer path.
+      </p>
       <div className="grid gap-4 md:grid-cols-3">
         <article className="border-2 border-foreground p-6"><p className="mono-label text-[10px]">Companies</p><p className="mt-2 text-4xl">{data.companies}</p></article>
         <article className="border-2 border-foreground p-6"><p className="mono-label text-[10px]">API Keys</p><p className="mt-2 text-4xl">{data.apiKeys}</p></article>
@@ -175,7 +185,7 @@ export default function DashboardPage() {
       {data.adminOpsAccess && data.ops ? (
         <section className="space-y-4 border-2 border-foreground p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-2xl">Platform ops dashboard</h2>
+            <h2 className="text-2xl">Operations dashboard</h2>
             <p className="text-xs text-muted-foreground">
               Weekly status: <span className="font-mono">{data.ops.weekly_run.this_week_status}</span> · parser:{' '}
               <span className="font-mono">{data.ops.weekly_run.parser_profile_used}</span>
@@ -190,10 +200,10 @@ export default function DashboardPage() {
               ))}
             </Select>
             <Select value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}>
-              <option value="">All plans</option>
-              <option value="free">free</option>
-              <option value="basic">basic</option>
-              <option value="pro">pro</option>
+              <option value="">All paths</option>
+              <option value="starter">Self-serve</option>
+              <option value="growth">API access</option>
+              <option value="enterprise">Enterprise</option>
             </Select>
             <Select value={String(tenantLimit)} onChange={(e) => setTenantLimit(Number(e.target.value))}>
               <option value="10">10 per page</option>
@@ -234,6 +244,17 @@ export default function DashboardPage() {
             </Button>
             {opsActionMsg ? <p className="text-xs text-muted-foreground">{opsActionMsg}</p> : null}
           </div>
+          <details className="border border-border-light p-3 text-xs">
+            <summary className="cursor-pointer font-mono uppercase tracking-widest text-[10px] text-muted-foreground">
+              How to read this dashboard
+            </summary>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">
+              <li><strong>Run health score</strong>: 0-100 indicator of weekly ingest quality and completeness.</li>
+              <li><strong>Runtime safety</strong>: checks queue and Redis safeguards for stable processing.</li>
+              <li><strong>Run health trend</strong>: sequence of recent run scores over time.</li>
+              <li><strong>API calls daily</strong>: rolling daily usage volume for demand monitoring.</li>
+            </ul>
+          </details>
           <div className="grid gap-3 md:grid-cols-4">
             <article className="border border-border-light p-3">
               <p className="mono-label text-[10px] text-muted-foreground">This week runs</p>
@@ -257,15 +278,7 @@ export default function DashboardPage() {
             </article>
             <article className="border border-border-light p-3">
               <p className="mono-label text-[10px] text-muted-foreground">Run health score</p>
-              <p
-                className={`mt-1 text-2xl ${
-                  data.ops.weekly_run.health_score.color === 'green'
-                    ? 'text-emerald-700'
-                    : data.ops.weekly_run.health_score.color === 'yellow'
-                      ? 'text-amber-700'
-                      : 'text-destructive'
-                }`}
-              >
+              <p className="mt-1 text-2xl">
                 {data.ops.weekly_run.health_score.score}
               </p>
               <p className="text-[10px] uppercase text-muted-foreground">{data.ops.weekly_run.health_score.color}</p>
@@ -273,15 +286,7 @@ export default function DashboardPage() {
             {runtimeSafety ? (
               <article className="border border-border-light p-3">
                 <p className="mono-label text-[10px] text-muted-foreground">Runtime safety</p>
-                <p
-                  className={`mt-1 text-2xl ${
-                    runtimeSafety.status === 'ok'
-                      ? 'text-emerald-700'
-                      : runtimeSafety.warnings.length <= 2
-                        ? 'text-amber-700'
-                        : 'text-destructive'
-                  }`}
-                >
+                <p className="mt-1 text-2xl">
                   {runtimeSafety.status === 'ok' ? 'GREEN' : runtimeSafety.warnings.length <= 2 ? 'YELLOW' : 'RED'}
                 </p>
                 <p className="text-[10px] uppercase text-muted-foreground">
@@ -353,7 +358,7 @@ export default function DashboardPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-xs text-emerald-700">No runtime safety warnings detected.</p>
+                <p className="mt-2 text-xs text-muted-foreground">No runtime safety warnings detected.</p>
               )}
             </article>
           ) : null}
@@ -419,7 +424,7 @@ export default function DashboardPage() {
                   <div key={t.tenantId} className="border-b border-border-light pb-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span>{t.tenantName}</span>
-                      <span className="font-mono">{t.planCode}</span>
+                      <span className="font-mono">{planLabel(t.planCode)}</span>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                       <span>{t.apiCalls30d} calls / {t.includedCallsPerDay} daily tier</span>
@@ -470,46 +475,61 @@ export default function DashboardPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <article className="border border-border-light p-4">
               <p className="mono-label text-[10px] text-muted-foreground">Run health trend</p>
-              <svg viewBox="0 0 600 180" className="mt-2 w-full border border-border-light bg-muted/20">
-                {data.ops.charts.run_health_series.map((p, i, arr) => {
-                  const x = arr.length <= 1 ? 20 : 20 + (i * 560) / (arr.length - 1);
-                  const y = 160 - (Math.max(0, Math.min(100, p.score)) * 1.4);
-                  const next = arr[i + 1];
-                  if (!next) return null;
-                  const nx = 20 + ((i + 1) * 560) / (arr.length - 1);
-                  const ny = 160 - (Math.max(0, Math.min(100, next.score)) * 1.4);
-                  return <line key={`${p.runId}-l`} x1={x} y1={y} x2={nx} y2={ny} stroke="currentColor" strokeOpacity="0.6" />;
-                })}
-                {data.ops.charts.run_health_series.map((p, i, arr) => {
-                  const x = arr.length <= 1 ? 20 : 20 + (i * 560) / (arr.length - 1);
-                  const y = 160 - (Math.max(0, Math.min(100, p.score)) * 1.4);
-                  const fill = p.score >= 80 ? '#047857' : p.score >= 50 ? '#b45309' : '#b91c1c';
-                  return <circle key={p.runId} cx={x} cy={y} r={4} fill={fill} />;
-                })}
-              </svg>
+              {data.ops.charts.run_health_series.length === 0 ? (
+                <p className="mt-2 border border-border-light p-3 text-xs text-muted-foreground">
+                  No run health points available for this filter range.
+                </p>
+              ) : (
+                <svg viewBox="0 0 600 180" className="mt-2 w-full border border-border-light bg-muted/20">
+                  <line x1="20" y1="160" x2="580" y2="160" stroke="currentColor" strokeOpacity="0.2" />
+                  <line x1="20" y1="20" x2="20" y2="160" stroke="currentColor" strokeOpacity="0.2" />
+                  {data.ops.charts.run_health_series.map((p, i, arr) => {
+                    const x = arr.length <= 1 ? 20 : 20 + (i * 560) / (arr.length - 1);
+                    const y = 160 - (Math.max(0, Math.min(100, p.score)) * 1.4);
+                    const next = arr[i + 1];
+                    if (!next) return null;
+                    const nx = 20 + ((i + 1) * 560) / (arr.length - 1);
+                    const ny = 160 - (Math.max(0, Math.min(100, next.score)) * 1.4);
+                    return <line key={`${p.runId}-l`} x1={x} y1={y} x2={nx} y2={ny} stroke="currentColor" strokeOpacity="0.6" />;
+                  })}
+                  {data.ops.charts.run_health_series.map((p, i, arr) => {
+                    const x = arr.length <= 1 ? 20 : 20 + (i * 560) / (arr.length - 1);
+                    const y = 160 - (Math.max(0, Math.min(100, p.score)) * 1.4);
+                    return <circle key={p.runId} cx={x} cy={y} r={3} fill="currentColor" />;
+                  })}
+                </svg>
+              )}
             </article>
             <article className="border border-border-light p-4">
               <p className="mono-label text-[10px] text-muted-foreground">API calls daily (30d)</p>
-              <svg viewBox="0 0 600 180" className="mt-2 w-full border border-border-light bg-muted/20">
-                {(() => {
-                  const arr = data.ops.charts.api_calls_30d_daily;
-                  const max = Math.max(1, ...arr.map((d) => d.apiCalls));
-                  return arr.map((d, i) => {
-                    const x = arr.length <= 1 ? 20 : 20 + (i * 560) / (arr.length - 1);
-                    const y = 160 - (d.apiCalls / max) * 140;
-                    const next = arr[i + 1];
-                    if (!next) return <circle key={`${d.day}-p`} cx={x} cy={y} r={2} fill="currentColor" />;
-                    const nx = 20 + ((i + 1) * 560) / (arr.length - 1);
-                    const ny = 160 - (next.apiCalls / max) * 140;
-                    return (
-                      <g key={`${d.day}-g`}>
-                        <line x1={x} y1={y} x2={nx} y2={ny} stroke="currentColor" strokeOpacity="0.6" />
-                        <circle cx={x} cy={y} r={2} fill="currentColor" />
-                      </g>
-                    );
-                  });
-                })()}
-              </svg>
+              {data.ops.charts.api_calls_30d_daily.length === 0 ? (
+                <p className="mt-2 border border-border-light p-3 text-xs text-muted-foreground">
+                  No API usage points available for this filter range.
+                </p>
+              ) : (
+                <svg viewBox="0 0 600 180" className="mt-2 w-full border border-border-light bg-muted/20">
+                  <line x1="20" y1="160" x2="580" y2="160" stroke="currentColor" strokeOpacity="0.2" />
+                  <line x1="20" y1="20" x2="20" y2="160" stroke="currentColor" strokeOpacity="0.2" />
+                  {(() => {
+                    const arr = data.ops.charts.api_calls_30d_daily;
+                    const max = Math.max(1, ...arr.map((d) => d.apiCalls));
+                    return arr.map((d, i) => {
+                      const x = arr.length <= 1 ? 20 : 20 + (i * 560) / (arr.length - 1);
+                      const y = 160 - (d.apiCalls / max) * 140;
+                      const next = arr[i + 1];
+                      if (!next) return <circle key={`${d.day}-p`} cx={x} cy={y} r={2} fill="currentColor" />;
+                      const nx = 20 + ((i + 1) * 560) / (arr.length - 1);
+                      const ny = 160 - (next.apiCalls / max) * 140;
+                      return (
+                        <g key={`${d.day}-g`}>
+                          <line x1={x} y1={y} x2={nx} y2={ny} stroke="currentColor" strokeOpacity="0.6" />
+                          <circle cx={x} cy={y} r={2} fill="currentColor" />
+                        </g>
+                      );
+                    });
+                  })()}
+                </svg>
+              )}
             </article>
           </div>
         </section>

@@ -70,6 +70,18 @@ a {
   text-decoration: none;
 }
 
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+
+.skip-link:focus {
+  left: 16px;
+  top: 16px;
+  background: white;
+  z-index: 1000;
+}
+
 /* Public auth / marketing: text links, no color accents */
 .link-auth {
   @apply text-sm text-foreground;

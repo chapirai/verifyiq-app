@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -10,6 +10,16 @@ import { api, ApiError } from '@/lib/api';
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const intent = searchParams.get('intent');
+  const intentLabel =
+    intent === 'api'
+      ? 'API access'
+      : intent === 'enterprise'
+        ? 'Enterprise onboarding'
+        : intent === 'self-serve'
+          ? 'Self-serve access'
+          : 'Workspace access';
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -44,16 +54,30 @@ export default function SignupPage() {
 
   return (
     <AuthShell
-      kicker="Workspace creation"
-      title="Request access"
-      lead="Create your VerifyIQ workspace with a work email. We will send a link to verify your inbox."
+      kicker="Onboarding"
+      title="Start your VerifyIQ access"
+      lead="Create your workspace with a work email. We send a verification link so your onboarding can move immediately."
       footer={
-        <p className="text-sm text-muted-foreground">
-          Already registered?{' '}
-          <Link href="/login" className="link-auth">
-            Sign in
-          </Link>
-        </p>
+        <div className="space-y-4">
+          <div className="border-l-2 border-foreground pl-3">
+            <p className="mono-label text-[10px] text-muted-foreground">Selected path</p>
+            <p className="text-sm text-foreground">{intentLabel}</p>
+          </div>
+          <div className="border-l-2 border-foreground pl-3">
+            <p className="mono-label text-[10px] text-muted-foreground">What happens next</p>
+            <ol className="mt-2 space-y-1 text-sm text-muted-foreground">
+              <li>1. Verify your work email.</li>
+              <li>2. Access your workspace and run first lookup.</li>
+              <li>3. Activate billing path when your team is ready.</li>
+            </ol>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Already registered?{' '}
+            <Link href="/login" className="link-auth">
+              Sign in
+            </Link>
+          </p>
+        </div>
       }
     >
       <form className="mt-10 grid gap-5" onSubmit={onSubmit}>
@@ -95,7 +119,7 @@ export default function SignupPage() {
           </p>
         ) : null}
         <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? 'Submitting...' : 'Request access →'}
+          {submitting ? 'Submitting...' : 'Create workspace →'}
         </Button>
       </form>
     </AuthShell>

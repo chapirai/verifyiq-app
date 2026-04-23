@@ -11,14 +11,14 @@ import { api } from '@/lib/api';
 
 const navItems: Array<{ href: Route; label: string }> = [
   { href: '/dashboard', label: 'Overview' },
-  { href: '/search', label: 'Lookup & sourcing' },
+  { href: '/search', label: 'Company lookup' },
   { href: '/companies', label: 'Companies' },
   { href: '/lists', label: 'Lists' },
   { href: '/compare', label: 'Compare' },
   { href: '/alerts', label: 'Alerts' },
   { href: '/bulk', label: 'Bulk' },
   { href: '/billing', label: 'Billing' },
-  { href: '/api-keys', label: 'API' },
+  { href: '/api-keys', label: 'API access' },
   { href: '/api-oauth-clients', label: 'OAuth' },
   { href: '/api-sandbox', label: 'Sandbox' },
   { href: '/settings', label: 'Settings' },

@@ -1,5 +1,6 @@
 import { Footer } from '@/components/sections/Footer';
 import { Navbar } from '@/components/sections/Navbar';
+import { Pricing } from '@/components/sections/Pricing';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Container';
 import {
@@ -39,6 +40,7 @@ export default function HomePage() {
                 </span>
               </h1>
               <p className="mt-4 max-w-2xl text-lg text-muted-foreground md:text-xl">{hero.sub}</p>
+              <p className="mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">{hero.support}</p>
               <div className="mt-8 flex items-center gap-4" aria-hidden>
                 <div className="h-1.5 w-32 bg-foreground md:w-48" />
                 <div className="h-5 w-5 border-2 border-foreground bg-background" />
@@ -48,7 +50,7 @@ export default function HomePage() {
                 <Button href="/signup" variant="primary">
                   {hero.ctaPrimary} →
                 </Button>
-                <Button href="/login" variant="secondary">
+                <Button href="#workflow" variant="secondary">
                   {hero.ctaSecondary}
                 </Button>
               </div>
@@ -118,22 +120,35 @@ export default function HomePage() {
                   style={{ width: '100%' }}
                 >
                   <div className="border-2 border-foreground p-0 transition-all duration-300 [transition-property:transform] group-hover:border-4 group-hover:duration-100">
-                    <div className="relative aspect-[16/10] overflow-hidden border-0 border-foreground">
-                      <div
-                        className="absolute inset-0 scale-100 transition-transform duration-300 group-hover:scale-[1.04]"
-                        style={{
-                          backgroundImage: `
-                            repeating-linear-gradient(90deg, #0002 0, #0002 1px, transparent 1px, transparent 24px),
-                            repeating-linear-gradient(0deg, #0001 0, #0001 1px, transparent 1px, transparent 20px)`,
-                        }}
-                        aria-hidden
-                      />
-                      <p className="font-mono text-[0.6rem] uppercase leading-relaxed tracking-widest text-foreground/40 absolute bottom-0 left-0 p-3 md:p-4 z-[1]">
-                        Payload · snapshot · serve
-                      </p>
+                    <div className="relative aspect-[16/10] overflow-hidden border-0 border-foreground p-4 md:p-5">
+                      <svg viewBox="0 0 640 220" className="h-full w-full" aria-label="Decision workflow graph">
+                        <line x1="34" y1="110" x2="606" y2="110" stroke="currentColor" strokeWidth="2" strokeDasharray="4 6" />
+                        {visualBlock.steps.map((step, i) => {
+                          const x = 70 + i * 125;
+                          return (
+                            <g key={step}>
+                              <rect x={x - 42} y={86} width="84" height="48" fill="white" stroke="currentColor" strokeWidth="2" />
+                              <text x={x} y={104} textAnchor="middle" className="font-mono" fontSize="9">
+                                {String(i + 1).padStart(2, '0')}
+                              </text>
+                              <text x={x} y={119} textAnchor="middle" fontSize="8">
+                                {step.length > 18 ? `${step.slice(0, 18)}...` : step}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
                     </div>
                   </div>
                 </div>
+                <ol className="mt-4 space-y-2 text-xs md:text-sm">
+                  {visualBlock.steps.map((step, i) => (
+                    <li key={step} className="flex items-start gap-2 border-b border-border-light pb-1">
+                      <span className="mono-label text-[10px] text-muted-foreground">{String(i + 1).padStart(2, '0')}</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
                 <p className="mt-4 text-xs text-muted-foreground leading-relaxed">{visualBlock.caption}</p>
               </div>
             </div>
@@ -161,12 +176,13 @@ export default function HomePage() {
         {/* Capabilities — invert on hover (spec) */}
         <section id="capabilities" className="site-divider py-24 md:py-32">
           <Container>
-            <p className="mono-label text-xs text-muted-foreground">Capabilities (from the product)</p>
+            <p className="mono-label text-xs text-muted-foreground">Capabilities</p>
             <h2 className="font-display mt-4 text-3xl leading-none tracking-tight text-foreground md:text-5xl">What the platform does</h2>
             <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {capabilities.map((c) => (
-                <article key={c} className="feature-card min-h-[120px] p-6 md:min-h-[140px] md:p-7">
-                  <h3 className="font-display text-xl tracking-tight transition-colors duration-100 md:text-2xl">{c}</h3>
+                <article key={c.title} className="feature-card min-h-[120px] p-6 md:min-h-[140px] md:p-7">
+                  <h3 className="font-display text-xl tracking-tight transition-colors duration-100 md:text-2xl">{c.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{c.detail}</p>
                 </article>
               ))}
             </div>
@@ -209,7 +225,7 @@ export default function HomePage() {
         <section id="access" className="site-divider py-24 md:py-32">
           <Container>
             <p className="mono-label text-xs text-muted-foreground">Ways in</p>
-            <h2 className="font-display mt-4 text-3xl leading-none tracking-tight text-foreground md:text-4xl">How teams engage</h2>
+            <h2 className="font-display mt-4 text-3xl leading-none tracking-tight text-foreground md:text-4xl">Ways in</h2>
             <p className="mt-2 max-w-2xl text-muted-foreground">
               Tiers are indicative — exact entitlements, quotas, and contracts are set with Nordic Data Company.
             </p>
@@ -221,7 +237,7 @@ export default function HomePage() {
                     t.elevated ? 'md:-translate-y-3 md:border-4 md:py-10' : ''
                   } ${t.elevated ? 'z-[1] bg-background' : 'border-foreground'}`}
                 >
-                  <p className="mono-label text-[11px] text-muted-foreground">Tier</p>
+                  <p className="mono-label text-[11px] text-muted-foreground">Option</p>
                   <h3 className="font-display mt-3 text-2xl text-foreground md:text-3xl">{t.name}</h3>
                   <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">{t.blurb}</p>
                 </div>
@@ -229,7 +245,7 @@ export default function HomePage() {
             </div>
             <div className="mt-10 text-center">
               <Button href="/signup" variant="primary">
-                Discuss access →
+                Get access →
               </Button>
             </div>
           </Container>
@@ -259,7 +275,7 @@ export default function HomePage() {
         {/* FAQ */}
         <section id="faq" className="site-divider py-24 md:py-32">
           <Container>
-            <p className="mono-label text-xs text-muted-foreground">Technical questions</p>
+            <p className="mono-label text-xs text-muted-foreground">Questions</p>
             <h2 className="font-display mt-4 text-2xl text-foreground md:text-3xl">FAQ</h2>
             <div className="mt-8 space-y-3">
               {faq.map((item) => (
@@ -276,6 +292,8 @@ export default function HomePage() {
             </div>
           </Container>
         </section>
+
+        <Pricing />
 
         {/* Final CTA — inverted + radial (spec) */}
         <section id="start" className="section-cta-final py-20 md:py-28" aria-label="Get started">
