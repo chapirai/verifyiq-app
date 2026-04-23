@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import type { BulkJob } from '@/types/api';
@@ -45,8 +46,24 @@ export default function BulkPage() {
 
   return (
     <section className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <h1 className="font-display text-5xl">Bulk enrichment</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          Use this page when a customer (or you) submits <strong>one identifier per line</strong> (or a labelled job name). Each line is stored as a
+          bulk job item, queued, and processed against the <strong>same live company APIs</strong> as single lookups—not against a downloaded national
+          Bolagsverket bulk ZIP file.
+        </p>
+        <aside className="mt-4 max-w-3xl border border-border-light bg-muted/30 p-3 text-sm leading-relaxed">
+          <p className="font-semibold text-foreground">Different from national bulk file ingest</p>
+          <p className="mt-1 text-muted-foreground">
+            The ZIP/TXT pipeline that fills <code className="font-mono text-xs">bv_bulk_*</code> tables is operated from the{' '}
+            <Link href="/dashboard" className="underline underline-offset-4">
+              Dashboard
+            </Link>{' '}
+            “Bolagsverket bulk file ingestion” panel (and related backend jobs). Nothing on this <code className="font-mono text-xs">/bulk</code> page
+            triggers that download.
+          </p>
+        </aside>
       </div>
       <form onSubmit={onCreate} className="grid gap-3 border-2 border-foreground p-4">
         <Input value={fileName} onChange={(e) => setFileName(e.target.value)} placeholder="File name" required />
@@ -97,8 +114,8 @@ export default function BulkPage() {
             </tbody>
           </Table>
           <p className="text-sm text-muted-foreground">
-            Bulk processing is intentionally sequential per company in the background due to Bolagsverket provider limits.
-            Uploads are queued and processed one-by-one with retry support.
+            These jobs are intentionally sequential per organisation in the background (provider rate limits on the live APIs). Rows are queued and
+            processed one-by-one with retry support. Again: this flow never starts the national Bolagsverket bulk ZIP download.
           </p>
           {selectedJob ? (
             <div className="space-y-3 border-2 border-foreground p-4">

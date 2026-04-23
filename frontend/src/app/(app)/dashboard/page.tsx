@@ -6,6 +6,7 @@ import { LoadingSkeleton, ErrorState } from '@/components/ui/StateBlocks';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
+import { BolagsverketBulkFileIngestionPanel } from '@/components/bulk/BolagsverketBulkFileIngestionPanel';
 
 function weekToIsoDate(weekVal: string): string | undefined {
   if (!weekVal || !/^\d{4}-W\d{2}$/.test(weekVal)) return undefined;
@@ -55,30 +56,40 @@ export default function DashboardPage() {
   const [tenantPage, setTenantPage] = useState(1);
   const [tenantLimit, setTenantLimit] = useState(10);
   const [opsLoading, setOpsLoading] = useState(false);
-  const [forceSourceUrl, setForceSourceUrl] = useState('');
   const [opsActionMsg, setOpsActionMsg] = useState('');
   const [runtimeSafety, setRuntimeSafety] = useState<Awaited<ReturnType<typeof api.getBulkRuntimeSafety>> | null>(null);
   const [runtimeSafetyNowTick, setRuntimeSafetyNowTick] = useState(Date.now());
+  const [opsLoadFailed, setOpsLoadFailed] = useState(false);
+  const [opsLoadFailedMsg, setOpsLoadFailedMsg] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      api.getCompanies('page=1&pageSize=1'),
-      api.listApiKeys(),
-      api.listBulkJobs(),
-      api.getBulkOpsDashboard().catch((e) => {
-        if (e instanceof Error && /restricted|forbidden|403/i.test(e.message)) return null;
-        return null;
-      }),
-    ])
-      .then(([companies, keys, jobs, ops]) => {
+    const loadOps = () =>
+      api.getBulkOpsDashboard().then(
+        (o) => ({ ops: o, failed: false as const, failedMsg: '' }),
+        (e: unknown) => {
+          if (e instanceof Error && /restricted|forbidden|403/i.test(e.message)) {
+            return { ops: null, failed: false, failedMsg: '' };
+          }
+          return {
+            ops: null,
+            failed: true,
+            failedMsg: e instanceof Error ? e.message : 'Request failed',
+          };
+        },
+      );
+
+    Promise.all([api.getCompanies('page=1&pageSize=1'), api.listApiKeys(), api.listBulkJobs(), loadOps()])
+      .then(([companies, keys, jobs, opsWrap]) => {
+        setOpsLoadFailed(opsWrap.failed);
+        setOpsLoadFailedMsg(opsWrap.failedMsg);
         setData({
           companies: companies.total ?? 0,
           apiKeys: keys.data.length,
           bulkJobs: jobs.data.length,
-          ops,
-          adminOpsAccess: !!ops,
+          ops: opsWrap.ops,
+          adminOpsAccess: !!opsWrap.ops,
         });
-        if (ops) {
+        if (opsWrap.ops) {
           void api
             .getBulkRuntimeSafety()
             .then(setRuntimeSafety)
@@ -87,6 +98,25 @@ export default function DashboardPage() {
       })
       .catch((err: { message?: string }) => setError(err?.message ?? 'Could not load dashboard.'));
   }, []);
+
+  const retryOpsDashboard = () => {
+    setOpsLoading(true);
+    void api
+      .getBulkOpsDashboard()
+      .then((ops) => {
+        setOpsLoadFailed(false);
+        setOpsLoadFailedMsg('');
+        setData((prev) => (prev ? { ...prev, ops, adminOpsAccess: !!ops } : prev));
+        if (ops) {
+          void api.getBulkRuntimeSafety().then(setRuntimeSafety).catch(() => setRuntimeSafety(null));
+        }
+      })
+      .catch((e: unknown) => {
+        setOpsLoadFailed(true);
+        setOpsLoadFailedMsg(e instanceof Error ? e.message : 'Request failed');
+      })
+      .finally(() => setOpsLoading(false));
+  };
 
   const reloadOps = () => {
     if (!data?.adminOpsAccess) return;
@@ -178,10 +208,21 @@ export default function DashboardPage() {
       <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
         Use this workspace to track decision workflow activity, data quality, and usage by customer path.
       </p>
+      <BolagsverketBulkFileIngestionPanel variant="dashboard" />
       <div className="grid gap-4 md:grid-cols-3">
         <article className="border-2 border-foreground p-6"><p className="mono-label text-[10px]">Companies</p><p className="mt-2 text-4xl">{data.companies}</p></article>
         <article className="border-2 border-foreground p-6"><p className="mono-label text-[10px]">API Keys</p><p className="mt-2 text-4xl">{data.apiKeys}</p></article>
-        <article className="border-2 border-foreground p-6"><p className="mono-label text-[10px]">Bulk Jobs</p><p className="mt-2 text-4xl">{data.bulkJobs}</p></article>
+        <article className="border-2 border-foreground p-6">
+          <p className="mono-label text-[10px]">Bulk jobs</p>
+          <p className="mt-2 text-4xl">{data.bulkJobs}</p>
+          <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+            Customer org lists → API queue on{' '}
+            <a href="/bulk" className="underline underline-offset-4">
+              /bulk
+            </a>
+            . Not the national ZIP file ingest above.
+          </p>
+        </article>
       </div>
       {data.adminOpsAccess && data.ops ? (
         <section className="space-y-4 border-2 border-foreground p-6">
@@ -190,6 +231,10 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">
               Weekly status: <span className="font-mono">{data.ops.weekly_run.this_week_status}</span> · parser:{' '}
               <span className="font-mono">{data.ops.weekly_run.parser_profile_used}</span>
+              {' · '}
+              <span className="text-muted-foreground">
+                ZIP/TXT file ingest controls and queue snapshot are in the section above (not live HVD API calls).
+              </span>
             </p>
           </div>
           <div className="grid gap-2 md:grid-cols-[170px_1fr_160px_auto_auto_auto]">
@@ -221,36 +266,16 @@ export default function DashboardPage() {
               Export run CSV
             </Button>
           </div>
-          <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
-            <Input
-              value={forceSourceUrl}
-              onChange={(e) => setForceSourceUrl(e.target.value)}
-              placeholder="Optional override ZIP URL for forced ingestion"
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setOpsActionMsg('');
-                void api
-                  .forceBulkRunNow(forceSourceUrl.trim() || undefined)
-                  .then(() => {
-                    setOpsActionMsg('Forced ingestion started.');
-                    reloadOps();
-                  })
-                  .catch((e) => setOpsActionMsg(e instanceof Error ? e.message : 'Force run failed'));
-              }}
-            >
-              Force download + full ingest
-            </Button>
-            {opsActionMsg ? <p className="text-xs text-muted-foreground">{opsActionMsg}</p> : null}
-          </div>
+          {opsActionMsg ? <p className="text-xs text-muted-foreground">{opsActionMsg}</p> : null}
           <details className="border border-border-light p-3 text-xs">
             <summary className="cursor-pointer font-mono uppercase tracking-widest text-[10px] text-muted-foreground">
               How to read this dashboard
             </summary>
             <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">
-              <li><strong>Run health score</strong>: 0-100 indicator of weekly ingest quality and completeness.</li>
+              <li>
+                <strong>Run health score</strong>: 0-100 indicator of quality for the Bolagsverket <strong>bulk file</strong> ingest
+                (ZIP/TXT into bv_bulk_* tables), separate from per-company API usage charts below.
+              </li>
               <li><strong>Runtime safety</strong>: checks queue and Redis safeguards for stable processing.</li>
               <li><strong>Run health trend</strong>: sequence of recent run scores over time.</li>
               <li><strong>API calls daily</strong>: rolling daily usage volume for demand monitoring.</li>
@@ -534,6 +559,20 @@ export default function DashboardPage() {
             </article>
           </div>
         </section>
+      ) : opsLoadFailed ? (
+        <article className="space-y-3 border border-border-light p-4 text-sm">
+          <p className="text-muted-foreground">
+            Operations data did not load (usually a temporary server error). The rest of this page still works.
+          </p>
+          {opsLoadFailedMsg ? (
+            <p className="font-mono text-xs text-muted-foreground" role="status">
+              {opsLoadFailedMsg}
+            </p>
+          ) : null}
+          <Button type="button" variant="secondary" disabled={opsLoading} onClick={retryOpsDashboard}>
+            {opsLoading ? 'Retrying…' : 'Retry operations dashboard'}
+          </Button>
+        </article>
       ) : (
         <article className="border border-border-light p-4 text-sm text-muted-foreground">
           Operations dashboard is currently unavailable.

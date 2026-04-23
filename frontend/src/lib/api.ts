@@ -721,10 +721,39 @@ export const api = {
     return requestText(`/bolagsverket-bulk/ops/dashboard/export.csv?${q.toString()}`);
   },
   async forceBulkRunNow(sourceUrl?: string) {
-    return request('/bolagsverket-bulk/runs/force', {
+    return request<{
+      runId: string;
+      rowCount: number;
+      applied: number;
+      changed: number;
+      seeded: number;
+      deduplicatedByHash: boolean;
+    }>('/bolagsverket-bulk/runs/force', {
       method: 'POST',
       body: JSON.stringify(sourceUrl ? { sourceUrl } : {}),
     });
+  },
+  async listBolagsverketFileRuns(limit = 52) {
+    return request<
+      Array<{
+        id: string;
+        sourceUrl: string;
+        downloadedAt: string;
+        effectiveDate: string | null;
+        zipObjectKey: string;
+        txtObjectKey: string;
+        rowCount: number;
+        parserProfile: string | null;
+        status: string;
+        errorMessage: string | null;
+      }>
+    >(`/bolagsverket-bulk/runs?limit=${encodeURIComponent(String(limit))}`);
+  },
+  async enqueueBolagsverketWeeklyFileJob() {
+    return request<{ queued: true }>('/bolagsverket-bulk/runs/weekly', { method: 'POST' });
+  },
+  async getBolagsverketFileIngestionQueue() {
+    return request<Record<string, unknown>>('/bolagsverket-bulk/runs/queue-status');
   },
   async replayBulkRun(runId: string) {
     return request(`/bolagsverket-bulk/runs/${encodeURIComponent(runId)}/replay`, {

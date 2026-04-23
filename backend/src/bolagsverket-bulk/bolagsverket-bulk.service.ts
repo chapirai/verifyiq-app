@@ -3,7 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Queue } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { DataSource, MoreThanOrEqual, Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { createHash } from 'crypto';
@@ -797,6 +797,124 @@ export class BolagsverketBulkService {
         .execute();
       this.logger.warn(`Bulk enrichment request failed for ${org}: ${req.errorMessage}`);
     }
+  }
+
+  /**
+   * BullMQ jobs + recent DB file runs so operators can see what is queued vs what hit the archive tables.
+   */
+  async getFileIngestionQueueSnapshot(): Promise<Record<string, unknown>> {
+    const counts = await this.queue.getJobCounts(
+      'wait',
+      'waiting',
+      'paused',
+      'delayed',
+      'active',
+      'completed',
+      'failed',
+    );
+
+    const states = [
+      'wait',
+      'waiting',
+      'delayed',
+      'paused',
+      'active',
+      'failed',
+      'completed',
+    ] as const;
+
+    const collected: Job[] = [];
+    const seen = new Set<string>();
+    for (const state of states) {
+      let list: Job[] = [];
+      try {
+        const limit =
+          state === 'completed' ? 6 : state === 'failed' ? 12 : state === 'active' ? 15 : 25;
+        list = await this.queue.getJobs([state], 0, limit, false);
+      } catch {
+        continue;
+      }
+      for (const j of list) {
+        const key = `${j.id ?? 'noid'}:${j.name}:${j.timestamp}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        collected.push(j);
+      }
+    }
+
+    collected.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+
+    const jobs = await Promise.all(
+      collected.slice(0, 40).map(async (j: Job) => {
+        let state: string;
+        try {
+          state = await j.getState();
+        } catch {
+          state = 'unknown';
+        }
+        return {
+          id: j.id != null ? String(j.id) : null,
+          name: j.name,
+          state,
+          data: j.data ?? {},
+          timestamp: j.timestamp,
+          processedOn: j.processedOn ?? null,
+          finishedOn: j.finishedOn ?? null,
+          failedReason: j.failedReason ?? null,
+        };
+      }),
+    );
+
+    const recentRuns = await this.runRepo.find({
+      order: { downloadedAt: 'DESC' },
+      take: 15,
+      select: {
+        id: true,
+        sourceUrl: true,
+        status: true,
+        downloadedAt: true,
+        rowCount: true,
+        errorMessage: true,
+        parserProfile: true,
+        zipObjectKey: true,
+        txtObjectKey: true,
+        effectiveDate: true,
+      },
+    });
+
+    return {
+      pipelineKind: 'bolagsverket_bulk_archive',
+      description: {
+        headline:
+          'Bolagsverket bulk ingestion is a file pipeline: download a ZIP archive, extract the bulk TXT, parse lines, and write to bv_* bulk tables. It is not the same as live per-company HVD or Företagsinformation API calls.',
+        not_customer_bulk_ui:
+          'This queue is not the in-app /bulk page: customer bulk jobs submit org numbers and call normal company APIs per row. They never download the national ZIP or populate bv_bulk_* from that archive.',
+        tables_written: [
+          'bv_bulk_file_runs — archive metadata (object keys, hashes, parser profile, status).',
+          'bv_bulk_raw_rows — raw line staging; bv_bulk_run_checkpoints — resumable ingest progress.',
+          'bv_bulk_companies_staging — parsed rows; bv_bulk_company_current — latest bulk snapshot per org.',
+          'bv_bulk_company_history — new/updated/removed tied to file_run_id.',
+        ],
+        company_read_model_flags:
+          'Seeding into the main company table sets sourcePayloadSummary.depth_source to "bolagsverket_bulk" and source_file_run_id so bulk-file provenance is visible next to live API snapshots.',
+      },
+      queueName: BOLAGSVERKET_BULK_QUEUE,
+      jobNames: BolagsverketBulkJobName,
+      counts,
+      jobs,
+      recentFileRuns: recentRuns.map(r => ({
+        id: r.id,
+        sourceUrl: r.sourceUrl,
+        status: r.status,
+        downloadedAt: r.downloadedAt,
+        effectiveDate: r.effectiveDate,
+        rowCount: r.rowCount,
+        errorMessage: r.errorMessage,
+        parserProfile: r.parserProfile,
+        zipObjectKey: r.zipObjectKey,
+        txtObjectKey: r.txtObjectKey,
+      })),
+    };
   }
 
   private async maybeEmitOpsAlert(runId: string): Promise<void> {

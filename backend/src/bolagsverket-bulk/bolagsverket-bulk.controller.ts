@@ -57,6 +57,12 @@ export class BolagsverketBulkController {
     return this.bulkService.listWeeklyRuns(Number(limit ?? 52));
   }
 
+  @Get('runs/queue-status')
+  getFileIngestionQueue(@Req() req: Request) {
+    this.assertPlatformAdmin(req);
+    return this.bulkService.getFileIngestionQueueSnapshot();
+  }
+
   @Get('runs/:runId/files')
   getRunFiles(@Req() req: Request, @Param('runId') runId: string) {
     this.assertPlatformAdmin(req);

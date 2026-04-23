@@ -19,6 +19,7 @@ import {
   StatusChip,
 } from '@/components/company/workspace-ui';
 import { AnnualReportsWorkspacePanel } from '@/components/company/AnnualReportsWorkspacePanel';
+import { BolagsverketBulkFileIngestionPanel } from '@/components/bulk/BolagsverketBulkFileIngestionPanel';
 import type {
   CompanyServingBundle,
   CompanyServingBundleDiagnostics,
@@ -518,8 +519,6 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
   const [decisionActionMsg, setDecisionActionMsg] = useState('');
   const [namnskyddslopnummer, setNamnskyddslopnummer] = useState('');
   const namnskyddRef = useRef('');
-  const [bulkIngestBusy, setBulkIngestBusy] = useState(false);
-  const [bulkIngestMsg, setBulkIngestMsg] = useState('');
   useEffect(() => {
     namnskyddRef.current = namnskyddslopnummer;
   }, [namnskyddslopnummer]);
@@ -787,7 +786,6 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
   const dualGapIsDegraded = !hasDualApiCoverage && hasPartialSignals;
 
   const bundleDiag = serving.diagnostics as CompanyServingBundleDiagnostics | undefined;
-  const isPlatformAdmin = true;
 
   const hvdEndpointOrg = extractHvdOrganisation(hvdOrg.data);
   const servingOverviewRows = serving.overview ? buildServingOverviewSummary(serving.overview) : [];
@@ -1234,38 +1232,7 @@ export function CompanyWorkspace({ orgNumberFromRoute }: CompanyWorkspaceProps) 
         </div>
       </details>
 
-      {isPlatformAdmin ? (
-        <div className="flex flex-col gap-2 border border-dashed border-foreground/40 p-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="mono-label text-[10px]">Bulk ingestion</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Ingest the latest Bolagsverket bulk file (same as Dashboard bulk ops). This can take several minutes.
-            </p>
-            {bulkIngestMsg ? <p className="mt-2 font-mono text-xs">{bulkIngestMsg}</p> : null}
-          </div>
-          <button
-            type="button"
-            disabled={bulkIngestBusy}
-            onClick={() => {
-              setBulkIngestBusy(true);
-              setBulkIngestMsg('');
-              void api
-                .forceBulkRunNow()
-                .then((r) => {
-                  const row = r as { runId?: string; rowCount?: number; applied?: number; deduplicatedByHash?: boolean };
-                  setBulkIngestMsg(
-                    `Run ${row.runId ?? '—'} · rows ${row.rowCount ?? '—'} · applied ${row.applied ?? '—'} · dedup=${String(row.deduplicatedByHash ?? false)}`,
-                  );
-                })
-                .catch((e: unknown) => setBulkIngestMsg(e instanceof Error ? e.message : 'Bulk ingest request failed'))
-                .finally(() => setBulkIngestBusy(false));
-            }}
-            className="border-2 border-foreground bg-background px-4 py-2 font-mono text-[10px] uppercase tracking-widest hover:bg-muted disabled:opacity-50"
-          >
-            {bulkIngestBusy ? 'Starting…' : 'Ingest latest bulk file'}
-          </button>
-        </div>
-      ) : null}
+      <BolagsverketBulkFileIngestionPanel variant="workspace" />
 
       {servingMeta.loading ? (
         <p className="text-sm text-muted-foreground">Updating read-model tables…</p>
