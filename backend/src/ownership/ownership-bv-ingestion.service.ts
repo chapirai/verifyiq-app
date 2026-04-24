@@ -17,6 +17,46 @@ function lowerCaseRowKeys(row: Record<string, unknown>): Record<string, unknown>
   return out;
 }
 
+/** TypeORM usually returns an array of rows; unwrap driver `{ rows }` if present. */
+function extractQueryRowArray(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object' && Array.isArray((raw as { rows?: unknown }).rows)) {
+    return (raw as { rows: unknown[] }).rows;
+  }
+  return [];
+}
+
+/**
+ * Decode one row from `drainIngestQueue` (object keys, mixed case, or pg array-mode).
+ * RETURNING column order: queue_id, tenant_id, organisationsnummer.
+ */
+function parseOwnershipQueueDrainRow(r: unknown): {
+  rowId: string;
+  tenantId: string;
+  organisationNumber: string;
+  rawForLog: Record<string, unknown>;
+} {
+  if (r != null && Array.isArray(r) && r.length >= 3) {
+    const rowId = String(r[0] ?? '').trim();
+    const tenantId = String(r[1] ?? '').trim();
+    const organisationNumber = String(r[2] ?? '').trim();
+    return {
+      rowId,
+      tenantId,
+      organisationNumber,
+      rawForLog: { '0': r[0], '1': r[1], '2': r[2] } as Record<string, unknown>,
+    };
+  }
+  if (r != null && typeof r === 'object' && !Array.isArray(r)) {
+    const o = lowerCaseRowKeys(r as Record<string, unknown>);
+    const rowId = String(o.queue_id ?? o.id ?? o['0'] ?? '').trim();
+    const tenantId = String(o.tenant_id ?? o['1'] ?? '').trim();
+    const organisationNumber = String(o.organisationsnummer ?? o['2'] ?? '').trim();
+    return { rowId, tenantId, organisationNumber, rawForLog: o };
+  }
+  return { rowId: '', tenantId: '', organisationNumber: '', rawForLog: {} };
+}
+
 type FiLatestRow = {
   id: string;
   raw_item: Record<string, unknown>;
@@ -46,12 +86,13 @@ export class OwnershipBvIngestionService {
    * Drain rows enqueued by bv_pipeline.process_refresh_queue after bv_read refresh.
    */
   async drainIngestQueue(batchSize = 25): Promise<number> {
-    const rows = await this.dataSource.query<
-      { id: string; tenant_id: string; organisationsnummer: string }[]
-    >(
+    const raw = await this.dataSource.query(
       `
-      WITH picked AS (
-        SELECT id FROM bv_pipeline.ownership_ingest_queue
+      UPDATE bv_pipeline.ownership_ingest_queue q
+      SET processed_at = NOW()
+      FROM (
+        SELECT id, tenant_id, organisationsnummer
+        FROM bv_pipeline.ownership_ingest_queue
         WHERE processed_at IS NULL
           AND tenant_id IS NOT NULL
           AND organisationsnummer IS NOT NULL
@@ -59,26 +100,22 @@ export class OwnershipBvIngestionService {
         ORDER BY id
         LIMIT $1
         FOR UPDATE SKIP LOCKED
-      )
-      UPDATE bv_pipeline.ownership_ingest_queue q
-      SET processed_at = NOW()
-      FROM picked
+      ) picked
       WHERE q.id = picked.id
-      RETURNING q.id::text AS queue_id,
-                q.tenant_id::text AS tenant_id,
-                q.organisationsnummer::text AS organisationsnummer
+      RETURNING picked.id::text AS queue_id,
+                picked.tenant_id::text AS tenant_id,
+                picked.organisationsnummer::text AS organisationsnummer
       `,
       [batchSize],
     );
 
+    const rows = extractQueryRowArray(raw);
+
     let ok = 0;
-    for (const r of rows as Array<Record<string, unknown>>) {
-      const o = lowerCaseRowKeys(r);
-      const rowId = String(o.queue_id ?? o.id ?? '').trim();
-      const tenantId = String(o.tenant_id ?? '').trim();
-      const organisationNumber = String(o.organisationsnummer ?? '').trim();
+    for (const r of rows) {
+      const { rowId, tenantId, organisationNumber, rawForLog } = parseOwnershipQueueDrainRow(r);
       if (!tenantId || !organisationNumber) {
-        this.trackMalformedRow(rowId, tenantId, organisationNumber, o);
+        this.trackMalformedRow(rowId, tenantId, organisationNumber, rawForLog, r);
         continue;
       }
       try {
@@ -98,6 +135,8 @@ export class OwnershipBvIngestionService {
     tenantId: string,
     organisationNumber: string,
     rawRow?: Record<string, unknown>,
+    /** Original driver value when shape is unexpected (logged once per window, truncated). */
+    rawOriginal?: unknown,
   ): void {
     const now = Date.now();
     const windowMs = 60_000;
@@ -120,8 +159,21 @@ export class OwnershipBvIngestionService {
         `Skipping malformed ownership ingest row id=${rowId || 'n/a'} tenant=${tenantId || 'n/a'} org=${organisationNumber || 'n/a'}` +
         (keys ? ` (row keys: ${keys})` : '');
       if (!keys) {
+        const type = rawOriginal === null ? 'null' : Array.isArray(rawOriginal) ? 'array' : typeof rawOriginal;
+        let sample: string;
+        if (type === 'array') {
+          sample = `length=${(rawOriginal as unknown[]).length}`;
+        } else if (type === 'object' && rawOriginal) {
+          try {
+            sample = JSON.stringify(rawOriginal).slice(0, 240);
+          } catch {
+            sample = '[unserializable]';
+          }
+        } else {
+          sample = String(type);
+        }
         this.logger.warn(
-          `${detail} — empty RETURNING row shape; check DB driver and bv_pipeline.ownership_ingest_queue migration version.`,
+          `${detail} — empty decoded row (${type}: ${sample}). Queue rows were already marked processed_at; fix decoding or re-enqueue affected ids from DB audit.`,
         );
       } else {
         this.logger.debug(detail);
