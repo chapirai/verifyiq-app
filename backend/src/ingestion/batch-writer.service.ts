@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { BvBulkRawRowEntity } from '../bolagsverket-bulk/entities/bv-bulk-raw-row.entity';
 import { BvBulkCompanyStagingEntity } from '../bolagsverket-bulk/entities/bv-bulk-company-staging.entity';
@@ -7,7 +8,10 @@ import { RawRecordLineageEntity } from './entities/raw-record-lineage.entity';
 
 @Injectable()
 export class BatchWriterService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly config: ConfigService,
+  ) {}
 
   async writeStagingBatch(input: {
     fileRunId: string;
@@ -21,7 +25,9 @@ export class BatchWriterService {
     const stagingWritten = input.stagingRows.length;
     const failedRows = input.rawRows.reduce((acc, row) => acc + (row.parsedOk ? 0 : 1), 0);
 
-    await this.dataSource.transaction(async manager => {
+    const timeoutMs = Math.max(1000, Number(this.config.get<number>('INGESTION_DB_WRITE_TIMEOUT_MS', 30000)));
+    await Promise.race([
+      this.dataSource.transaction(async manager => {
       if (rowsWritten > 0) await manager.insert(BvBulkRawRowEntity, input.rawRows);
       if (stagingWritten > 0) await manager.insert(BvBulkCompanyStagingEntity, input.stagingRows);
 
@@ -42,7 +48,11 @@ export class BatchWriterService {
         rowsWritten,
         stagingWritten,
       });
-    });
+      }),
+      new Promise((_resolve, reject) =>
+        setTimeout(() => reject(new Error(`DB batch write timed out after ${timeoutMs}ms`)), timeoutMs),
+      ),
+    ]);
 
     return { rowsWritten, stagingWritten, failedRows };
   }

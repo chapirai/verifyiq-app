@@ -348,13 +348,19 @@ export class BolagsverketBulkService {
     sourceFileKey: string,
     ingestionRunId: string,
   ): Promise<IngestStats> {
-    const chunkSize = Math.max(50, Number(this.config.get<number>('BV_BULK_BATCH_SIZE', 500)));
+    const configuredBatch = Number(this.config.get<number>('INGESTION_BATCH_SIZE', 250));
+    const initialBatchSize = Math.max(50, Math.min(1000, configuredBatch));
+    let currentBatchSize = initialBatchSize;
     const yieldEveryLines = Math.max(1000, Number(this.config.get<number>('BV_BULK_YIELD_EVERY_LINES', 5000)));
+    const progressLogEveryRows = Math.max(
+      1000,
+      Number(this.config.get<number>('INGESTION_PROGRESS_LOG_EVERY_ROWS', 5000)),
+    );
     const baseChunkPauseMs = Math.max(0, Number(this.config.get<number>('BV_BULK_CHUNK_PAUSE_MS', 5)));
     const autoThrottleEnabled = String(this.config.get<string>('BV_BULK_AUTO_THROTTLE_ENABLED', 'true')).toLowerCase() === 'true';
     const autoThrottleMaxPauseMs = Math.max(baseChunkPauseMs, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MAX_PAUSE_MS', 100)));
-    const memWarnMb = Math.max(64, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MEM_WARN_MB', 350)));
-    const memHardMb = Math.max(memWarnMb, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MEM_HARD_MB', 500)));
+    const memWarnMb = Math.max(64, Number(this.config.get<number>('INGESTION_MEMORY_WARN_MB', 350)));
+    const memHardMb = Math.max(memWarnMb, Number(this.config.get<number>('INGESTION_MEMORY_PAUSE_MB', 425)));
     const lagWarnMs = Math.max(10, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_EVENT_LOOP_WARN_MS', 80)));
     const lagHardMs = Math.max(lagWarnMs, Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_EVENT_LOOP_HARD_MS', 140)));
     const loopLag = monitorEventLoopDelay({ resolution: 20 });
@@ -399,19 +405,34 @@ export class BolagsverketBulkService {
         recordsFailed: rowsFailed,
         memoryPeakMb,
       });
-      this.ingestionLogger.progress({
-        runId: ingestionRunId,
-        phase: 'flush_batch',
-        recordsSeen: lineNumber,
-        recordsInserted: rowsInserted,
-        recordsFailed: rowsFailed,
-        memoryRssMb: mem.rssMb,
-        at: new Date().toISOString(),
-      });
-      if (mem.unsafe) {
-        throw new Error(
-          `Memory guard triggered: rss=${mem.rssMb}MB exceeds INGESTION_MEMORY_FAIL_MB=${mem.failMb}`,
+      if (lineNumber % progressLogEveryRows === 0 || this.memoryGuard.shouldWarn(mem)) {
+        this.ingestionLogger.progress({
+          runId: ingestionRunId,
+          phase: 'flush_batch',
+          recordsSeen: lineNumber,
+          recordsInserted: rowsInserted,
+          recordsFailed: rowsFailed,
+          memoryRssMb: mem.rssMb,
+          at: new Date().toISOString(),
+        });
+      }
+      if (this.memoryGuard.shouldFail(mem)) {
+        throw new Error('Stopped before Render OOM: memory exceeded safe threshold');
+      }
+      if (this.memoryGuard.shouldWarn(mem) && currentBatchSize > 50) {
+        currentBatchSize = Math.max(50, Math.floor(currentBatchSize * 0.8));
+        this.logger.warn(
+          `Ingestion memory warning at ${mem.rssMb}MB; reducing batch size to ${currentBatchSize}.`,
         );
+      }
+      if (this.memoryGuard.shouldPause(mem)) {
+        this.logger.warn(
+          `Ingestion memory critical at ${mem.rssMb}MB; pausing parser and attempting recovery.`,
+        );
+        const recovered = await this.memoryGuard.recoverFromCriticalPressure();
+        if (this.memoryGuard.shouldFail(recovered)) {
+          throw new Error('Stopped before Render OOM: memory exceeded safe threshold');
+        }
       }
       const pauseMs = adaptivePauseMs();
       if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
@@ -457,7 +478,7 @@ export class BolagsverketBulkService {
             parseError: err instanceof Error ? err.message : String(err),
           });
         }
-        if (rawChunk.length >= chunkSize) await flush();
+        if (rawChunk.length >= currentBatchSize) await flush();
         if (lineNumber % yieldEveryLines === 0) await new Promise(resolve => setImmediate(resolve));
       }
       await flush();
@@ -835,7 +856,7 @@ export class BolagsverketBulkService {
     }
 
     const cfg = {
-      batchSize: Number(this.config.get<number>('BV_BULK_BATCH_SIZE', 500)),
+      batchSize: Math.max(50, Math.min(1000, Number(this.config.get<number>('INGESTION_BATCH_SIZE', 250)))),
       maxTxtBytes: Number(this.config.get<number>('BV_BULK_MAX_TXT_BYTES', 350_000_000)),
       yieldEveryLines: Number(this.config.get<number>('BV_BULK_YIELD_EVERY_LINES', 5000)),
       baseChunkPauseMs: Number(this.config.get<number>('BV_BULK_CHUNK_PAUSE_MS', 5)),
@@ -844,6 +865,9 @@ export class BolagsverketBulkService {
       autoThrottleMaxPauseMs: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MAX_PAUSE_MS', 100)),
       autoThrottleMemWarnMb: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MEM_WARN_MB', 350)),
       autoThrottleMemHardMb: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_MEM_HARD_MB', 500)),
+      ingestionMemoryWarnMb: Number(this.config.get<number>('INGESTION_MEMORY_WARN_MB', 350)),
+      ingestionMemoryPauseMb: Number(this.config.get<number>('INGESTION_MEMORY_PAUSE_MB', 425)),
+      ingestionMemoryFailMb: Number(this.config.get<number>('INGESTION_MEMORY_FAIL_MB', 475)),
       autoThrottleLagWarnMs: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_EVENT_LOOP_WARN_MS', 80)),
       autoThrottleLagHardMs: Number(this.config.get<number>('BV_BULK_AUTO_THROTTLE_EVENT_LOOP_HARD_MS', 140)),
       queueConcurrency: 1,
@@ -854,7 +878,7 @@ export class BolagsverketBulkService {
     if (redisPolicy && redisPolicy !== expectedPolicy) {
       warnings.push(`Redis eviction policy is "${redisPolicy}" (recommended "${expectedPolicy}" for queues).`);
     }
-    if (cfg.batchSize > 1000) warnings.push('BV_BULK_BATCH_SIZE is high for low-memory tiers; prefer <= 500.');
+    if (cfg.batchSize > 1000) warnings.push('INGESTION_BATCH_SIZE is above safe cap; use <= 1000 (prefer 250 for 512MB tiers).');
     if (!cfg.autoThrottleEnabled) warnings.push('Auto-throttle is disabled; ingestion may impact API latency on small instances.');
     if (cfg.autoThrottleMaxPauseMs < 20) warnings.push('Auto-throttle max pause is low; burst pressure may still occur under load.');
 
