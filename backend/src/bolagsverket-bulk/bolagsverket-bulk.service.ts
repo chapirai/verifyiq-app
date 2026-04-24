@@ -12,7 +12,6 @@ import { Readable } from 'stream';
 import { monitorEventLoopDelay } from 'perf_hooks';
 import { BolagsverketService } from '../companies/services/bolagsverket.service';
 import { BolagsverketBulkStorageService } from './bolagsverket-bulk.storage.service';
-import { BolagsverketBulkParser } from './bolagsverket-bulk.parser';
 import { BolagsverketBulkUpsertService } from './bolagsverket-bulk-upsert.service';
 import { BvBulkFileRunEntity } from './entities/bv-bulk-file-run.entity';
 import { BvBulkRawRowEntity } from './entities/bv-bulk-raw-row.entity';
@@ -34,8 +33,14 @@ import {
   BolagsverketBulkJobName,
   ProcessEnrichmentRequestJobData,
 } from './queues/bolagsverket-bulk.queue';
+import { BatchWriterService } from '../ingestion/batch-writer.service';
+import { BolagsverketLineParserService } from '../ingestion/bolagsverket-line-parser.service';
+import { IngestionService } from '../ingestion/ingestion.service';
+import { IngestionLoggerService } from '../ingestion/ingestion-logger.service';
+import { MemoryGuardService } from '../ingestion/memory-guard.service';
 
 const ADMIN_READ_ROLES = ['admin'] as const;
+type IngestStats = { lineCount: number; rowsInserted: number; rowsFailed: number; memoryPeakMb: number };
 
 @Injectable()
 export class BolagsverketBulkService {
@@ -46,7 +51,11 @@ export class BolagsverketBulkService {
     private readonly httpService: HttpService,
     private readonly auditService: AuditService,
     private readonly storage: BolagsverketBulkStorageService,
-    private readonly parser: BolagsverketBulkParser,
+    private readonly lineParser: BolagsverketLineParserService,
+    private readonly batchWriter: BatchWriterService,
+    private readonly ingestionService: IngestionService,
+    private readonly ingestionLogger: IngestionLoggerService,
+    private readonly memoryGuard: MemoryGuardService,
     private readonly upsert: BolagsverketBulkUpsertService,
     private readonly bolagsverketService: BolagsverketService,
     @InjectRepository(BvBulkFileRunEntity)
@@ -130,14 +139,47 @@ export class BolagsverketBulkService {
       );
     const now = new Date();
     const parserProfile = this.config.get<string>('BV_BULK_PARSER_PROFILE', 'default_v1');
+    const ingestionRun = await this.ingestionService.startRun({
+      sourceProvider: 'bolagsverket',
+      ingestionType: 'weekly_bulk',
+    });
     const dl = await this.storage.downloadAndArchiveWeeklyZip(sourceUrl);
+    await this.ingestionService.updateRunProgress(ingestionRun.id, { r2ObjectKey: dl.zipObjectKey });
+    await this.ingestionService.persistSourceFile({
+      provider: 'bolagsverket.bulk.zip',
+      sha256: dl.zipSha256,
+      sizeBytes: dl.zipSizeBytes,
+      r2ObjectKey: dl.zipObjectKey,
+      contentType: 'application/zip',
+    });
+    await this.ingestionService.persistSourceFile({
+      provider: 'bolagsverket.bulk.txt',
+      sha256: dl.txtSha256,
+      sizeBytes: dl.txtSizeBytes,
+      r2ObjectKey: dl.txtObjectKey,
+      contentType: 'text/plain; charset=utf-8',
+    });
     const maxTxtBytes = Number(this.config.get<number>('BV_BULK_MAX_TXT_BYTES', 350_000_000));
     if (maxTxtBytes > 0 && dl.txtSizeBytes > maxTxtBytes) {
-      throw new Error(`Bulk TXT too large (${dl.txtSizeBytes} bytes), exceeds BV_BULK_MAX_TXT_BYTES=${maxTxtBytes}`);
+      const msg = `Bulk TXT too large (${dl.txtSizeBytes} bytes), exceeds BV_BULK_MAX_TXT_BYTES=${maxTxtBytes}`;
+      await this.ingestionService.finishRunFailure(ingestionRun.id, {
+        recordsSeen: 0,
+        recordsInserted: 0,
+        recordsFailed: 0,
+        memoryPeakMb: this.memoryGuard.snapshot().rssMb,
+        errorMessage: msg,
+      });
+      throw new Error(msg);
     }
 
     const existingByHash = await this.runRepo.findOne({ where: { zipSha256: dl.zipSha256 } });
     if (existingByHash && !force) {
+      await this.ingestionService.finishRunSuccess(ingestionRun.id, {
+        recordsSeen: existingByHash.rowCount,
+        recordsInserted: 0,
+        recordsFailed: 0,
+        memoryPeakMb: this.memoryGuard.snapshot().rssMb,
+      });
       return {
         runId: existingByHash.id,
         rowCount: existingByHash.rowCount,
@@ -162,10 +204,13 @@ export class BolagsverketBulkService {
         status: 'downloaded',
       }),
     );
+    let lastIngestStats: IngestStats | null = null;
 
     try {
       const txtStream = await this.storage.getObjectStream(dl.txtObjectKey);
-      const lineCount = await this.ingestStreamWithCheckpoints(run.id, txtStream, parserProfile);
+      const ingestStats = await this.ingestStreamWithCheckpoints(run.id, txtStream, parserProfile, dl.txtObjectKey, ingestionRun.id);
+      lastIngestStats = ingestStats;
+      const lineCount = ingestStats.lineCount;
 
       run.rowCount = lineCount;
       run.status = 'parsed';
@@ -180,6 +225,12 @@ export class BolagsverketBulkService {
       run.status = 'applied';
       await this.runRepo.save(run);
       await this.maybeEmitOpsAlert(run.id);
+      await this.ingestionService.finishRunSuccess(ingestionRun.id, {
+        recordsSeen: ingestStats.lineCount,
+        recordsInserted: ingestStats.rowsInserted,
+        recordsFailed: ingestStats.rowsFailed,
+        memoryPeakMb: ingestStats.memoryPeakMb,
+      });
       return {
         runId: run.id,
         rowCount: lineCount,
@@ -192,6 +243,14 @@ export class BolagsverketBulkService {
       run.status = 'failed';
       run.errorMessage = err instanceof Error ? err.message : String(err);
       await this.runRepo.save(run);
+      const partial = this.extractPartialStats(err) ?? lastIngestStats;
+      await this.ingestionService.finishRunFailure(ingestionRun.id, {
+        recordsSeen: partial?.lineCount ?? 0,
+        recordsInserted: partial?.rowsInserted ?? 0,
+        recordsFailed: partial?.rowsFailed ?? 0,
+        memoryPeakMb: partial?.memoryPeakMb ?? this.memoryGuard.snapshot().rssMb,
+        errorMessage: run.errorMessage ?? 'Bulk ingestion failed',
+      });
       throw err;
     }
   }
@@ -221,9 +280,23 @@ export class BolagsverketBulkService {
         status: 'downloaded',
       }),
     );
+    const ingestionRun = await this.ingestionService.startRun({
+      sourceProvider: 'bolagsverket',
+      ingestionType: 'replay_bulk',
+      r2ObjectKey: sourceRun.zipObjectKey,
+    });
+    let lastIngestStats: IngestStats | null = null;
     try {
       const txtStream = await this.storage.getObjectStream(sourceRun.txtObjectKey);
-      const lineCount = await this.ingestStreamWithCheckpoints(replayRun.id, txtStream, parserProfile);
+      const ingestStats = await this.ingestStreamWithCheckpoints(
+        replayRun.id,
+        txtStream,
+        parserProfile,
+        sourceRun.txtObjectKey,
+        ingestionRun.id,
+      );
+      lastIngestStats = ingestStats;
+      const lineCount = ingestStats.lineCount;
       replayRun.rowCount = lineCount;
       replayRun.status = 'parsed';
       await this.runRepo.save(replayRun);
@@ -233,6 +306,12 @@ export class BolagsverketBulkService {
       replayRun.status = 'applied';
       await this.runRepo.save(replayRun);
       await this.maybeEmitOpsAlert(replayRun.id);
+      await this.ingestionService.finishRunSuccess(ingestionRun.id, {
+        recordsSeen: ingestStats.lineCount,
+        recordsInserted: ingestStats.rowsInserted,
+        recordsFailed: ingestStats.rowsFailed,
+        memoryPeakMb: ingestStats.memoryPeakMb,
+      });
       return {
         replayRunId: replayRun.id,
         sourceRunId: sourceRun.id,
@@ -245,6 +324,14 @@ export class BolagsverketBulkService {
       replayRun.status = 'failed';
       replayRun.errorMessage = err instanceof Error ? err.message : String(err);
       await this.runRepo.save(replayRun);
+      const partial = this.extractPartialStats(err) ?? lastIngestStats;
+      await this.ingestionService.finishRunFailure(ingestionRun.id, {
+        recordsSeen: partial?.lineCount ?? 0,
+        recordsInserted: partial?.rowsInserted ?? 0,
+        recordsFailed: partial?.rowsFailed ?? 0,
+        memoryPeakMb: partial?.memoryPeakMb ?? this.memoryGuard.snapshot().rssMb,
+        errorMessage: replayRun.errorMessage ?? 'Replay ingestion failed',
+      });
       throw err;
     }
   }
@@ -254,7 +341,13 @@ export class BolagsverketBulkService {
     return createHash('sha256').update(seed).digest('hex');
   }
 
-  private async ingestStreamWithCheckpoints(fileRunId: string, stream: Readable, parserProfile: string): Promise<number> {
+  private async ingestStreamWithCheckpoints(
+    fileRunId: string,
+    stream: Readable,
+    parserProfile: string,
+    sourceFileKey: string,
+    ingestionRunId: string,
+  ): Promise<IngestStats> {
     const chunkSize = Math.max(50, Number(this.config.get<number>('BV_BULK_BATCH_SIZE', 500)));
     const yieldEveryLines = Math.max(1000, Number(this.config.get<number>('BV_BULK_YIELD_EVERY_LINES', 5000)));
     const baseChunkPauseMs = Math.max(0, Number(this.config.get<number>('BV_BULK_CHUNK_PAUSE_MS', 5)));
@@ -269,6 +362,9 @@ export class BolagsverketBulkService {
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     let lineNumber = 0;
     let checkpointSeq = 0;
+    let rowsInserted = 0;
+    let rowsFailed = 0;
+    let memoryPeakMb = this.memoryGuard.snapshot().rssMb;
     let rawChunk: Array<Partial<BvBulkRawRowEntity>> = [];
     let stagingChunk: Array<Partial<BvBulkCompanyStagingEntity>> = [];
     const adaptivePauseMs = (): number => {
@@ -283,21 +379,40 @@ export class BolagsverketBulkService {
     const flush = async () => {
       if (rawChunk.length === 0 && stagingChunk.length === 0) return;
       checkpointSeq += 1;
-      const rowsWritten = rawChunk.length;
-      const stagingWritten = stagingChunk.length;
-      await this.dataSource.transaction(async manager => {
-        if (rowsWritten > 0) await manager.insert(BvBulkRawRowEntity, rawChunk);
-        if (stagingWritten > 0) await manager.insert(BvBulkCompanyStagingEntity, stagingChunk);
-        await manager.insert(BvBulkRunCheckpointEntity, {
-          fileRunId,
-          checkpointSeq,
-          lastLineNumber: lineNumber,
-          rowsWritten,
-          stagingWritten,
-        });
+      const write = await this.batchWriter.writeStagingBatch({
+        fileRunId,
+        checkpointSeq,
+        lastLineNumber: lineNumber,
+        sourceFileKey,
+        rawRows: rawChunk,
+        stagingRows: stagingChunk,
       });
+      rowsInserted += write.stagingWritten;
+      rowsFailed += write.failedRows;
       rawChunk = [];
       stagingChunk = [];
+      const mem = this.memoryGuard.snapshot();
+      memoryPeakMb = Math.max(memoryPeakMb, mem.rssMb);
+      await this.ingestionService.updateRunProgress(ingestionRunId, {
+        recordsSeen: lineNumber,
+        recordsInserted: rowsInserted,
+        recordsFailed: rowsFailed,
+        memoryPeakMb,
+      });
+      this.ingestionLogger.progress({
+        runId: ingestionRunId,
+        phase: 'flush_batch',
+        recordsSeen: lineNumber,
+        recordsInserted: rowsInserted,
+        recordsFailed: rowsFailed,
+        memoryRssMb: mem.rssMb,
+        at: new Date().toISOString(),
+      });
+      if (mem.unsafe) {
+        throw new Error(
+          `Memory guard triggered: rss=${mem.rssMb}MB exceeds INGESTION_MEMORY_FAIL_MB=${mem.failMb}`,
+        );
+      }
       const pauseMs = adaptivePauseMs();
       if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
     };
@@ -308,7 +423,7 @@ export class BolagsverketBulkService {
         if (!line.trim()) continue;
         lineNumber += 1;
         try {
-          const parsed = this.parser.parseLineToStaging(line, parserProfile);
+          const parsed = this.lineParser.parseLine(line, lineNumber, parserProfile);
           rawChunk.push({ fileRunId, lineNumber, rawLine: line, parsedOk: true, parseError: null });
           stagingChunk.push({
             fileRunId,
@@ -346,10 +461,33 @@ export class BolagsverketBulkService {
         if (lineNumber % yieldEveryLines === 0) await new Promise(resolve => setImmediate(resolve));
       }
       await flush();
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      (e as Error & { ingestStats?: IngestStats }).ingestStats = {
+        lineCount: lineNumber,
+        rowsInserted,
+        rowsFailed,
+        memoryPeakMb,
+      };
+      throw e;
     } finally {
       loopLag.disable();
     }
-    return lineNumber;
+    return { lineCount: lineNumber, rowsInserted, rowsFailed, memoryPeakMb };
+  }
+
+  private extractPartialStats(err: unknown): IngestStats | null {
+    const stats = (err as { ingestStats?: IngestStats } | null)?.ingestStats;
+    if (!stats) return null;
+    if (
+      typeof stats.lineCount !== 'number' ||
+      typeof stats.rowsInserted !== 'number' ||
+      typeof stats.rowsFailed !== 'number' ||
+      typeof stats.memoryPeakMb !== 'number'
+    ) {
+      return null;
+    }
+    return stats;
   }
 
   async listCurrentShallow(query: { q?: string; page?: number; limit?: number; seedState?: string }) {

@@ -5,6 +5,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditModule } from '../audit/audit.module';
 import { ApiQuotaModule } from '../common/api-quota.module';
 import { CompaniesModule } from '../companies/companies.module';
+import { IngestionModule } from '../ingestion/ingestion.module';
+import { ObjectStorageModule } from '../object-storage/object-storage.module';
 import { CompanyEntity } from '../companies/entities/company.entity';
 import { UsageEventEntity } from '../audit/usage-event.entity';
 import { SubscriptionEntity } from '../billing/entities/subscription.entity';
@@ -32,6 +34,8 @@ import { BOLAGSVERKET_BULK_QUEUE } from './queues/bolagsverket-bulk.queue';
     AuditModule,
     ApiQuotaModule,
     CompaniesModule,
+    IngestionModule,
+    ObjectStorageModule,
     BullModule.registerQueue({ name: BOLAGSVERKET_BULK_QUEUE }),
     TypeOrmModule.forFeature([
       BvBulkFileRunEntity,
