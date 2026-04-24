@@ -8,6 +8,15 @@ import {
 
 export const BV_FI_ORG_ENGAGEMENT_INGESTION_SOURCE = 'bolagsverket_fi.organisationsengagemang';
 
+/** pg/TypeORM raw rows use lowercase keys; normalize in case a driver returns mixed case. */
+function lowerCaseRowKeys(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[k.toLowerCase()] = v;
+  }
+  return out;
+}
+
 type FiLatestRow = {
   id: string;
   raw_item: Record<string, unknown>;
@@ -20,9 +29,15 @@ type FiLatestRow = {
 @Injectable()
 export class OwnershipBvIngestionService {
   private readonly logger = new Logger(OwnershipBvIngestionService.name);
-  private malformedRowLogState: { windowStart: number; count: number } = {
+  private malformedRowLogState: {
+    windowStart: number;
+    count: number;
+    /** Last queue row id seen in the current window (for accurate summaries). */
+    lastQueueId: string;
+  } = {
     windowStart: Date.now(),
     count: 0,
+    lastQueueId: '',
   };
 
   constructor(private readonly dataSource: DataSource) {}
@@ -58,11 +73,12 @@ export class OwnershipBvIngestionService {
 
     let ok = 0;
     for (const r of rows as Array<Record<string, unknown>>) {
-      const rowId = String(r.queue_id ?? r.id ?? '').trim();
-      const tenantId = String(r.tenant_id ?? '').trim();
-      const organisationNumber = String(r.organisationsnummer ?? '').trim();
+      const o = lowerCaseRowKeys(r);
+      const rowId = String(o.queue_id ?? o.id ?? '').trim();
+      const tenantId = String(o.tenant_id ?? '').trim();
+      const organisationNumber = String(o.organisationsnummer ?? '').trim();
       if (!tenantId || !organisationNumber) {
-        this.trackMalformedRow(rowId, tenantId, organisationNumber);
+        this.trackMalformedRow(rowId, tenantId, organisationNumber, o);
         continue;
       }
       try {
@@ -77,22 +93,39 @@ export class OwnershipBvIngestionService {
     return ok;
   }
 
-  private trackMalformedRow(rowId: string, tenantId: string, organisationNumber: string): void {
+  private trackMalformedRow(
+    rowId: string,
+    tenantId: string,
+    organisationNumber: string,
+    rawRow?: Record<string, unknown>,
+  ): void {
     const now = Date.now();
     const windowMs = 60_000;
     if (now - this.malformedRowLogState.windowStart >= windowMs) {
       if (this.malformedRowLogState.count > 0) {
+        const latestId = this.malformedRowLogState.lastQueueId || 'n/a';
         this.logger.warn(
-          `Skipped ${this.malformedRowLogState.count} malformed ownership ingest rows in the last minute (latest id=${rowId || 'n/a'}).`,
+          `Skipped ${this.malformedRowLogState.count} malformed ownership ingest rows in the last minute (latest queue_id=${latestId}).`,
         );
       }
-      this.malformedRowLogState = { windowStart: now, count: 0 };
+      this.malformedRowLogState = { windowStart: now, count: 0, lastQueueId: '' };
     }
     this.malformedRowLogState.count += 1;
+    if (rowId) {
+      this.malformedRowLogState.lastQueueId = rowId;
+    }
     if (this.malformedRowLogState.count === 1) {
-      this.logger.debug(
-        `Skipping malformed ownership ingest row id=${rowId || 'n/a'} tenant=${tenantId || 'n/a'} org=${organisationNumber || 'n/a'}`,
-      );
+      const keys = rawRow ? Object.keys(rawRow).sort().join(',') : '';
+      const detail =
+        `Skipping malformed ownership ingest row id=${rowId || 'n/a'} tenant=${tenantId || 'n/a'} org=${organisationNumber || 'n/a'}` +
+        (keys ? ` (row keys: ${keys})` : '');
+      if (!keys) {
+        this.logger.warn(
+          `${detail} — empty RETURNING row shape; check DB driver and bv_pipeline.ownership_ingest_queue migration version.`,
+        );
+      } else {
+        this.logger.debug(detail);
+      }
     }
   }
 
