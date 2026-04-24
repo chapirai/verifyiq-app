@@ -721,14 +721,23 @@ export const api = {
     return requestText(`/bolagsverket-bulk/ops/dashboard/export.csv?${q.toString()}`);
   },
   async forceBulkRunNow(sourceUrl?: string) {
-    return request<{
-      runId: string;
-      rowCount: number;
-      applied: number;
-      changed: number;
-      seeded: number;
-      deduplicatedByHash: boolean;
-    }>('/bolagsverket-bulk/runs/force', {
+    return request<
+      | {
+          runId: string;
+          rowCount: number;
+          applied: number;
+          changed: number;
+          seeded: number;
+          deduplicatedByHash: boolean;
+        }
+      | {
+          queued: true;
+          mode: 'queued';
+          job: 'run-weekly-ingestion';
+          sourceUrlOverride: boolean;
+          note: string;
+        }
+    >('/bolagsverket-bulk/runs/force', {
       method: 'POST',
       body: JSON.stringify(sourceUrl ? { sourceUrl } : {}),
     });

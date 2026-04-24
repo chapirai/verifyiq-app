@@ -93,6 +93,27 @@ export class BolagsverketBulkService {
     return { queued: true };
   }
 
+  async enqueueForcedIngestion(sourceUrl?: string): Promise<{
+    queued: true;
+    mode: 'queued';
+    job: 'run-weekly-ingestion';
+    sourceUrlOverride: boolean;
+    note: string;
+  }> {
+    await this.queue.add(
+      BolagsverketBulkJobName.RUN_WEEKLY_INGESTION,
+      sourceUrl ? { sourceUrl } : {},
+      { removeOnComplete: { count: 20 }, removeOnFail: { count: 20 } },
+    );
+    return {
+      queued: true,
+      mode: 'queued',
+      job: BolagsverketBulkJobName.RUN_WEEKLY_INGESTION,
+      sourceUrlOverride: !!sourceUrl,
+      note: 'Queued to avoid web-request memory spikes; worker executes ZIP/TXT pipeline in background.',
+    };
+  }
+
   async runWeeklyIngestion(sourceUrlOverride?: string, force = false): Promise<{
     runId: string;
     rowCount: number;

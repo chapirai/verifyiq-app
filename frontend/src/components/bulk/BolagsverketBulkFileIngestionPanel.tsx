@@ -178,7 +178,7 @@ export function BolagsverketBulkFileIngestionPanel({ variant = 'dashboard' }: { 
                 .finally(() => setForceBusy(false));
             }}
           >
-            {forceBusy ? 'Running (waits for full file pipeline)…' : 'Run now: forced file ingest'}
+            {forceBusy ? 'Queuing forced ingest…' : 'Queue forced file ingest'}
           </Button>
           <Button type="button" variant="secondary" onClick={() => void refreshSnapshot()}>
             Refresh status
@@ -187,7 +187,7 @@ export function BolagsverketBulkFileIngestionPanel({ variant = 'dashboard' }: { 
       </div>
 
       <p className="text-xs text-muted-foreground">
-        “Queue weekly” adds a BullMQ job (concurrency 1). “Run now” calls the same pipeline inline until it finishes or errors—expect minutes on large archives.
+        “Queue weekly” and “Queue forced” both add BullMQ jobs (concurrency 1). This avoids running full ZIP/TXT ingest inside the web request, which helps prevent Render memory spikes.
       </p>
 
       {snapshotErr ? (

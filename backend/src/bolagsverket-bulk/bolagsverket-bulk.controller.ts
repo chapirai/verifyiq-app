@@ -41,6 +41,8 @@ export class BolagsverketBulkController {
   @RequiredScopes('companies:write')
   forceRunNow(@Req() req: Request, @Body() body?: { sourceUrl?: string }) {
     this.assertPlatformAdmin(req);
+    const allowSync = String(process.env.BV_BULK_FORCE_SYNC_ENABLED ?? 'false').toLowerCase() === 'true';
+    if (!allowSync) return this.bulkService.enqueueForcedIngestion(body?.sourceUrl);
     return this.bulkService.runWeeklyIngestion(body?.sourceUrl, true);
   }
 
