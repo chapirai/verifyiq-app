@@ -32,6 +32,24 @@ function jobDescription(name: string): string {
   return 'Background worker job on bolagsverket-bulk queue.';
 }
 
+function formatFailureStep(step: string | null | undefined): string {
+  if (!step) return 'unknown';
+  if (step === 'download_zip') return 'download ZIP';
+  if (step === 'extract_txt') return 'extract TXT from ZIP';
+  if (step === 'parse_stream') return 'parse/flush TXT stream';
+  if (step === 'apply_changes') return 'apply staging/current changes';
+  return step.replace(/_/g, ' ');
+}
+
+function formatPipelineStep(step: string): string {
+  if (step === 'download_zip') return 'download ZIP';
+  if (step === 'archive_zip') return 'archive ZIP to object storage';
+  if (step === 'extract_txt') return 'extract TXT from ZIP';
+  if (step === 'parse_stream') return 'parse + stage TXT stream';
+  if (step === 'apply_changes') return 'apply staged changes';
+  return step.replace(/_/g, ' ');
+}
+
 function formatTs(ms: number | null | undefined): string {
   if (ms == null || !Number.isFinite(ms)) return '—';
   return new Date(ms).toISOString();
@@ -84,6 +102,31 @@ export function BolagsverketBulkFileIngestionPanel({ variant = 'dashboard' }: { 
     finishedOn: number | null;
     failedReason: string | null;
   }>;
+  const recentFileRunsFromQueue = (queueSnapshot?.recentFileRuns ?? []) as Array<{
+    id: string;
+    sourceUrl: string;
+    status: string;
+    testCompleted?: boolean;
+    failureStep?: string | null;
+    failureDetail?: string | null;
+    pipelineSteps?: Array<{
+      step: string;
+      status: 'success' | 'failed' | 'skipped' | 'pending';
+      message: string | null;
+    }>;
+  }>;
+  const failureByRunId = new Map(
+    recentFileRunsFromQueue
+      .filter(r => !!r.id)
+      .map(r => [
+        r.id,
+        {
+          failureStep: r.failureStep ?? null,
+          failureDetail: r.failureDetail ?? null,
+          pipelineSteps: r.pipelineSteps ?? [],
+        },
+      ]),
+  );
   const desc = queueSnapshot?.description as
     | {
         headline?: string;
@@ -241,10 +284,32 @@ export function BolagsverketBulkFileIngestionPanel({ variant = 'dashboard' }: { 
                   <p className="mt-1 text-[10px] text-muted-foreground">Job payload: {'{}'} (weekly job uses server URL from env)</p>
                 )}
                 {j.failedReason ? (
-                  <p className="mt-2 text-destructive">
-                    <span className="font-semibold">Failed: </span>
-                    {j.failedReason}
-                  </p>
+                  <div className="mt-2 space-y-1 text-destructive">
+                    <p>
+                      <span className="font-semibold">Failed: </span>
+                      {j.failedReason}
+                    </p>
+                    {typeof j.data?.runId === 'string' && failureByRunId.get(j.data.runId)?.failureStep ? (
+                      <p className="font-mono text-[10px]">
+                        Step: {formatFailureStep(failureByRunId.get(j.data.runId)?.failureStep)}
+                      </p>
+                    ) : null}
+                    {typeof j.data?.runId === 'string' && failureByRunId.get(j.data.runId)?.failureDetail ? (
+                      <p className="font-mono text-[10px] whitespace-pre-wrap break-words">
+                        {failureByRunId.get(j.data.runId)?.failureDetail}
+                      </p>
+                    ) : null}
+                    {typeof j.data?.runId === 'string' && (failureByRunId.get(j.data.runId)?.pipelineSteps?.length ?? 0) > 0 ? (
+                      <ul className="mt-1 space-y-1 font-mono text-[10px]">
+                        {failureByRunId.get(j.data.runId)?.pipelineSteps?.map(step => (
+                          <li key={`${j.data.runId}-${step.step}`}>
+                            [{step.status.toUpperCase()}] {formatPipelineStep(step.step)}
+                            {step.message ? ` — ${step.message}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
                 ) : null}
               </li>
             ))}
@@ -262,6 +327,11 @@ export function BolagsverketBulkFileIngestionPanel({ variant = 'dashboard' }: { 
               <li key={r.id} className="border-b border-border-light pb-3 last:border-0 last:pb-0">
                 <div className="flex flex-wrap gap-2">
                   <span className="font-semibold uppercase">{r.status}</span>
+                  {r.testCompleted ? (
+                    <span className="border border-emerald-500/50 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] uppercase text-emerald-600">
+                      test_completed
+                    </span>
+                  ) : null}
                   <span className="font-mono text-muted-foreground">{r.id}</span>
                   <span>{r.rowCount} rows</span>
                   {r.parserProfile ? <span className="text-muted-foreground">parser {r.parserProfile}</span> : null}
@@ -273,11 +343,35 @@ export function BolagsverketBulkFileIngestionPanel({ variant = 'dashboard' }: { 
                 </p>
                 <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">ZIP key: {r.zipObjectKey}</p>
                 <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">TXT key: {r.txtObjectKey}</p>
-                {r.errorMessage ? (
+                {r.errorMessage && !r.testCompleted ? (
                   <p className="mt-2 text-destructive">
                     <span className="font-semibold">errorMessage: </span>
                     {r.errorMessage}
                   </p>
+                ) : null}
+                {r.failureStep ? (
+                  <p className="mt-1 text-destructive">
+                    <span className="font-semibold">failed step: </span>
+                    {formatFailureStep(r.failureStep)}
+                  </p>
+                ) : null}
+                {r.failureDetail ? (
+                  <p className="mt-1 whitespace-pre-wrap break-words font-mono text-[10px] text-destructive">
+                    {r.failureDetail}
+                  </p>
+                ) : null}
+                {r.pipelineSteps?.length ? (
+                  <div className="mt-2 rounded border border-border-light bg-muted/20 p-2">
+                    <p className="mono-label text-[10px] text-muted-foreground">pipeline steps</p>
+                    <ul className="mt-1 space-y-1 font-mono text-[10px]">
+                      {r.pipelineSteps.map(step => (
+                        <li key={`${r.id}-${step.step}`}>
+                          [{step.status.toUpperCase()}] {formatPipelineStep(step.step)}
+                          {step.message ? ` — ${step.message}` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
               </li>
             ))}

@@ -729,6 +729,7 @@ export const api = {
           changed: number;
           seeded: number;
           deduplicatedByHash: boolean;
+          testCompleted: boolean;
         }
       | {
           queued: true;
@@ -755,6 +756,14 @@ export const api = {
         parserProfile: string | null;
         status: string;
         errorMessage: string | null;
+        testCompleted: boolean;
+        failureStep: string | null;
+        failureDetail: string | null;
+        pipelineSteps: Array<{
+          step: 'download_zip' | 'archive_zip' | 'extract_txt' | 'parse_stream' | 'apply_changes';
+          status: 'success' | 'failed' | 'skipped' | 'pending';
+          message: string | null;
+        }>;
       }>
     >(`/bolagsverket-bulk/runs?limit=${encodeURIComponent(String(limit))}`);
   },

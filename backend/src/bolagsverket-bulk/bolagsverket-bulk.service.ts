@@ -51,6 +51,16 @@ type IngestResult = IngestStats & {
 @Injectable()
 export class BolagsverketBulkService {
   private readonly logger = new Logger(BolagsverketBulkService.name);
+  private static readonly TEST_LIMIT_PREFIX = 'test_limit:';
+  private static readonly FAILURE_PHASE_PREFIX = 'failure_phase:';
+  private static readonly FAILURE_DETAIL_PREFIX = 'failure_detail:';
+  private static readonly PIPELINE_STEPS = [
+    'download_zip',
+    'archive_zip',
+    'extract_txt',
+    'parse_stream',
+    'apply_changes',
+  ] as const;
 
   constructor(
     private readonly config: ConfigService,
@@ -136,7 +146,9 @@ export class BolagsverketBulkService {
     changed: number;
     seeded: number;
     deduplicatedByHash: boolean;
+    testCompleted: boolean;
   }> {
+    let currentPhase: (typeof BolagsverketBulkService.PIPELINE_STEPS)[number] = 'download_zip';
     const sourceUrl =
       sourceUrlOverride ||
       this.config.get<string>(
@@ -151,6 +163,7 @@ export class BolagsverketBulkService {
       ingestionType: 'weekly_bulk',
     });
     const dl = await this.storage.downloadAndArchiveWeeklyZip(sourceUrl);
+    currentPhase = 'parse_stream';
     await this.ingestionService.updateRunProgress(ingestionRun.id, { r2ObjectKey: dl.zipObjectKey });
     await this.ingestionService.persistSourceFile({
       provider: 'bolagsverket.bulk.zip',
@@ -194,6 +207,7 @@ export class BolagsverketBulkService {
         changed: 0,
         seeded: 0,
         deduplicatedByHash: true,
+        testCompleted: false,
       };
     }
 
@@ -231,7 +245,7 @@ export class BolagsverketBulkService {
       await this.runRepo.save(run);
 
       if (ingestStats.stoppedEarlyByTestLimit) {
-        run.errorMessage = `test_limit:${ingestStats.maxRowsToProcess}`;
+        run.errorMessage = `${BolagsverketBulkService.TEST_LIMIT_PREFIX}${ingestStats.maxRowsToProcess}`;
         await this.runRepo.save(run);
         this.logger.warn(
           `Run ${run.id} finished parser validation mode after ${ingestStats.parsedRowsProcessed} parsed rows; skipping apply/remove/seed to avoid partial snapshot side effects.`,
@@ -249,9 +263,11 @@ export class BolagsverketBulkService {
           changed: 0,
           seeded: 0,
           deduplicatedByHash: false,
+          testCompleted: true,
         };
       }
 
+      currentPhase = 'apply_changes';
       const applied = await this.upsert.applyStagingToCurrent(run.id, now);
       const removed = await this.upsert.detectRemovedCompanies(run.id, now);
       const seeded = await this.upsert.seedCompaniesFromCurrent(
@@ -274,10 +290,12 @@ export class BolagsverketBulkService {
         changed: applied.changed + removed,
         seeded,
         deduplicatedByHash: false,
+        testCompleted: false,
       };
     } catch (err) {
       run.status = 'failed';
-      run.errorMessage = err instanceof Error ? err.message : String(err);
+      const detail = err instanceof Error ? err.message : String(err);
+      run.errorMessage = this.encodeFailureMessage(currentPhase, detail);
       await this.runRepo.save(run);
       const partial = this.extractPartialStats(err) ?? lastIngestStats;
       await this.ingestionService.finishRunFailure(ingestionRun.id, {
@@ -298,7 +316,9 @@ export class BolagsverketBulkService {
     applied: number;
     changed: number;
     seeded: number;
+    testCompleted: boolean;
   }> {
+    let currentPhase: (typeof BolagsverketBulkService.PIPELINE_STEPS)[number] = 'extract_txt';
     const sourceRun = await this.runRepo.findOneByOrFail({ id: runId });
     const now = new Date();
     const parserProfile = sourceRun.parserProfile ?? this.config.get<string>('BV_BULK_PARSER_PROFILE', 'default_v1');
@@ -325,6 +345,7 @@ export class BolagsverketBulkService {
     let lastIngestStats: IngestStats | null = null;
     try {
       const txtStream = await this.storage.getObjectStream(sourceRun.txtObjectKey);
+      currentPhase = 'parse_stream';
       const ingestStats = await this.ingestStreamWithCheckpoints(
         replayRun.id,
         txtStream,
@@ -340,7 +361,7 @@ export class BolagsverketBulkService {
       await this.runRepo.save(replayRun);
 
       if (ingestStats.stoppedEarlyByTestLimit) {
-        replayRun.errorMessage = `test_limit:${ingestStats.maxRowsToProcess}`;
+        replayRun.errorMessage = `${BolagsverketBulkService.TEST_LIMIT_PREFIX}${ingestStats.maxRowsToProcess}`;
         await this.runRepo.save(replayRun);
         this.logger.warn(
           `Replay run ${replayRun.id} finished parser validation mode after ${ingestStats.parsedRowsProcessed} parsed rows; skipping apply/remove/seed to avoid partial snapshot side effects.`,
@@ -358,9 +379,11 @@ export class BolagsverketBulkService {
           applied: 0,
           changed: 0,
           seeded: 0,
+          testCompleted: true,
         };
       }
 
+      currentPhase = 'apply_changes';
       const applied = await this.upsert.applyStagingToCurrent(replayRun.id, now);
       const removed = await this.upsert.detectRemovedCompanies(replayRun.id, now);
       const seeded = await this.upsert.seedCompaniesFromCurrent(this.config.get<string>('BV_BULK_DEFAULT_TENANT_ID', ''));
@@ -380,10 +403,12 @@ export class BolagsverketBulkService {
         applied: applied.upserted,
         changed: applied.changed + removed,
         seeded,
+        testCompleted: false,
       };
     } catch (err) {
       replayRun.status = 'failed';
-      replayRun.errorMessage = err instanceof Error ? err.message : String(err);
+      const detail = err instanceof Error ? err.message : String(err);
+      replayRun.errorMessage = this.encodeFailureMessage(currentPhase, detail);
       await this.runRepo.save(replayRun);
       const partial = this.extractPartialStats(err) ?? lastIngestStats;
       await this.ingestionService.finishRunFailure(ingestionRun.id, {
@@ -410,6 +435,22 @@ export class BolagsverketBulkService {
     const parsed = Number(normalized);
     if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) return null;
     return parsed;
+  }
+
+  private encodeFailureMessage(phase: string, detail: string): string {
+    return `${BolagsverketBulkService.FAILURE_PHASE_PREFIX}${phase}\n${BolagsverketBulkService.FAILURE_DETAIL_PREFIX}${detail}`;
+  }
+
+  private decodeFailureMessage(encoded: string | null | undefined): { phase: string | null; detail: string | null } {
+    const raw = String(encoded ?? '');
+    if (!raw) return { phase: null, detail: null };
+    if (!raw.includes(BolagsverketBulkService.FAILURE_PHASE_PREFIX)) return { phase: null, detail: raw };
+    const lines = raw.split('\n');
+    const phaseLine = lines.find(line => line.startsWith(BolagsverketBulkService.FAILURE_PHASE_PREFIX)) ?? '';
+    const detailLine = lines.find(line => line.startsWith(BolagsverketBulkService.FAILURE_DETAIL_PREFIX)) ?? '';
+    const phase = phaseLine.slice(BolagsverketBulkService.FAILURE_PHASE_PREFIX.length).trim() || null;
+    const detail = detailLine.slice(BolagsverketBulkService.FAILURE_DETAIL_PREFIX.length).trim() || null;
+    return { phase, detail };
   }
 
   private async ingestStreamWithCheckpoints(
@@ -633,11 +674,109 @@ export class BolagsverketBulkService {
     return this.currentRepo.findOne({ where: { organisationNumber: org } });
   }
 
-  async listWeeklyRuns(limit = 52) {
-    return this.runRepo.find({
+  private isTestCompletedRun(run: { status?: string | null; errorMessage?: string | null }): boolean {
+    if (run.status !== 'parsed') return false;
+    return String(run.errorMessage ?? '').startsWith(BolagsverketBulkService.TEST_LIMIT_PREFIX);
+  }
+
+  private buildRunUiMetadata(run: BvBulkFileRunEntity): {
+    testCompleted: boolean;
+    failureStep: string | null;
+    failureDetail: string | null;
+    pipelineSteps: Array<{
+      step: (typeof BolagsverketBulkService.PIPELINE_STEPS)[number];
+      status: 'success' | 'failed' | 'skipped' | 'pending';
+      message: string | null;
+    }>;
+  } {
+    const testCompleted = this.isTestCompletedRun(run);
+    const decoded = this.decodeFailureMessage(run.errorMessage);
+    const explicitFailureStep = decoded.phase;
+    const explicitFailureDetail = decoded.detail;
+    const pipelineSteps: Array<{
+      step: (typeof BolagsverketBulkService.PIPELINE_STEPS)[number];
+      status: 'success' | 'failed' | 'skipped' | 'pending';
+      message: string | null;
+    }> = BolagsverketBulkService.PIPELINE_STEPS.map(step => ({
+      step,
+      status: 'pending',
+      message: null,
+    }));
+    const mark = (
+      step: (typeof BolagsverketBulkService.PIPELINE_STEPS)[number],
+      status: 'success' | 'failed' | 'skipped' | 'pending',
+      message: string | null = null,
+    ) => {
+      const item = pipelineSteps.find(s => s.step === step);
+      if (item) {
+        item.status = status;
+        item.message = message;
+      }
+    };
+    mark('download_zip', 'success');
+    mark('archive_zip', 'success');
+    mark('extract_txt', 'success');
+    if (testCompleted) {
+      const rawLimit = String(run.errorMessage ?? '').slice(BolagsverketBulkService.TEST_LIMIT_PREFIX.length);
+      const detail = rawLimit ? `Validation mode stopped after ${rawLimit} parsed rows.` : 'Validation mode stopped early by configured test limit.';
+      mark('parse_stream', 'success', detail);
+      mark('apply_changes', 'skipped', 'Skipped in validation mode.');
+      return { testCompleted: true, failureStep: null, failureDetail: detail, pipelineSteps };
+    }
+    if (run.status === 'applied') {
+      mark('parse_stream', 'success');
+      mark('apply_changes', 'success');
+      return { testCompleted: false, failureStep: null, failureDetail: null, pipelineSteps };
+    }
+    if (run.status === 'parsed') {
+      mark('parse_stream', 'success');
+      mark('apply_changes', 'pending', 'Apply phase not started.');
+      return { testCompleted: false, failureStep: null, failureDetail: null, pipelineSteps };
+    }
+    if (run.status !== 'failed') return { testCompleted: false, failureStep: null, failureDetail: null, pipelineSteps };
+    if (explicitFailureStep && BolagsverketBulkService.PIPELINE_STEPS.includes(explicitFailureStep as never)) {
+      mark(explicitFailureStep as (typeof BolagsverketBulkService.PIPELINE_STEPS)[number], 'failed', explicitFailureDetail);
+      if (explicitFailureStep === 'parse_stream') mark('apply_changes', 'pending', 'Parse failed before apply phase.');
+      if (explicitFailureStep === 'apply_changes') mark('parse_stream', 'success');
+      return {
+        testCompleted: false,
+        failureStep: explicitFailureStep,
+        failureDetail: explicitFailureDetail ?? 'Bulk ingestion failed.',
+        pipelineSteps,
+      };
+    }
+    mark('parse_stream', 'failed', run.errorMessage ?? 'Bulk ingestion failed.');
+    mark('apply_changes', 'pending', 'Parse failed before apply phase.');
+    return {
+      testCompleted: false,
+      failureStep: 'parse_stream',
+      failureDetail: run.errorMessage ?? 'Bulk ingestion failed.',
+      pipelineSteps,
+    };
+  }
+
+  async listWeeklyRuns(limit = 52): Promise<
+    Array<
+      BvBulkFileRunEntity & {
+        testCompleted: boolean;
+        failureStep: string | null;
+        failureDetail: string | null;
+        pipelineSteps: Array<{
+          step: (typeof BolagsverketBulkService.PIPELINE_STEPS)[number];
+          status: 'success' | 'failed' | 'skipped' | 'pending';
+          message: string | null;
+        }>;
+      }
+    >
+  > {
+    const runs = await this.runRepo.find({
       order: { downloadedAt: 'DESC' },
       take: Math.max(1, Math.min(200, limit)),
     });
+    return runs.map(run => ({
+      ...run,
+      ...this.buildRunUiMetadata(run),
+    }));
   }
 
   async getOpsDashboardSummary(filters: {
@@ -1190,6 +1329,7 @@ export class BolagsverketBulkService {
         id: r.id,
         sourceUrl: r.sourceUrl,
         status: r.status,
+        ...this.buildRunUiMetadata(r as BvBulkFileRunEntity),
         downloadedAt: r.downloadedAt,
         effectiveDate: r.effectiveDate,
         rowCount: r.rowCount,

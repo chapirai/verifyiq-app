@@ -8,7 +8,12 @@ import {
   RunWeeklyIngestionJobData,
 } from './queues/bolagsverket-bulk.queue';
 
-@Processor(BOLAGSVERKET_BULK_QUEUE, { concurrency: 1 })
+@Processor(BOLAGSVERKET_BULK_QUEUE, {
+  concurrency: 1,
+  lockDuration: 300_000,
+  stalledInterval: 30_000,
+  maxStalledCount: 5,
+})
 export class BolagsverketBulkProcessor extends WorkerHost {
   constructor(private readonly bulkService: BolagsverketBulkService) {
     super();
