@@ -304,6 +304,7 @@ async function main(): Promise<void> {
             WHERE x.tenant_id = $2::uuid
               AND x.organisation_number = c.organisation_number
           )
+          RETURNING 1
         )
         SELECT COUNT(*)::text AS c FROM inserted
         `,
