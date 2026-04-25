@@ -13,6 +13,7 @@ type ParsedArgs = {
   batchSize: number;
   maxRows: number | null;
   effectiveDate: string | null;
+  allowProductionDb: boolean;
 };
 
 type RawRowInput = {
@@ -71,7 +72,8 @@ function parseArgs(argv: string[]): ParsedArgs {
     maxRowsRaw == null || !Number.isFinite(maxRowsNum) || maxRowsNum <= 0 ? null : Math.floor(maxRowsNum);
   const effectiveDateRaw = get('--effective-date');
   const effectiveDate = effectiveDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(effectiveDateRaw) ? effectiveDateRaw : null;
-  return { file: resolve(file), parserProfile, batchSize, maxRows, effectiveDate };
+  const allowProductionDb = (get('--allow-production-db') ?? '').toLowerCase() === 'true';
+  return { file: resolve(file), parserProfile, batchSize, maxRows, effectiveDate, allowProductionDb };
 }
 
 async function createPgClient(): Promise<Client> {
@@ -115,6 +117,19 @@ function buildBulkInsert(
   }
   const sql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${chunks.join(', ')}`;
   return { sql, values };
+}
+
+function toStockholmTime(date: Date): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Stockholm',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date);
 }
 
 async function flushBatch(
@@ -210,6 +225,26 @@ async function main(): Promise<void> {
 
   const parser = new BolagsverketBulkParser();
   const client = await createPgClient();
+  const guardEnabled = String(process.env.ALLOW_LOCAL_BV_BULK_INGEST ?? 'false').toLowerCase() === 'true';
+  if (!guardEnabled) {
+    throw new Error(
+      'Local ingest is blocked. Set ALLOW_LOCAL_BV_BULK_INGEST=true to confirm you intentionally run local bulk ingestion.',
+    );
+  }
+  const dbInfo = await client.query<{ db: string }>('SELECT current_database() AS db');
+  const dbName = String(dbInfo.rows[0]?.db ?? '');
+  const isLikelyProdDb = /prod|production|live/i.test(dbName);
+  if (isLikelyProdDb && !args.allowProductionDb) {
+    throw new Error(
+      `Refusing to ingest into likely production DB "${dbName}". Pass --allow-production-db true to override explicitly.`,
+    );
+  }
+  const lockRes = await client.query<{ ok: boolean }>(
+    `SELECT pg_try_advisory_lock(880014001::bigint) AS ok`,
+  );
+  if (!lockRes.rows[0]?.ok) {
+    throw new Error('Another local bulk ingest/promote process is running (advisory lock busy).');
+  }
   const txtSha = createHash('sha256').update(`${args.file}:${txtStats.size}:${txtStats.mtimeMs}`).digest('hex');
   const runFingerprint = createHash('sha256').update(`local-run:${txtSha}:${Date.now()}`).digest('hex');
   const zipSha = runFingerprint;
@@ -325,6 +360,8 @@ async function main(): Promise<void> {
           fileRunId,
           file: args.file,
           parserProfile: args.parserProfile,
+          createdAtUtc: now.toISOString(),
+          createdAtStockholm: toStockholmTime(now),
           lineCount: lineNumber,
           parsedOk,
           parsedFailed,
@@ -344,6 +381,7 @@ async function main(): Promise<void> {
     }
     throw err;
   } finally {
+    await client.query(`SELECT pg_advisory_unlock(880014001::bigint)`).catch(() => undefined);
     await client.end();
   }
 }
