@@ -83,6 +83,7 @@ const envSchema = z.object({
   BV_BULK_DEFAULT_TENANT_ID: z.string().uuid().optional(),
   BV_BULK_PARSER_PROFILE: z.enum(['default_v1', 'vendor_2025_alt']).optional(),
   BV_BULK_BATCH_SIZE: z.coerce.number().int().positive().optional(),
+  BV_BULK_MAX_ROWS_TO_PROCESS: z.coerce.number().int().min(0).optional(),
   BV_BULK_MAX_TXT_BYTES: z.coerce.number().int().positive().optional(),
   BV_BULK_YIELD_EVERY_LINES: z.coerce.number().int().positive().optional(),
   BV_BULK_CHUNK_PAUSE_MS: z.coerce.number().int().min(0).optional(),

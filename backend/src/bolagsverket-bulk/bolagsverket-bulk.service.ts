@@ -41,6 +41,12 @@ import { MemoryGuardService } from '../ingestion/memory-guard.service';
 
 const ADMIN_READ_ROLES = ['admin'] as const;
 type IngestStats = { lineCount: number; rowsInserted: number; rowsFailed: number; memoryPeakMb: number };
+type IngestOptions = { maxRowsToProcess?: number };
+type IngestResult = IngestStats & {
+  parsedRowsProcessed: number;
+  stoppedEarlyByTestLimit: boolean;
+  maxRowsToProcess: number | null;
+};
 
 @Injectable()
 export class BolagsverketBulkService {
@@ -139,6 +145,7 @@ export class BolagsverketBulkService {
       );
     const now = new Date();
     const parserProfile = this.config.get<string>('BV_BULK_PARSER_PROFILE', 'default_v1');
+    const maxRowsToProcess = this.readMaxRowsToProcess();
     const ingestionRun = await this.ingestionService.startRun({
       sourceProvider: 'bolagsverket',
       ingestionType: 'weekly_bulk',
@@ -208,7 +215,14 @@ export class BolagsverketBulkService {
 
     try {
       const txtStream = await this.storage.getObjectStream(dl.txtObjectKey);
-      const ingestStats = await this.ingestStreamWithCheckpoints(run.id, txtStream, parserProfile, dl.txtObjectKey, ingestionRun.id);
+      const ingestStats = await this.ingestStreamWithCheckpoints(
+        run.id,
+        txtStream,
+        parserProfile,
+        dl.txtObjectKey,
+        ingestionRun.id,
+        { maxRowsToProcess: maxRowsToProcess ?? undefined },
+      );
       lastIngestStats = ingestStats;
       const lineCount = ingestStats.lineCount;
 
@@ -224,6 +238,11 @@ export class BolagsverketBulkService {
 
       run.status = 'applied';
       await this.runRepo.save(run);
+      if (ingestStats.stoppedEarlyByTestLimit) {
+        this.logger.warn(
+          `Run ${run.id} completed in test mode after ${ingestStats.parsedRowsProcessed} parsed rows (BV_BULK_MAX_ROWS_TO_PROCESS=${ingestStats.maxRowsToProcess}).`,
+        );
+      }
       await this.maybeEmitOpsAlert(run.id);
       await this.ingestionService.finishRunSuccess(ingestionRun.id, {
         recordsSeen: ingestStats.lineCount,
@@ -266,6 +285,7 @@ export class BolagsverketBulkService {
     const sourceRun = await this.runRepo.findOneByOrFail({ id: runId });
     const now = new Date();
     const parserProfile = sourceRun.parserProfile ?? this.config.get<string>('BV_BULK_PARSER_PROFILE', 'default_v1');
+    const maxRowsToProcess = this.readMaxRowsToProcess();
     const replayRun = await this.runRepo.save(
       this.runRepo.create({
         sourceUrl: `replay:${sourceRun.id}`,
@@ -294,6 +314,7 @@ export class BolagsverketBulkService {
         parserProfile,
         sourceRun.txtObjectKey,
         ingestionRun.id,
+        { maxRowsToProcess: maxRowsToProcess ?? undefined },
       );
       lastIngestStats = ingestStats;
       const lineCount = ingestStats.lineCount;
@@ -305,6 +326,11 @@ export class BolagsverketBulkService {
       const seeded = await this.upsert.seedCompaniesFromCurrent(this.config.get<string>('BV_BULK_DEFAULT_TENANT_ID', ''));
       replayRun.status = 'applied';
       await this.runRepo.save(replayRun);
+      if (ingestStats.stoppedEarlyByTestLimit) {
+        this.logger.warn(
+          `Replay run ${replayRun.id} completed in test mode after ${ingestStats.parsedRowsProcessed} parsed rows (BV_BULK_MAX_ROWS_TO_PROCESS=${ingestStats.maxRowsToProcess}).`,
+        );
+      }
       await this.maybeEmitOpsAlert(replayRun.id);
       await this.ingestionService.finishRunSuccess(ingestionRun.id, {
         recordsSeen: ingestStats.lineCount,
@@ -341,13 +367,30 @@ export class BolagsverketBulkService {
     return createHash('sha256').update(seed).digest('hex');
   }
 
+  private readMaxRowsToProcess(): number | null {
+    const raw = this.config.get<string | number | null | undefined>('BV_BULK_MAX_ROWS_TO_PROCESS');
+    if (raw === undefined || raw === null) return null;
+    const normalized = String(raw).trim();
+    if (!normalized) return null;
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) return null;
+    return parsed;
+  }
+
   private async ingestStreamWithCheckpoints(
     fileRunId: string,
     stream: Readable,
     parserProfile: string,
     sourceFileKey: string,
     ingestionRunId: string,
-  ): Promise<IngestStats> {
+    options?: IngestOptions,
+  ): Promise<IngestResult> {
+    const maxRowsToProcess = options?.maxRowsToProcess ?? this.readMaxRowsToProcess();
+    if (maxRowsToProcess) {
+      this.logger.warn(
+        `BV_BULK_MAX_ROWS_TO_PROCESS active: stopping after ${maxRowsToProcess} rows`,
+      );
+    }
     const configuredBatch = Number(this.config.get<number>('INGESTION_BATCH_SIZE', 250));
     const initialBatchSize = Math.max(50, Math.min(1000, configuredBatch));
     let currentBatchSize = initialBatchSize;
@@ -367,10 +410,12 @@ export class BolagsverketBulkService {
     loopLag.enable();
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     let lineNumber = 0;
+    let parsedSuccessCount = 0;
     let checkpointSeq = 0;
     let rowsInserted = 0;
     let rowsFailed = 0;
     let memoryPeakMb = this.memoryGuard.snapshot().rssMb;
+    let stoppedEarlyByTestLimit = false;
     let rawChunk: Array<Partial<BvBulkRawRowEntity>> = [];
     let stagingChunk: Array<Partial<BvBulkCompanyStagingEntity>> = [];
     const adaptivePauseMs = (): number => {
@@ -445,6 +490,7 @@ export class BolagsverketBulkService {
         lineNumber += 1;
         try {
           const parsed = this.lineParser.parseLine(line, lineNumber, parserProfile);
+          parsedSuccessCount += 1;
           rawChunk.push({ fileRunId, lineNumber, rawLine: line, parsedOk: true, parseError: null });
           stagingChunk.push({
             fileRunId,
@@ -469,6 +515,10 @@ export class BolagsverketBulkService {
             countryCode: parsed.countryCode,
             contentHash: parsed.contentHash,
           });
+          if (maxRowsToProcess && parsedSuccessCount >= maxRowsToProcess) {
+            this.logger.warn('Test limit reached, stopping ingestion early');
+            stoppedEarlyByTestLimit = true;
+          }
         } catch (err) {
           rawChunk.push({
             fileRunId,
@@ -479,6 +529,11 @@ export class BolagsverketBulkService {
           });
         }
         if (rawChunk.length >= currentBatchSize) await flush();
+        if (stoppedEarlyByTestLimit) {
+          rl.close();
+          stream.destroy();
+          break;
+        }
         if (lineNumber % yieldEveryLines === 0) await new Promise(resolve => setImmediate(resolve));
       }
       await flush();
@@ -494,7 +549,15 @@ export class BolagsverketBulkService {
     } finally {
       loopLag.disable();
     }
-    return { lineCount: lineNumber, rowsInserted, rowsFailed, memoryPeakMb };
+    return {
+      lineCount: lineNumber,
+      rowsInserted,
+      rowsFailed,
+      memoryPeakMb,
+      parsedRowsProcessed: parsedSuccessCount,
+      stoppedEarlyByTestLimit,
+      maxRowsToProcess: maxRowsToProcess ?? null,
+    };
   }
 
   private extractPartialStats(err: unknown): IngestStats | null {
@@ -857,6 +920,7 @@ export class BolagsverketBulkService {
 
     const cfg = {
       batchSize: Math.max(50, Math.min(1000, Number(this.config.get<number>('INGESTION_BATCH_SIZE', 250)))),
+      maxRowsToProcess: this.readMaxRowsToProcess(),
       maxTxtBytes: Number(this.config.get<number>('BV_BULK_MAX_TXT_BYTES', 350_000_000)),
       yieldEveryLines: Number(this.config.get<number>('BV_BULK_YIELD_EVERY_LINES', 5000)),
       baseChunkPauseMs: Number(this.config.get<number>('BV_BULK_CHUNK_PAUSE_MS', 5)),
