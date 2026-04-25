@@ -8,6 +8,31 @@ import { BvBulkCompanyStagingEntity } from './entities/bv-bulk-company-staging.e
 import { BvBulkCompanyNameEntity } from './entities/bv-bulk-company-name.entity';
 import { BvBulkCompanyRestructuringEntity } from './entities/bv-bulk-company-restructuring.entity';
 
+const NAME_TYPE_LABELS: Record<string, string> = {
+  'FORETAGSNAMN-ORGNAM': 'Foretagsnamn',
+  'NAMN-ORGNAM': 'Namn',
+  'FORNAMN_FRSPRAK-ORGNAM': 'Foretagsnamn pa frammande sprak',
+  'SARS_FORNAMN-ORGNAM': 'Sarskilt foretagsnamn',
+};
+const LEGAL_FORM_LABELS: Record<string, string> = {
+  'AB-ORGFO': 'Aktiebolag',
+  'HB-ORGFO': 'Handelsbolag',
+  'KB-ORGFO': 'Kommanditbolag',
+  'E-ORGFO': 'Enskild naringsverksamhet',
+};
+const DEREG_REASON_LABELS: Record<string, string> = {
+  'ARSEED-AVORG': 'Arsredovisning saknas',
+  'AVREG-AVORG': 'Avregistrerad',
+  'KKAV-AVORG': 'Konkurs',
+  'LIAV-AVORG': 'Likvidation',
+};
+const RESTRUCTURING_LABELS: Record<string, string> = {
+  'LI-AVOMFO': 'Likvidation',
+  'KK-AVOMFO': 'Konkurs',
+  'FR-AVOMFO': 'Foretagsrekonstruktion',
+  'OM-AVOMFO': 'Ombildning',
+};
+
 @Injectable()
 export class BolagsverketBulkUpsertService {
   constructor(
@@ -43,7 +68,7 @@ export class BolagsverketBulkUpsertService {
         return {
           name: p[0] ?? null,
           typeCode,
-          typeLabel: typeCode ?? null,
+          typeLabel: typeCode ? NAME_TYPE_LABELS[typeCode] ?? null : null,
           registrationDate: p[2] ?? null,
           extra: p.slice(3).join('$') || null,
         };
@@ -62,7 +87,7 @@ export class BolagsverketBulkUpsertService {
         const maybeDate = p[1] && /^\d{4}-\d{2}-\d{2}$/.test(p[1]) ? p[1] : null;
         return {
           code,
-          label: code ?? null,
+          label: code ? RESTRUCTURING_LABELS[code] ?? null : null,
           text: maybeDate ? null : p[1] ?? null,
           fromDate: maybeDate ?? (p[2] && /^\d{4}-\d{2}-\d{2}$/.test(p[2]) ? p[2] : null),
         };
@@ -78,7 +103,11 @@ export class BolagsverketBulkUpsertService {
       if (!org) continue;
       const existing = await this.currentRepo.findOne({ where: { organisationNumber: org } });
       const nameList = this.deriveNameList(row.organisationNamesRaw);
-      const primaryName = nameList[0] ?? null;
+      const primaryName =
+        nameList.find(n => n.typeCode === 'FORETAGSNAMN-ORGNAM') ??
+        nameList.find(n => n.typeCode === 'NAMN-ORGNAM') ??
+        nameList[0] ??
+        null;
       const sourceIdentityKey = `${row.identityType ?? ''}:${row.identityValue ?? ''}:${row.namnskyddslopnummer ?? ''}`;
       const restructuring = this.deriveRestructuring(row.restructuringRaw);
       const payload: Partial<BvBulkCompanyCurrentEntity> = {
@@ -86,7 +115,12 @@ export class BolagsverketBulkUpsertService {
         sourceIdentityKey,
         identityValue: row.identityValue,
         identityTypeCode: row.identityType,
-        identityTypeLabel: row.identityType,
+        identityTypeLabel:
+          row.identityType === 'ORGNR-IDORG'
+            ? 'Organisationsnummer'
+            : row.identityType === 'PERSON-IDORG'
+              ? 'Identitetsbeteckning person'
+              : row.identityType,
         personalIdentityNumber: row.identityType === 'PERSON-IDORG' ? row.identityValue : null,
         nameProtectionSequenceNumber: row.namnskyddslopnummer,
         identityType: row.identityType,
@@ -95,13 +129,14 @@ export class BolagsverketBulkUpsertService {
         primaryNameTypeLabel: primaryName?.typeLabel ?? null,
         nameAllJsonb: nameList,
         organisationFormCode: row.organisationFormCode,
-        organisationFormText: row.organisationFormCode,
-        legalFormLabel: row.organisationFormCode,
+        organisationFormText: row.organisationFormCode ? LEGAL_FORM_LABELS[row.organisationFormCode] ?? row.organisationFormCode : null,
+        legalFormLabel: row.organisationFormCode ? LEGAL_FORM_LABELS[row.organisationFormCode] ?? null : null,
         registrationDate: row.registrationDate,
         deregistrationDate: row.deregistrationDate,
         deregistrationReasonCode: row.deregistrationReasonCode,
         deregistrationReasonText: row.deregistrationReasonText,
-        deregistrationReasonLabel: row.deregistrationReasonCode,
+        deregistrationReasonLabel:
+          row.deregistrationReasonCode ? DEREG_REASON_LABELS[row.deregistrationReasonCode] ?? null : null,
         restructuringStatusJsonb: { raw: row.restructuringRaw },
         hasActiveRestructuringOrWindup: restructuring.length > 0,
         activeRestructuringCodes: restructuring.map(r => r.code).filter((x): x is string => !!x),
@@ -121,8 +156,8 @@ export class BolagsverketBulkUpsertService {
         postalCity: row.city,
         postalCode: row.postalCode,
         postalCountryCode: row.countryCode,
-        postalCountryLabel: row.countryCode,
-        registrationCountryLabel: row.registrationCountryCode,
+        postalCountryLabel: row.countryCode === 'SE-LAND' ? 'Sverige' : row.countryCode,
+        registrationCountryLabel: row.registrationCountryCode === 'SE-LAND' ? 'Sverige' : row.registrationCountryCode,
         registrationsCountryCode: row.registrationCountryCode,
         sourceFileRunId: fileRunId,
         sourceIngestionRunId: fileRunId,

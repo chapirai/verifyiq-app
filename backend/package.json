@@ -9,6 +9,7 @@
     "start:dev": "nest start --watch",
     "seed": "ts-node -r tsconfig-paths/register src/seed.ts",
     "ingest:bulk:local": "ts-node -r tsconfig-paths/register src/scripts/ingest-bv-bulk-local.ts",
+    "ingest:bulk:promote": "ts-node -r tsconfig-paths/register src/scripts/promote-bv-bulk-staging.ts",
     "test": "jest",
     "test:watch": "jest --watch"
   },

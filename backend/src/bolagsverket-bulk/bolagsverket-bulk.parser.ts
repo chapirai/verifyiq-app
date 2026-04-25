@@ -56,14 +56,41 @@ export interface ParsedBulkLine {
 
 const LEGAL_FORM_LABELS: Record<string, string> = {
   'AB-ORGFO': 'Aktiebolag',
+  'BAB-ORGFO': 'Bankaktiebolag',
+  'BF-ORGFO': 'Bostadsforening',
+  'BFL-ORGFO': 'Utlandsk banks filial',
+  'BRF-ORGFO': 'Bostadsrattsforening',
+  'EB-ORGFO': 'Enkla bolag',
+  'EEIG-ORGFO': 'Europeisk ekonomisk intressegruppering',
+  'EGTS-ORGFO': 'Europeisk gruppering for territoriellt samarbete',
+  'EK-ORGFO': 'Ekonomisk forening',
+  'FAB-ORGFO': 'Forsakringsaktiebolag',
+  'FF-ORGFO': 'Forsakringsformedlare',
+  'FL-ORGFO': 'Filial',
+  'FOF-ORGFO': 'Forsakringsforening',
   'HB-ORGFO': 'Handelsbolag',
+  'I-ORGFO': 'Ideell forening som bedriver naringsverksamhet',
   'KB-ORGFO': 'Kommanditbolag',
+  'KHF-ORGFO': 'Kooperativ hyresrattsforening',
+  'MB-ORGFO': 'Medlemsbank',
+  'OFB-ORGFO': 'Omsesidigt forsakringsbolag',
+  'OTPB-ORGFO': 'Omsesidigt tjanstepensionsbolag',
+  'S-ORGFO': 'Stiftelse som bedriver naringsverksamhet',
+  'SB-ORGFO': 'Sparbank',
+  'SCE-ORGFO': 'Europakooperativ',
+  'SE-ORGFO': 'Europabolag',
+  'SF-ORGFO': 'Sambruksforening',
+  'TPAB-ORGFO': 'Tjanstepensionsaktiebolag',
+  'TPF-ORGFO': 'Tjanstepensionsforening',
+  'TSF-ORGFO': 'Trossamfund som bedriver naringsverksamhet',
   'E-ORGFO': 'Enskild naringsverksamhet',
 };
 
 const IDENTITY_TYPE_LABELS: Record<string, string> = {
   'ORGNR-IDORG': 'Organisationsnummer',
   'PERSON-IDORG': 'Identitetsbeteckning person',
+  'GDNR-IDORG': 'GD-nummer',
+  'SAMORDNR-IDORG': 'Samordningsnummer',
   'SE-LAND': 'Sverige',
 };
 
@@ -75,17 +102,37 @@ const NAME_TYPE_LABELS: Record<string, string> = {
 };
 
 const DEREG_REASON_LABELS: Record<string, string> = {
+  'AKEJH-AVORG': 'Aktiekapitalet inte hojts',
   'ARSEED-AVORG': 'Arsredovisning saknas',
   'AVREG-AVORG': 'Avregistrerad',
+  'BABAKEJH-AVORG': 'Ombildat till bankaktiebolag eller aktiekapitalet inte hojts',
+  'DELAV-AVORG': 'Delning',
+  'DOM-AVORG': 'Beslut av instans',
+  'FUAV-AVORG': 'Fusion',
+  'GROMAV-AVORG': 'Gransoverskridande ombildning',
   'KKAV-AVORG': 'Konkurs',
   'LIAV-AVORG': 'Likvidation',
+  'NYINN-AVORG': 'Ny innehavare',
+  'OMAV-AVORG': 'Ombildning',
+  'OMBAB-AVORG': 'Ombildat till bankaktiebolag',
+  'OVERK-AVORG': 'Overksamhet',
+  'UTLKKLI-AVORG': 'Det utlandska foretagets likvidation eller konkurs',
+  'VDSAK-AVORG': 'Verkstallande direktor saknas',
+  'VERKUPP-AVORG': 'Verksamheten har upphort',
 };
 
 const RESTRUCTURING_LABELS: Record<string, string> = {
+  'AC-AVOMFO': 'Ackordsforhandling',
+  'DEOL-AVOMFO': 'Overlatande vid delning',
+  'DEOT-AVOMFO': 'Overtagande vid delning',
+  'FUOL-AVOMFO': 'Overlatande i fusion',
+  'FUOT-AVOMFO': 'Overtagande i fusion',
+  'GROM-AVOMFO': 'Gransoverskridande ombildning',
   'LI-AVOMFO': 'Likvidation',
   'KK-AVOMFO': 'Konkurs',
   'FR-AVOMFO': 'Foretagsrekonstruktion',
   'OM-AVOMFO': 'Ombildning',
+  'RES-AVOMFO': 'Resolution',
 };
 
 @Injectable()
@@ -107,9 +154,13 @@ export class BolagsverketBulkParser {
     });
   }
 
-  private splitComposite(raw: string | null): string[] {
+  private splitCompositeKeepEmpty(raw: string | null): string[] {
     if (!raw) return [];
-    return raw.split('$').map(v => v.trim()).filter(Boolean);
+    return raw.split('$').map(v => v.trim());
+  }
+
+  private splitCompositeNonEmpty(raw: string | null): string[] {
+    return this.splitCompositeKeepEmpty(raw).filter(v => v.length > 0);
   }
 
   private parseIdentity(raw: string | null): {
@@ -129,12 +180,13 @@ export class BolagsverketBulkParser {
     const typeCode = right.trim() || null;
     const typeLabel = typeCode ? IDENTITY_TYPE_LABELS[typeCode] ?? null : null;
     const organisationNumber = typeCode === 'ORGNR-IDORG' ? value : null;
-    const personalIdentityNumber = typeCode === 'PERSON-IDORG' ? value : null;
+    const personalIdentityNumber =
+      typeCode === 'PERSON-IDORG' || typeCode === 'SAMORDNR-IDORG' ? value : null;
     return { value, typeCode, typeLabel, organisationNumber, personalIdentityNumber };
   }
 
   private parseNamePrimary(raw: string | null): string | null {
-    const parts = this.splitComposite(raw);
+    const parts = this.splitCompositeNonEmpty(raw);
     return parts[0] ?? null;
   }
 
@@ -146,7 +198,11 @@ export class BolagsverketBulkParser {
     countryCode: string | null;
     warning: string | null;
   } {
-    const p = this.splitComposite(raw);
+    const p = this.splitCompositeKeepEmpty(raw);
+    const norm = (v: string | null | undefined): string | null => {
+      const t = (v ?? '').trim();
+      return t.length > 0 ? t : null;
+    };
     const p2 = p[2] ?? null;
     const p3 = p[3] ?? null;
     const isPostal = (v: string | null) => !!v && /^\d{5}$/.test(v.replace(/\s/g, ''));
@@ -161,7 +217,7 @@ export class BolagsverketBulkParser {
     }
     return {
       deliveryAddress: p[0] ?? null,
-      coAddress: p[1] ?? null,
+      coAddress: norm(p[1] ?? null),
       city: city ?? null,
       postalCode: postalCode ?? null,
       countryCode: p[4] ?? null,
@@ -179,10 +235,7 @@ export class BolagsverketBulkParser {
 
   private parseDeregistrationReason(raw: string | null): { code: string | null; text: string | null } {
     if (!raw) return { code: null, text: null };
-    const parts = raw
-      .split('$')
-      .map(v => v.trim())
-      .filter(Boolean);
+    const parts = raw.split('$').map(v => v.trim()).filter(v => v.length > 0);
     if (parts.length === 0) return { code: null, text: null };
     if (parts.length === 1) {
       const only = parts[0] ?? null;
@@ -219,6 +272,18 @@ export class BolagsverketBulkParser {
       });
   }
 
+  private pickPrimaryName(
+    names: ParsedBulkLine['namesAll'],
+  ): { name: string | null; typeCode: string | null; typeLabel: string | null } | null {
+    if (names.length === 0) return null;
+    const preferred =
+      names.find(n => n.typeCode === 'FORETAGSNAMN-ORGNAM') ??
+      names.find(n => n.typeCode === 'NAMN-ORGNAM') ??
+      names[0] ??
+      null;
+    return preferred ? { name: preferred.name, typeCode: preferred.typeCode, typeLabel: preferred.typeLabel } : null;
+  }
+
   private parseRestructuring(raw: string | null): ParsedBulkLine['restructuringEntries'] {
     if (!raw) return [];
     return raw
@@ -226,16 +291,18 @@ export class BolagsverketBulkParser {
       .map(part => part.trim())
       .filter(Boolean)
       .map(part => {
-        const bits = part.split('$').map(v => v.trim()).filter(Boolean);
-        const code = bits[0] ?? null;
+        const bits = part.split('$').map(v => v.trim());
+        const code = bits[0] || null;
+        const b1 = bits[1] || null;
+        const b2 = bits[2] || null;
         let text: string | null = null;
         let fromDate: string | null = null;
-        if (bits.length >= 3) {
-          text = bits[1] ?? null;
-          fromDate = this.normalizeDate(bits[2] ?? null);
-        } else if (bits.length === 2) {
-          if (this.normalizeDate(bits[1])) fromDate = this.normalizeDate(bits[1]);
-          else text = bits[1] ?? null;
+        if (b2 !== null) {
+          text = b1;
+          fromDate = this.normalizeDate(b2);
+        } else if (b1 !== null) {
+          if (this.normalizeDate(b1)) fromDate = this.normalizeDate(b1);
+          else text = b1;
         }
         return {
           code,
@@ -264,7 +331,7 @@ export class BolagsverketBulkParser {
     const deregistrationReason = this.parseDeregistrationReason(deregistrationReasonRaw);
     const id = this.parseIdentity(identityRaw);
     const names = this.parseNames(namesRaw);
-    const primaryName = names[0] ?? null;
+    const primaryName = this.pickPrimaryName(names);
     const restructuringEntries = this.parseRestructuring(restructuringRaw);
     const address = this.parseAddress(postalAddressRaw);
     const sourceIdentityKey = `${id.typeCode ?? ''}:${id.value ?? ''}:${namnskydd ?? ''}`;
