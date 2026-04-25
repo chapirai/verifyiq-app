@@ -230,6 +230,28 @@ export class BolagsverketBulkService {
       run.status = 'parsed';
       await this.runRepo.save(run);
 
+      if (ingestStats.stoppedEarlyByTestLimit) {
+        run.errorMessage = `test_limit:${ingestStats.maxRowsToProcess}`;
+        await this.runRepo.save(run);
+        this.logger.warn(
+          `Run ${run.id} finished parser validation mode after ${ingestStats.parsedRowsProcessed} parsed rows; skipping apply/remove/seed to avoid partial snapshot side effects.`,
+        );
+        await this.ingestionService.finishRunSuccess(ingestionRun.id, {
+          recordsSeen: ingestStats.lineCount,
+          recordsInserted: ingestStats.rowsInserted,
+          recordsFailed: ingestStats.rowsFailed,
+          memoryPeakMb: ingestStats.memoryPeakMb,
+        });
+        return {
+          runId: run.id,
+          rowCount: lineCount,
+          applied: 0,
+          changed: 0,
+          seeded: 0,
+          deduplicatedByHash: false,
+        };
+      }
+
       const applied = await this.upsert.applyStagingToCurrent(run.id, now);
       const removed = await this.upsert.detectRemovedCompanies(run.id, now);
       const seeded = await this.upsert.seedCompaniesFromCurrent(
@@ -238,11 +260,6 @@ export class BolagsverketBulkService {
 
       run.status = 'applied';
       await this.runRepo.save(run);
-      if (ingestStats.stoppedEarlyByTestLimit) {
-        this.logger.warn(
-          `Run ${run.id} completed in test mode after ${ingestStats.parsedRowsProcessed} parsed rows (BV_BULK_MAX_ROWS_TO_PROCESS=${ingestStats.maxRowsToProcess}).`,
-        );
-      }
       await this.maybeEmitOpsAlert(run.id);
       await this.ingestionService.finishRunSuccess(ingestionRun.id, {
         recordsSeen: ingestStats.lineCount,
@@ -321,16 +338,34 @@ export class BolagsverketBulkService {
       replayRun.rowCount = lineCount;
       replayRun.status = 'parsed';
       await this.runRepo.save(replayRun);
+
+      if (ingestStats.stoppedEarlyByTestLimit) {
+        replayRun.errorMessage = `test_limit:${ingestStats.maxRowsToProcess}`;
+        await this.runRepo.save(replayRun);
+        this.logger.warn(
+          `Replay run ${replayRun.id} finished parser validation mode after ${ingestStats.parsedRowsProcessed} parsed rows; skipping apply/remove/seed to avoid partial snapshot side effects.`,
+        );
+        await this.ingestionService.finishRunSuccess(ingestionRun.id, {
+          recordsSeen: ingestStats.lineCount,
+          recordsInserted: ingestStats.rowsInserted,
+          recordsFailed: ingestStats.rowsFailed,
+          memoryPeakMb: ingestStats.memoryPeakMb,
+        });
+        return {
+          replayRunId: replayRun.id,
+          sourceRunId: sourceRun.id,
+          rowCount: lineCount,
+          applied: 0,
+          changed: 0,
+          seeded: 0,
+        };
+      }
+
       const applied = await this.upsert.applyStagingToCurrent(replayRun.id, now);
       const removed = await this.upsert.detectRemovedCompanies(replayRun.id, now);
       const seeded = await this.upsert.seedCompaniesFromCurrent(this.config.get<string>('BV_BULK_DEFAULT_TENANT_ID', ''));
       replayRun.status = 'applied';
       await this.runRepo.save(replayRun);
-      if (ingestStats.stoppedEarlyByTestLimit) {
-        this.logger.warn(
-          `Replay run ${replayRun.id} completed in test mode after ${ingestStats.parsedRowsProcessed} parsed rows (BV_BULK_MAX_ROWS_TO_PROCESS=${ingestStats.maxRowsToProcess}).`,
-        );
-      }
       await this.maybeEmitOpsAlert(replayRun.id);
       await this.ingestionService.finishRunSuccess(ingestionRun.id, {
         recordsSeen: ingestStats.lineCount,
@@ -386,17 +421,19 @@ export class BolagsverketBulkService {
     options?: IngestOptions,
   ): Promise<IngestResult> {
     const maxRowsToProcess = options?.maxRowsToProcess ?? this.readMaxRowsToProcess();
+    const testMode = Boolean(maxRowsToProcess);
     if (maxRowsToProcess) {
       this.logger.warn(
         `BV_BULK_MAX_ROWS_TO_PROCESS active: stopping after ${maxRowsToProcess} rows`,
       );
     }
     const configuredBatch = Number(this.config.get<number>('INGESTION_BATCH_SIZE', 250));
-    const initialBatchSize = Math.max(50, Math.min(1000, configuredBatch));
+    const minBatchSize = testMode ? 1 : 50;
+    const initialBatchSize = Math.max(minBatchSize, Math.min(1000, configuredBatch));
     let currentBatchSize = initialBatchSize;
-    const yieldEveryLines = Math.max(1000, Number(this.config.get<number>('BV_BULK_YIELD_EVERY_LINES', 5000)));
+    const yieldEveryLines = Math.max(testMode ? 1 : 1000, Number(this.config.get<number>('BV_BULK_YIELD_EVERY_LINES', 5000)));
     const progressLogEveryRows = Math.max(
-      1000,
+      testMode ? 1 : 1000,
       Number(this.config.get<number>('INGESTION_PROGRESS_LOG_EVERY_ROWS', 5000)),
     );
     const baseChunkPauseMs = Math.max(0, Number(this.config.get<number>('BV_BULK_CHUNK_PAUSE_MS', 5)));
@@ -464,8 +501,8 @@ export class BolagsverketBulkService {
       if (this.memoryGuard.shouldFail(mem)) {
         throw new Error('Stopped before Render OOM: memory exceeded safe threshold');
       }
-      if (this.memoryGuard.shouldWarn(mem) && currentBatchSize > 50) {
-        currentBatchSize = Math.max(50, Math.floor(currentBatchSize * 0.8));
+      if (this.memoryGuard.shouldWarn(mem) && currentBatchSize > minBatchSize) {
+        currentBatchSize = Math.max(minBatchSize, Math.floor(currentBatchSize * 0.8));
         this.logger.warn(
           `Ingestion memory warning at ${mem.rssMb}MB; reducing batch size to ${currentBatchSize}.`,
         );
