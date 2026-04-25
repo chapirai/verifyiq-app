@@ -27,43 +27,43 @@ export interface ParsedBulkLine {
 
 type FieldKey =
   | 'identityRaw'
+  | 'namnskyddslopnummer'
+  | 'registrationCountryCode'
   | 'namesRaw'
   | 'organisationFormCode'
-  | 'registrationDate'
   | 'deregistrationDate'
-  | 'deregistrationReasonCode'
-  | 'deregistrationReasonText'
+  | 'deregistrationReasonRaw'
   | 'restructuringRaw'
+  | 'registrationDate'
   | 'businessDescription'
-  | 'postalAddressRaw'
-  | 'registrationCountryCode';
+  | 'postalAddressRaw';
 
 const PARSER_PROFILES: Record<string, Record<FieldKey, number>> = {
   default_v1: {
     identityRaw: 0,
-    namesRaw: 1,
-    organisationFormCode: 2,
-    registrationDate: 3,
-    deregistrationDate: 4,
-    deregistrationReasonCode: 5,
-    deregistrationReasonText: 6,
+    namnskyddslopnummer: 1,
+    registrationCountryCode: 2,
+    namesRaw: 3,
+    organisationFormCode: 4,
+    deregistrationDate: 5,
+    deregistrationReasonRaw: 6,
     restructuringRaw: 7,
-    businessDescription: 8,
-    postalAddressRaw: 9,
-    registrationCountryCode: 10,
+    registrationDate: 8,
+    businessDescription: 9,
+    postalAddressRaw: 10,
   },
   vendor_2025_alt: {
     identityRaw: 1,
+    namnskyddslopnummer: 0,
+    registrationCountryCode: 14,
     namesRaw: 2,
     organisationFormCode: 3,
     registrationDate: 6,
     deregistrationDate: 7,
-    deregistrationReasonCode: 8,
-    deregistrationReasonText: 9,
+    deregistrationReasonRaw: 8,
     restructuringRaw: 10,
     businessDescription: 11,
     postalAddressRaw: 12,
-    registrationCountryCode: 13,
   },
 };
 
@@ -139,6 +139,26 @@ export class BolagsverketBulkParser {
     return null;
   }
 
+  private parseDeregistrationReason(raw: string | null): { code: string | null; text: string | null } {
+    if (!raw) return { code: null, text: null };
+    const parts = raw
+      .split('$')
+      .map(v => v.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return { code: null, text: null };
+    if (parts.length === 1) {
+      const only = parts[0] ?? null;
+      if (only && only.toUpperCase().endsWith('-AVORG')) return { code: only, text: null };
+      return { code: null, text: only };
+    }
+    const codeCandidate = parts.find(p => p.toUpperCase().endsWith('-AVORG')) ?? null;
+    const textCandidate = parts.find(p => p !== codeCandidate) ?? null;
+    return {
+      code: codeCandidate,
+      text: textCandidate,
+    };
+  }
+
   parseLineToStaging(line: string, profileName = 'default_v1'): ParsedBulkLine {
     const cols = this.parseDelimitedLine(line);
     const map = PARSER_PROFILES[profileName] ?? PARSER_PROFILES.default_v1;
@@ -148,12 +168,13 @@ export class BolagsverketBulkParser {
     const organisationFormCode = pick('organisationFormCode');
     const registrationDate = this.normalizeDate(pick('registrationDate'));
     const deregistrationDate = this.normalizeDate(pick('deregistrationDate'));
-    const deregistrationReasonCode = pick('deregistrationReasonCode');
-    const deregistrationReasonText = pick('deregistrationReasonText');
+    const deregistrationReasonRaw = pick('deregistrationReasonRaw');
+    const deregistrationReason = this.parseDeregistrationReason(deregistrationReasonRaw);
     const restructuringRaw = pick('restructuringRaw');
     const businessDescription = pick('businessDescription');
     const postalAddressRaw = pick('postalAddressRaw');
     const registrationCountryCode = pick('registrationCountryCode');
+    const namnskyddFromColumn = pick('namnskyddslopnummer');
 
     const id = this.parseIdentity(identityRaw);
     const address = this.parseAddress(postalAddressRaw);
@@ -168,8 +189,8 @@ export class BolagsverketBulkParser {
       organisationFormCode,
       registrationDate,
       deregistrationDate,
-      deregistrationReasonCode,
-      deregistrationReasonText,
+      deregistrationReasonCode: deregistrationReason.code,
+      deregistrationReasonText: deregistrationReason.text,
       restructuringRaw,
       businessDescription,
       postalAddressRaw,
@@ -179,7 +200,7 @@ export class BolagsverketBulkParser {
       postalCode: address.postalCode,
       countryCode: address.countryCode,
       registrationCountryCode,
-      namnskyddslopnummer: id.ns,
+      namnskyddslopnummer: namnskyddFromColumn || id.ns,
       contentHash: stableHash,
     };
   }
