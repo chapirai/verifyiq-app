@@ -45,6 +45,13 @@ type StagingRowInput = {
   contentHash: string;
 };
 
+function clip(value: string | null | undefined, max: number): string | null {
+  if (value == null) return null;
+  const v = String(value).trim();
+  if (!v) return null;
+  return v.length <= max ? v : v.slice(0, max);
+}
+
 function parseArgs(argv: string[]): ParsedArgs {
   const get = (flag: string): string | null => {
     const idx = argv.indexOf(flag);
@@ -249,14 +256,14 @@ async function main(): Promise<void> {
         rawBatch.push({ lineNumber, rawLine: line, parsedOk: true, parseError: null });
         stagingBatch.push({
           organisationIdentityRaw: parsed.identityRaw,
-          identityValue: parsed.identityValue,
-          identityType: parsed.identityType,
-          namnskyddslopnummer: parsed.namnskyddslopnummer,
-          registrationCountryCode: parsed.registrationCountryCode,
+          identityValue: clip(parsed.identityValue, 64),
+          identityType: clip(parsed.identityType, 64),
+          namnskyddslopnummer: clip(parsed.namnskyddslopnummer, 64),
+          registrationCountryCode: clip(parsed.registrationCountryCode, 16),
           organisationNamesRaw: parsed.namesRaw,
-          organisationFormCode: parsed.organisationFormCode,
+          organisationFormCode: clip(parsed.organisationFormCode, 64),
           deregistrationDate: parsed.deregistrationDate,
-          deregistrationReasonCode: parsed.deregistrationReasonCode,
+          deregistrationReasonCode: clip(parsed.deregistrationReasonCode, 64),
           deregistrationReasonText: parsed.deregistrationReasonText,
           restructuringRaw: parsed.restructuringRaw,
           registrationDate: parsed.registrationDate,
@@ -264,10 +271,10 @@ async function main(): Promise<void> {
           postalAddressRaw: parsed.postalAddressRaw,
           deliveryAddress: parsed.deliveryAddress,
           coAddress: parsed.coAddress,
-          postalCode: parsed.postalCode,
-          city: parsed.city,
-          countryCode: parsed.countryCode,
-          contentHash: parsed.contentHash,
+          postalCode: clip(parsed.postalCode, 32),
+          city: clip(parsed.city, 255),
+          countryCode: clip(parsed.countryCode, 16),
+          contentHash: clip(parsed.contentHash, 64) ?? '',
         });
       } catch (err) {
         parsedFailed += 1;
