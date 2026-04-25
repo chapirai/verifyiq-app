@@ -21,6 +21,8 @@ import { BolagsverketBulkStorageService } from './bolagsverket-bulk.storage.serv
 import { BolagsverketBulkUpsertService } from './bolagsverket-bulk-upsert.service';
 import { BvBulkCompanyCurrentEntity } from './entities/bv-bulk-company-current.entity';
 import { BvBulkCompanyHistoryEntity } from './entities/bv-bulk-company-history.entity';
+import { BvBulkCompanyNameEntity } from './entities/bv-bulk-company-name.entity';
+import { BvBulkCompanyRestructuringEntity } from './entities/bv-bulk-company-restructuring.entity';
 import { BvBulkCompanyStagingEntity } from './entities/bv-bulk-company-staging.entity';
 import { BvBulkEnrichmentRequestEntity } from './entities/bv-bulk-enrichment-request.entity';
 import { BvBulkFileRunEntity } from './entities/bv-bulk-file-run.entity';
@@ -44,6 +46,8 @@ import { BOLAGSVERKET_BULK_QUEUE } from './queues/bolagsverket-bulk.queue';
       BvBulkCompanyCurrentEntity,
       BvBulkRunCheckpointEntity,
       BvBulkCompanyHistoryEntity,
+      BvBulkCompanyNameEntity,
+      BvBulkCompanyRestructuringEntity,
       BvBulkEnrichmentRequestEntity,
       CompanyEntity,
       UsageEventEntity,

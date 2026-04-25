@@ -487,6 +487,7 @@ export class BolagsverketBulkService {
     const loopLag = monitorEventLoopDelay({ resolution: 20 });
     loopLag.enable();
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+    const sourceFileName = sourceFileKey.split('/').pop() ?? sourceFileKey;
     let lineNumber = 0;
     let parsedSuccessCount = 0;
     let checkpointSeq = 0;
@@ -569,7 +570,28 @@ export class BolagsverketBulkService {
         try {
           const parsed = this.lineParser.parseLine(line, lineNumber, parserProfile);
           parsedSuccessCount += 1;
-          rawChunk.push({ fileRunId, lineNumber, rawLine: line, parsedOk: true, parseError: null });
+          rawChunk.push({
+            fileRunId,
+            lineNumber,
+            rawLine: line,
+            sourceFileName,
+            sourceFileDate: null,
+            sourceFileSizeBytes: null,
+            organisationsidentitet: parsed.rawColumns[0] ?? null,
+            namnskyddslopnummer: parsed.rawColumns[1] ?? null,
+            registreringsland: parsed.rawColumns[2] ?? null,
+            organisationsnamn: parsed.rawColumns[3] ?? null,
+            organisationsform: parsed.rawColumns[4] ?? null,
+            avregistreringsdatum: parsed.rawColumns[5] ?? null,
+            avregistreringsorsak: parsed.rawColumns[6] ?? null,
+            pagandeAvvecklingsEllerOmstruktureringsforfarande: parsed.rawColumns[7] ?? null,
+            registreringsdatum: parsed.rawColumns[8] ?? null,
+            verksamhetsbeskrivning: parsed.rawColumns[9] ?? null,
+            postadress: parsed.rawColumns[10] ?? null,
+            parseStatus: 'parsed',
+            parsedOk: true,
+            parseError: null,
+          });
           stagingChunk.push({
             fileRunId,
             organisationIdentityRaw: parsed.identityRaw,
@@ -602,6 +624,8 @@ export class BolagsverketBulkService {
             fileRunId,
             lineNumber,
             rawLine: line,
+            sourceFileName,
+            parseStatus: 'malformed',
             parsedOk: false,
             parseError: err instanceof Error ? err.message : String(err),
           });

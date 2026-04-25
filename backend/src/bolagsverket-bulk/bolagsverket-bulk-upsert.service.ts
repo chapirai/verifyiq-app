@@ -5,6 +5,8 @@ import { CompanyEntity } from '../companies/entities/company.entity';
 import { BvBulkCompanyCurrentEntity } from './entities/bv-bulk-company-current.entity';
 import { BvBulkCompanyHistoryEntity } from './entities/bv-bulk-company-history.entity';
 import { BvBulkCompanyStagingEntity } from './entities/bv-bulk-company-staging.entity';
+import { BvBulkCompanyNameEntity } from './entities/bv-bulk-company-name.entity';
+import { BvBulkCompanyRestructuringEntity } from './entities/bv-bulk-company-restructuring.entity';
 
 @Injectable()
 export class BolagsverketBulkUpsertService {
@@ -17,9 +19,19 @@ export class BolagsverketBulkUpsertService {
     private readonly historyRepo: Repository<BvBulkCompanyHistoryEntity>,
     @InjectRepository(CompanyEntity)
     private readonly companyRepo: Repository<CompanyEntity>,
+    @InjectRepository(BvBulkCompanyNameEntity)
+    private readonly nameRepo: Repository<BvBulkCompanyNameEntity>,
+    @InjectRepository(BvBulkCompanyRestructuringEntity)
+    private readonly restructuringRepo: Repository<BvBulkCompanyRestructuringEntity>,
   ) {}
 
-  private deriveNameList(raw: string | null): Array<Record<string, unknown>> {
+  private deriveNameList(raw: string | null): Array<{
+    name: string | null;
+    typeCode: string | null;
+    typeLabel: string | null;
+    registrationDate: string | null;
+    extra: string | null;
+  }> {
     if (!raw) return [];
     return raw
       .split('|')
@@ -27,10 +39,32 @@ export class BolagsverketBulkUpsertService {
       .filter(Boolean)
       .map(x => {
         const p = x.split('$').map(v => v.trim());
+        const typeCode = p[1] ?? null;
         return {
           name: p[0] ?? null,
-          type: p[1] ?? null,
-          effectiveDate: p[2] ?? null,
+          typeCode,
+          typeLabel: typeCode ?? null,
+          registrationDate: p[2] ?? null,
+          extra: p.slice(3).join('$') || null,
+        };
+      });
+  }
+
+  private deriveRestructuring(raw: string | null): Array<{ code: string | null; label: string | null; text: string | null; fromDate: string | null }> {
+    if (!raw) return [];
+    return raw
+      .split('|')
+      .map(x => x.trim())
+      .filter(Boolean)
+      .map(x => {
+        const p = x.split('$').map(v => v.trim()).filter(Boolean);
+        const code = p[0] ?? null;
+        const maybeDate = p[1] && /^\d{4}-\d{2}-\d{2}$/.test(p[1]) ? p[1] : null;
+        return {
+          code,
+          label: code ?? null,
+          text: maybeDate ? null : p[1] ?? null,
+          fromDate: maybeDate ?? (p[2] && /^\d{4}-\d{2}-\d{2}$/.test(p[2]) ? p[2] : null),
         };
       });
   }
@@ -44,18 +78,34 @@ export class BolagsverketBulkUpsertService {
       if (!org) continue;
       const existing = await this.currentRepo.findOne({ where: { organisationNumber: org } });
       const nameList = this.deriveNameList(row.organisationNamesRaw);
+      const primaryName = nameList[0] ?? null;
+      const sourceIdentityKey = `${row.identityType ?? ''}:${row.identityValue ?? ''}:${row.namnskyddslopnummer ?? ''}`;
+      const restructuring = this.deriveRestructuring(row.restructuringRaw);
       const payload: Partial<BvBulkCompanyCurrentEntity> = {
         organisationNumber: org,
+        sourceIdentityKey,
+        identityValue: row.identityValue,
+        identityTypeCode: row.identityType,
+        identityTypeLabel: row.identityType,
+        personalIdentityNumber: row.identityType === 'PERSON-IDORG' ? row.identityValue : null,
+        nameProtectionSequenceNumber: row.namnskyddslopnummer,
         identityType: row.identityType,
-        namePrimary: row.organisationNamesRaw?.split('$')[0] ?? row.identityValue ?? null,
+        namePrimary: primaryName?.name ?? row.organisationNamesRaw?.split('$')[0] ?? row.identityValue ?? null,
+        primaryNameTypeCode: primaryName?.typeCode ?? null,
+        primaryNameTypeLabel: primaryName?.typeLabel ?? null,
         nameAllJsonb: nameList,
         organisationFormCode: row.organisationFormCode,
         organisationFormText: row.organisationFormCode,
+        legalFormLabel: row.organisationFormCode,
         registrationDate: row.registrationDate,
         deregistrationDate: row.deregistrationDate,
         deregistrationReasonCode: row.deregistrationReasonCode,
         deregistrationReasonText: row.deregistrationReasonText,
+        deregistrationReasonLabel: row.deregistrationReasonCode,
         restructuringStatusJsonb: { raw: row.restructuringRaw },
+        hasActiveRestructuringOrWindup: restructuring.length > 0,
+        activeRestructuringCodes: restructuring.map(r => r.code).filter((x): x is string => !!x),
+        activeRestructuringLabels: restructuring.map(r => r.label).filter((x): x is string => !!x),
         businessDescription: row.businessDescription,
         postalAddressJsonb: {
           raw: row.postalAddressRaw,
@@ -65,8 +115,18 @@ export class BolagsverketBulkUpsertService {
           city: row.city,
           countryCode: row.countryCode,
         },
+        rawPostadress: row.postalAddressRaw,
+        postalAddressLine: row.deliveryAddress,
+        postalCoAddress: row.coAddress,
+        postalCity: row.city,
+        postalCode: row.postalCode,
+        postalCountryCode: row.countryCode,
+        postalCountryLabel: row.countryCode,
+        registrationCountryLabel: row.registrationCountryCode,
         registrationsCountryCode: row.registrationCountryCode,
         sourceFileRunId: fileRunId,
+        sourceIngestionRunId: fileRunId,
+        sourceRawLineNumber: null,
         sourceLastSeenAt: runAt,
         firstSeenAt: existing?.firstSeenAt ?? runAt,
         lastSeenAt: runAt,
@@ -80,6 +140,35 @@ export class BolagsverketBulkUpsertService {
       if (isChanged || isNew) changed += 1;
 
       const saved = await this.currentRepo.save(this.currentRepo.create({ ...(existing ?? {}), ...payload }));
+      await this.nameRepo.delete({ sourceIdentityKey, sourceFileRunId: fileRunId });
+      if (nameList.length > 0) {
+        await this.nameRepo.insert(
+          nameList.map((n, i) => ({
+            sourceIdentityKey,
+            sourceFileRunId: fileRunId,
+            name: n.name,
+            nameTypeCode: n.typeCode,
+            nameTypeLabel: n.typeLabel,
+            registrationDate: n.registrationDate,
+            extra: n.extra,
+            ordinal: i,
+          })),
+        );
+      }
+      await this.restructuringRepo.delete({ sourceIdentityKey, sourceFileRunId: fileRunId });
+      if (restructuring.length > 0) {
+        await this.restructuringRepo.insert(
+          restructuring.map((r, i) => ({
+            sourceIdentityKey,
+            sourceFileRunId: fileRunId,
+            code: r.code,
+            label: r.label,
+            text: r.text,
+            fromDate: r.fromDate,
+            ordinal: i,
+          })),
+        );
+      }
       await this.historyRepo.save(
         this.historyRepo.create({
           organisationNumber: org,
